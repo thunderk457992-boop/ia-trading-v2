@@ -11,7 +11,7 @@ export default async function PricingPage() {
     .from("profiles")
     .select("plan, stripe_subscription_id")
     .eq("id", user.id)
-    .single()
+    .maybeSingle()
 
   return (
     <PricingClient

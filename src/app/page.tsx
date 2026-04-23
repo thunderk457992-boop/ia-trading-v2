@@ -1,117 +1,209 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Brain, TrendingUp, Shield, Zap, Star, ChevronDown } from "lucide-react"
+import { ArrowRight, Check, Zap, Crown, Sparkles } from "lucide-react"
+
+const EXAMPLE_ALLOCATION = [
+  { asset: "BTC",  pct: 40, label: "Bitcoin" },
+  { asset: "ETH",  pct: 30, label: "Ethereum" },
+  { asset: "SOL",  pct: 15, label: "Solana" },
+  { asset: "BNB",  pct: 10, label: "BNB" },
+  { asset: "AVAX", pct: 5,  label: "Avalanche" },
+]
+
+const BAR_COLORS: Record<string, string> = {
+  BTC: "bg-amber-400", ETH: "bg-blue-500", SOL: "bg-violet-500",
+  BNB: "bg-yellow-400", AVAX: "bg-rose-500",
+}
+
+function VelaLogo() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 4L8 13L14 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      <span className="font-black text-foreground text-lg tracking-tight">Vela</span>
+      <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md">AI</span>
+    </div>
+  )
+}
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-black overflow-hidden">
+    <div className="min-h-screen bg-background overflow-hidden">
+
       {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-              <Brain className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-white">IA Trading Sens</span>
-          </div>
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <VelaLogo />
           <div className="hidden md:flex items-center gap-8">
-            <Link href="#features" className="text-sm text-white/60 hover:text-white transition-colors">Fonctionnalités</Link>
-            <Link href="#pricing" className="text-sm text-white/60 hover:text-white transition-colors">Tarifs</Link>
-            <Link href="/login" className="text-sm text-white/60 hover:text-white transition-colors">Connexion</Link>
+            <Link href="#how" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Fonctionnement</Link>
+            <Link href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Tarifs</Link>
+            <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Connexion</Link>
             <Link
               href="/register"
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold rounded-lg transition-colors"
             >
-              Commencer gratuitement
+              Tester gratuitement
             </Link>
           </div>
+          <Link href="/register" className="md:hidden px-4 py-2 bg-amber-500 text-black text-sm font-bold rounded-lg">
+            Tester
+          </Link>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="relative min-h-screen flex items-center justify-center pt-16">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[120px]" />
-          <div className="absolute top-1/2 left-1/4 w-[400px] h-[400px] bg-purple-600/8 rounded-full blur-[80px]" />
-          <div className="absolute top-1/2 right-1/4 w-[400px] h-[400px] bg-violet-600/8 rounded-full blur-[80px]" />
-        </div>
-
-        <div className="relative z-10 text-center px-6 max-w-5xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 text-sm mb-8">
-            <Zap className="w-3.5 h-3.5" />
-            <span>Propulsé par Claude AI</span>
+      <section className="pt-32 pb-28 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium mb-10 border border-amber-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Propulsé par Claude AI · Analyses en 30 secondes
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
-            Votre conseiller crypto{" "}
-            <span className="gradient-text">intelligent</span>
+          <h1 className="font-bold tracking-tighter text-foreground mb-4 leading-[1.02]">
+            <span className="block text-5xl md:text-7xl">Arrêtez de deviner.</span>
+            <span className="block text-5xl md:text-7xl text-muted-foreground mt-1">Investissez avec méthode.</span>
           </h1>
 
-          <p className="text-xl text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Obtenez des allocations de portfolio personnalisées basées sur votre profil,
-            vos objectifs et les conditions du marché — en quelques secondes.
+          <p className="text-xl text-muted-foreground max-w-lg mx-auto mb-10 leading-relaxed mt-8">
+            Décrivez votre profil. L&apos;IA analyse vos objectifs et génère une allocation crypto sur mesure en 30 secondes.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
             <Link
               href="/register"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-2xl transition-all glow-purple hover:scale-[1.02] active:scale-[0.98]"
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl transition-colors text-base"
             >
-              Analyser mon portfolio gratuitement
-              <ArrowRight className="w-5 h-5" />
+              Tester gratuitement
+              <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              href="#features"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 glass-strong text-white font-semibold rounded-2xl transition-all hover:bg-white/10"
+              href="#how"
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-secondary border border-border text-foreground font-semibold rounded-xl transition-colors hover:bg-secondary/80 text-base"
             >
-              Voir les fonctionnalités
+              Voir un exemple
             </Link>
           </div>
 
-          <div className="mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto">
-            {[
-              { value: "10K+", label: "Utilisateurs" },
-              { value: "98%", label: "Satisfaction" },
-              { value: "€2.4M", label: "Gérés" },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-2xl font-bold gradient-text">{stat.value}</div>
-                <div className="text-xs text-white/40 mt-1">{stat.label}</div>
+          <div className="flex items-center justify-center gap-6 flex-wrap text-sm text-muted-foreground">
+            {["Sans carte de crédit", "30 secondes chrono", "Claude AI"].map((t) => (
+              <div key={t} className="flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                {t}
               </div>
             ))}
           </div>
         </div>
+      </section>
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <ChevronDown className="w-6 h-6 text-white/30" />
+      {/* How it works */}
+      <section id="how" className="py-24 px-6 bg-secondary border-y border-border">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-3">Fonctionnement</p>
+            <h2 className="text-4xl font-bold text-foreground tracking-tight">3 étapes, 30 secondes</h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-10 mb-20">
+            {[
+              { n: "01", title: "Renseignez votre profil", desc: "Capital, tolérance au risque, horizon, objectifs. 5 questions, pas plus." },
+              { n: "02", title: "L'IA analyse",            desc: "Claude AI croise votre profil avec les conditions de marché en temps réel." },
+              { n: "03", title: "Recevez votre plan",      desc: "Allocation en % par crypto, score de confiance, plan d'action en étapes." },
+            ].map((item) => (
+              <div key={item.n} className="relative">
+                <div className="text-5xl font-black text-border mb-4 tracking-tighter select-none">{item.n}</div>
+                <h3 className="font-semibold text-foreground mb-2 text-lg">{item.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Example card */}
+          <div className="max-w-xl mx-auto rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="bg-secondary px-6 py-4 flex items-center justify-between border-b border-border">
+              <div className="flex items-center gap-3">
+                <VelaLogo />
+                <span className="text-sm text-muted-foreground font-medium">Exemple de résultat</span>
+              </div>
+              <span className="text-xs text-muted-foreground">Modéré · 5 000€ · Moyen terme</span>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6 p-4 rounded-xl bg-secondary border border-border">
+                <div className="text-5xl font-black text-amber-500 tabular-nums">82</div>
+                <div>
+                  <div className="font-bold text-foreground">Bon profil</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Stratégie solide, bonne diversification</div>
+                  <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 border border-amber-200 rounded-full">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    <span className="text-xs font-semibold text-amber-700">Risque modéré</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-5">
+                {EXAMPLE_ALLOCATION.map((item) => (
+                  <div key={item.asset}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${BAR_COLORS[item.asset]}`} />
+                        <span className="text-sm font-bold text-foreground">{item.asset}</span>
+                        <span className="text-xs text-muted-foreground">{item.label}</span>
+                      </div>
+                      <span className="text-sm font-bold text-foreground">{item.pct}%</span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
+                      <div className={`h-1.5 rounded-full ${BAR_COLORS[item.asset]}`} style={{ width: `${item.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 mb-5">
+                <p className="text-xs font-semibold text-emerald-700 mb-1">Plan d&apos;action recommandé</p>
+                <p className="text-xs text-emerald-600 leading-relaxed">
+                  Acheter BTC + ETH immédiatement · DCA sur SOL sur 3 mois · Conserver 10% de liquidités
+                </p>
+              </div>
+
+              <div className="text-center">
+                <Link href="/register"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold rounded-xl transition-colors">
+                  Obtenir mon analyse personnalisée
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="py-32 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">Tout ce dont vous avez besoin</h2>
-            <p className="text-white/50 text-lg max-w-2xl mx-auto">
-              De l&apos;analyse IA avancée aux alertes en temps réel.
-            </p>
+      <section id="features" className="py-24 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-3">Fonctionnalités</p>
+            <h2 className="text-4xl font-bold text-foreground tracking-tight">Tout ce dont vous avez besoin</h2>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-border rounded-2xl overflow-hidden border border-border">
             {[
-              { icon: Brain, title: "IA Conseiller", desc: "Profil d'investisseur → allocation optimale générée par Claude AI en quelques secondes.", gradient: "from-indigo-600/20 to-purple-600/20" },
-              { icon: TrendingUp, title: "Signaux de trading", desc: "Alertes personnalisées basées sur vos cryptos préférées et votre tolérance au risque.", gradient: "from-emerald-600/20 to-teal-600/20" },
-              { icon: Shield, title: "Gestion du risque", desc: "Analyse de corrélation et diversification pour protéger votre capital.", gradient: "from-amber-600/20 to-orange-600/20" },
-              { icon: Zap, title: "Temps réel", desc: "Prix et données de marché mis à jour en continu pour des décisions éclairées.", gradient: "from-pink-600/20 to-rose-600/20" },
-              { icon: Star, title: "Rapports PDF", desc: "Générez des rapports professionnels de votre portfolio.", gradient: "from-violet-600/20 to-purple-600/20" },
-              { icon: ArrowRight, title: "API Access", desc: "Intégrez nos analyses dans vos propres outils et dashboards.", gradient: "from-cyan-600/20 to-blue-600/20" },
-            ].map((feature) => (
-              <div key={feature.title} className="p-6 rounded-2xl glass border border-white/5 hover:border-white/10 transition-all group">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <feature.icon className="w-6 h-6 text-white" />
+              { title: "IA Conseiller",         desc: "Profil investisseur → allocation optimale en 30 secondes. Propulsé par Claude AI." },
+              { title: "Données en temps réel", desc: "Prix et capitalisation des principales cryptos mis à jour automatiquement." },
+              { title: "Gestion du risque",     desc: "Profils conservateur, modéré ou agressif — diversification adaptée à chaque cas." },
+              { title: "Plan d'action concret", desc: "Pas que des chiffres — un plan étape par étape pour mettre en œuvre la stratégie." },
+              { title: "Historique complet",    desc: "Toutes vos analyses sauvegardées. Suivez l'évolution de votre stratégie dans le temps." },
+              { title: "Dashboard clair",       desc: "Score moyen, marchés en direct, dernière recommandation — tout en un coup d'œil." },
+            ].map((f) => (
+              <div key={f.title} className="p-7 bg-card hover:bg-secondary transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center mb-4">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M2 4L8 13L14 4" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                <p className="text-white/50 text-sm leading-relaxed">{feature.desc}</p>
+                <h3 className="font-semibold text-foreground mb-2">{f.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -119,73 +211,130 @@ export default function HomePage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-32 px-6">
+      <section id="pricing" className="py-24 px-6 bg-secondary border-y border-border">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">Tarifs simples</h2>
-            <p className="text-white/50 text-lg">Commencez gratuitement, évoluez selon vos besoins.</p>
+          <div className="text-center mb-16">
+            <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-3">Tarifs</p>
+            <h2 className="text-4xl font-bold text-foreground tracking-tight">Commencez gratuitement</h2>
+            <p className="text-muted-foreground mt-3">Évoluez quand vous êtes prêt.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
+
+          <div className="grid md:grid-cols-3 gap-4 items-stretch">
             {[
-              { name: "Free", price: "0€", features: ["1 analyse IA/mois", "Portfolio basique", "Données (15min délai)", "Support email"], cta: "Commencer", highlighted: false },
-              { name: "Pro", price: "29€", features: ["20 analyses IA/mois", "3 portfolios", "Données temps réel", "Alertes prix", "Rapports PDF"], cta: "Essayer 14 jours gratuit", highlighted: true },
-              { name: "Premium", price: "79€", features: ["Analyses illimitées", "Portfolios illimités", "Signaux avancés", "API Access", "Gestionnaire dédié"], cta: "Contacter", highlighted: false },
-            ].map((plan) => (
-              <div key={plan.name} className={`p-8 rounded-2xl relative ${plan.highlighted ? "bg-indigo-600/20 border border-indigo-500/40 glow-purple" : "glass border border-white/5"}`}>
-                {plan.highlighted && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-indigo-600 text-white text-xs font-semibold rounded-full">Populaire</div>
-                )}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-1">{plan.name}</h3>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                    <span className="text-white/40 text-sm">/mois</span>
+              {
+                name: "Gratuit", price: "0€", icon: Sparkles,
+                features: ["1 analyse IA par mois", "Dashboard marché en direct", "8 cryptos majeures", "Historique 3 analyses"],
+                cta: "Commencer gratuitement", highlighted: false, href: "/register", badge: null,
+              },
+              {
+                name: "Pro", price: "29€", icon: Zap,
+                features: ["20 analyses IA par mois", "Historique complet", "Données marché enrichies", "Priorité de traitement", "Support prioritaire"],
+                cta: "Choisir Pro", highlighted: true, href: "/register", badge: "Populaire",
+              },
+              {
+                name: "Premium", price: "79€", icon: Crown,
+                features: ["Analyses illimitées", "Historique 20 analyses", "Claude Opus (modèle premium)", "Accès anticipé", "Support dédié < 4h"],
+                cta: "Choisir Premium", highlighted: false, href: "/register", badge: null,
+              },
+            ].map((plan) => {
+              const Icon = plan.icon
+              return (
+                <div key={plan.name} className={`relative flex flex-col rounded-2xl p-8 ${
+                  plan.highlighted
+                    ? "bg-gradient-to-b from-amber-50 to-card border border-amber-200"
+                    : "bg-card border border-border"
+                }`}>
+                  {plan.badge && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-amber-500 text-black text-xs font-bold rounded-full shadow-sm">
+                      {plan.badge}
+                    </div>
+                  )}
+                  <div className="mb-8">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${plan.highlighted ? "bg-amber-100" : "bg-secondary"}`}>
+                        <Icon className={`w-4 h-4 ${plan.highlighted ? "text-amber-600" : "text-muted-foreground"}`} />
+                      </div>
+                      <h3 className="font-bold text-foreground">{plan.name}</h3>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold text-foreground">{plan.price}</span>
+                      {plan.price !== "0€" && <span className="text-sm text-muted-foreground">/mois</span>}
+                    </div>
                   </div>
+                  <ul className="space-y-3 flex-1 mb-8">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-center gap-2.5 text-sm">
+                        <Check className={`w-4 h-4 shrink-0 ${plan.highlighted ? "text-amber-500" : "text-muted-foreground"}`} />
+                        <span className="text-muted-foreground">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href={plan.href}
+                    className={`block text-center py-3 rounded-xl font-bold text-sm transition-colors ${
+                      plan.highlighted
+                        ? "bg-amber-500 hover:bg-amber-400 text-black"
+                        : "bg-secondary hover:bg-secondary/80 text-foreground border border-border"
+                    }`}
+                  >
+                    {plan.cta}
+                  </Link>
                 </div>
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-white/70">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/register" className={`block text-center py-3 rounded-xl font-medium text-sm transition-all ${plan.highlighted ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "glass-strong hover:bg-white/10 text-white"}`}>
-                  {plan.cta}
-                </Link>
-              </div>
-            ))}
+              )
+            })}
           </div>
+
+          <p className="text-center text-xs text-muted-foreground mt-8">
+            Paiement sécurisé par Stripe · Sans engagement · Annulez à tout moment
+          </p>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-32 px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="p-12 rounded-3xl glass border border-white/5 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/10 to-purple-600/10" />
-            <div className="relative z-10">
-              <h2 className="text-4xl font-bold mb-4">Prêt à optimiser vos cryptos ?</h2>
-              <p className="text-white/50 mb-8">Rejoignez des milliers d&apos;investisseurs qui font confiance à notre IA.</p>
-              <Link href="/register" className="inline-flex items-center gap-2 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-2xl transition-all glow-purple">
-                Démarrer gratuitement
-                <ArrowRight className="w-5 h-5" />
-              </Link>
-            </div>
+      {/* Final CTA */}
+      <section className="py-24 px-6 bg-background">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium mb-8 border border-amber-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            1 analyse gratuite dès l&apos;inscription
           </div>
+          <h2 className="text-4xl font-bold text-foreground mb-4 tracking-tight">
+            Votre premier plan crypto IA<br />en 30 secondes.
+          </h2>
+          <p className="text-muted-foreground mb-10 text-lg">
+            Créez un compte gratuit. Aucune carte requise.
+          </p>
+          <Link
+            href="/register"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl transition-colors"
+          >
+            Tester gratuitement
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
+
+      {/* Mobile sticky CTA */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border px-4 py-3 safe-area-bottom">
+        <Link
+          href="/register"
+          className="flex items-center justify-center gap-2 w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl transition-colors"
+        >
+          Tester gratuitement — c&apos;est gratuit
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
 
       {/* Footer */}
-      <footer className="border-t border-white/5 py-12 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center">
-              <Brain className="w-3 h-3 text-white" />
-            </div>
-            <span className="text-sm font-medium">IA Trading Sens</span>
+      <footer className="bg-secondary border-t border-border py-10 px-6 pb-24 md:pb-10">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <VelaLogo />
+          <p className="text-xs text-muted-foreground text-center">
+            © 2026 Vela. Les cryptomonnaies comportent des risques de perte en capital. Ce n&apos;est pas un conseil financier.
+          </p>
+          <div className="flex items-center gap-5">
+            <Link href="/legal/cgu" className="text-xs text-muted-foreground hover:text-foreground transition-colors">CGU</Link>
+            <Link href="/legal/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Confidentialité</Link>
           </div>
-          <p className="text-sm text-white/30">© 2025 IA Trading Sens. Les cryptomonnaies comportent des risques.</p>
         </div>
       </footer>
     </div>

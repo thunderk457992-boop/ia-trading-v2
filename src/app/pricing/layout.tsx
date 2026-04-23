@@ -11,12 +11,12 @@ export default async function PricingLayout({ children }: { children: React.Reac
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single()
+    .maybeSingle()
 
   return (
-    <div className="min-h-screen bg-black flex">
+    <div className="min-h-screen bg-slate-50 flex">
       <DashboardNav user={user} profile={profile} />
-      <main className="flex-1 ml-64 p-8 overflow-auto">{children}</main>
+      <main className="flex-1 md:ml-64 mt-14 md:mt-0 p-5 md:p-8 pb-24 md:pb-8 overflow-auto">{children}</main>
     </div>
   )
 }

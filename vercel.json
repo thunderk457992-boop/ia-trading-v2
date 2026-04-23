@@ -3,5 +3,13 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "regions": ["cdg1"]
+  "regions": ["cdg1"],
+  "functions": {
+    "src/app/api/advisor/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/stripe/webhook/route.ts": {
+      "maxDuration": 30
+    }
+  }
 }

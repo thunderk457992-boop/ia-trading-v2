@@ -12,7 +12,7 @@ export async function POST() {
       .from("profiles")
       .select("stripe_customer_id")
       .eq("id", user.id)
-      .single()
+      .maybeSingle()
 
     if (!profile?.stripe_customer_id) {
       return NextResponse.json({ error: "Aucun abonnement actif" }, { status: 400 })
@@ -20,7 +20,7 @@ export async function POST() {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings`,
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")}/settings`,
     })
 
     return NextResponse.json({ url: session.url })

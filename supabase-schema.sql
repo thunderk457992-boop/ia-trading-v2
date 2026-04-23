@@ -1,77 +1,200 @@
--- IA Trading Sens — Supabase Schema
--- Run this in your Supabase SQL editor
+-- ============================================================
+-- IA Trading Sens — Supabase Complete Schema
+-- Run this in: Supabase Dashboard → SQL Editor → Run
+-- ============================================================
 
--- Profiles table (extends auth.users)
-create table public.profiles (
-  id uuid references auth.users(id) on delete cascade primary key,
-  email text,
-  full_name text,
-  avatar_url text,
-  plan text not null default 'free' check (plan in ('free', 'pro', 'premium')),
-  stripe_customer_id text unique,
-  stripe_subscription_id text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+-- ============================================================
+-- TABLE 1: profiles
+-- Extends auth.users — created automatically via trigger
+-- ============================================================
+create table if not exists public.profiles (
+  id            uuid        primary key references auth.users(id) on delete cascade,
+  full_name     text,
+  avatar_url    text,
+  plan          text        not null default 'free'
+                            check (plan in ('free', 'pro', 'premium')),
+  stripe_customer_id      text unique,
+  stripe_subscription_id  text unique,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 
--- AI Analyses table
-create table public.ai_analyses (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
-  investor_profile jsonb not null default '{}',
-  allocations jsonb not null default '[]',
-  total_score integer default 0,
-  market_context text,
-  recommendations jsonb default '[]',
-  warnings jsonb default '[]',
-  created_at timestamptz default now()
+comment on table public.profiles is 'User profiles extending auth.users';
+
+-- ============================================================
+-- TABLE 2: subscriptions
+-- One row per Stripe subscription (source of truth for billing)
+-- ============================================================
+create table if not exists public.subscriptions (
+  id                   text        primary key,  -- Stripe subscription ID (sub_xxx)
+  user_id              uuid        not null references public.profiles(id) on delete cascade,
+  status               text        not null
+                                   check (status in ('active','trialing','past_due','canceled','incomplete','incomplete_expired','unpaid','paused')),
+  plan                 text        not null check (plan in ('free','pro','premium')),
+  price_id             text,
+  quantity             integer     default 1,
+  cancel_at_period_end boolean     default false,
+  current_period_start timestamptz,
+  current_period_end   timestamptz,
+  cancel_at            timestamptz,
+  canceled_at          timestamptz,
+  trial_start          timestamptz,
+  trial_end            timestamptz,
+  metadata             jsonb       default '{}',
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now()
 );
 
--- Enable Row Level Security
-alter table public.profiles enable row level security;
-alter table public.ai_analyses enable row level security;
+comment on table public.subscriptions is 'Stripe subscriptions — synced via webhook';
+create index if not exists subscriptions_user_id_idx on public.subscriptions(user_id);
+create index if not exists subscriptions_status_idx  on public.subscriptions(status);
 
--- Profiles RLS policies
-create policy "Users can view own profile"
-  on public.profiles for select
-  using (auth.uid() = id);
+-- ============================================================
+-- TABLE 3: payments
+-- Every successful Stripe charge / invoice
+-- ============================================================
+create table if not exists public.payments (
+  id               text        primary key,  -- Stripe PaymentIntent or Invoice ID
+  user_id          uuid        not null references public.profiles(id) on delete cascade,
+  subscription_id  text        references public.subscriptions(id),
+  amount           integer     not null,  -- cents
+  currency         text        not null default 'eur',
+  status           text        not null
+                               check (status in ('succeeded','pending','failed','refunded')),
+  description      text,
+  invoice_url      text,
+  receipt_url      text,
+  metadata         jsonb       default '{}',
+  paid_at          timestamptz,
+  created_at       timestamptz not null default now()
+);
 
-create policy "Users can update own profile"
-  on public.profiles for update
-  using (auth.uid() = id);
+comment on table public.payments is 'Payment history from Stripe invoices/charges';
+create index if not exists payments_user_id_idx on public.payments(user_id);
+create index if not exists payments_created_at_idx on public.payments(created_at desc);
 
--- AI Analyses RLS policies
-create policy "Users can view own analyses"
-  on public.ai_analyses for select
-  using (auth.uid() = user_id);
+-- ============================================================
+-- TABLE 4: strategies (portfolio allocations saved by users)
+-- ============================================================
+create table if not exists public.strategies (
+  id               uuid        primary key default gen_random_uuid(),
+  user_id          uuid        not null references public.profiles(id) on delete cascade,
+  name             text        not null default 'Ma stratégie',
+  description      text,
+  risk_level       text        check (risk_level in ('conservative','moderate','aggressive')),
+  horizon          text        check (horizon in ('short','medium','long')),
+  initial_capital  numeric(15,2),
+  monthly_contribution numeric(12,2) default 0,
+  goals            text[]      default '{}',
+  allocations      jsonb       not null default '[]',
+  -- [{ symbol, name, percentage, rationale, risk_level, expected_return, category }]
+  is_active        boolean     default true,
+  is_favorite      boolean     default false,
+  performance_7d   numeric(6,2),  -- % change tracked
+  performance_30d  numeric(6,2),
+  last_updated_at  timestamptz default now(),
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
 
-create policy "Users can insert own analyses"
-  on public.ai_analyses for insert
-  with check (auth.uid() = user_id);
+comment on table public.strategies is 'User-saved crypto portfolio strategies';
+create index if not exists strategies_user_id_idx on public.strategies(user_id);
+create index if not exists strategies_is_active_idx on public.strategies(user_id, is_active);
 
--- Auto-create profile on signup
+-- ============================================================
+-- TABLE 5: ai_analyses (each AI advisor session)
+-- ============================================================
+create table if not exists public.ai_analyses (
+  id               uuid        primary key default gen_random_uuid(),
+  user_id          uuid        not null references public.profiles(id) on delete cascade,
+  strategy_id      uuid        references public.strategies(id) on delete set null,
+  investor_profile jsonb       not null default '{}',
+  allocations      jsonb       not null default '[]',
+  total_score      integer     default 0 check (total_score between 0 and 100),
+  market_context   text,
+  recommendations  jsonb       default '[]',
+  warnings         jsonb       default '[]',
+  model_used       text        default 'claude-sonnet-4-6',
+  tokens_used      integer,
+  created_at       timestamptz not null default now()
+);
+
+comment on table public.ai_analyses is 'AI advisor analysis results per session';
+create index if not exists ai_analyses_user_id_idx    on public.ai_analyses(user_id);
+create index if not exists ai_analyses_created_at_idx on public.ai_analyses(created_at desc);
+
+-- ============================================================
+-- ROW LEVEL SECURITY
+-- ============================================================
+alter table public.profiles      enable row level security;
+alter table public.subscriptions enable row level security;
+alter table public.payments      enable row level security;
+alter table public.strategies    enable row level security;
+alter table public.ai_analyses   enable row level security;
+
+-- profiles: users see and edit only their own row
+create policy "profiles: own row read"
+  on public.profiles for select using (auth.uid() = id);
+create policy "profiles: own row update"
+  on public.profiles for update using (auth.uid() = id);
+
+-- subscriptions: read + upsert for user (also writable by service role via webhook)
+create policy "subscriptions: own rows read"
+  on public.subscriptions for select using (auth.uid() = user_id);
+create policy "subscriptions: own rows insert"
+  on public.subscriptions for insert with check (auth.uid() = user_id);
+create policy "subscriptions: own rows update"
+  on public.subscriptions for update using (auth.uid() = user_id);
+
+-- payments: read-only for user (writes via service role)
+create policy "payments: own rows read"
+  on public.payments for select using (auth.uid() = user_id);
+
+-- strategies: full CRUD by owner
+create policy "strategies: own rows read"
+  on public.strategies for select using (auth.uid() = user_id);
+create policy "strategies: own rows insert"
+  on public.strategies for insert with check (auth.uid() = user_id);
+create policy "strategies: own rows update"
+  on public.strategies for update using (auth.uid() = user_id);
+create policy "strategies: own rows delete"
+  on public.strategies for delete using (auth.uid() = user_id);
+
+-- ai_analyses: full CRUD by owner
+create policy "ai_analyses: own rows read"
+  on public.ai_analyses for select using (auth.uid() = user_id);
+create policy "ai_analyses: own rows insert"
+  on public.ai_analyses for insert with check (auth.uid() = user_id);
+
+-- ============================================================
+-- TRIGGERS
+-- ============================================================
+
+-- Auto-create profile row when user signs up
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
-security definer set search_path = public
+security definer
+set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, full_name)
+  insert into public.profiles (id, full_name)
   values (
     new.id,
-    new.email,
-    new.raw_user_meta_data->>'full_name'
-  );
+    coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1))
+  )
+  on conflict (id) do nothing;
   return new;
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- Updated_at trigger
-create or replace function public.handle_updated_at()
+-- Auto-update updated_at on profiles
+create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
 as $$
@@ -83,8 +206,34 @@ $$;
 
 create trigger profiles_updated_at
   before update on public.profiles
-  for each row execute procedure public.handle_updated_at();
+  for each row execute procedure public.set_updated_at();
 
--- Indexes
-create index on public.ai_analyses (user_id);
-create index on public.ai_analyses (created_at desc);
+create trigger strategies_updated_at
+  before update on public.strategies
+  for each row execute procedure public.set_updated_at();
+
+create trigger subscriptions_updated_at
+  before update on public.subscriptions
+  for each row execute procedure public.set_updated_at();
+
+-- ============================================================
+-- HELPER FUNCTION: get active subscription for user
+-- ============================================================
+create or replace function public.get_active_subscription(p_user_id uuid)
+returns table(
+  subscription_id text,
+  plan text,
+  status text,
+  current_period_end timestamptz,
+  cancel_at_period_end boolean
+)
+language sql
+security definer
+as $$
+  select id, plan, status, current_period_end, cancel_at_period_end
+  from public.subscriptions
+  where user_id = p_user_id
+    and status in ('active', 'trialing')
+  order by created_at desc
+  limit 1;
+$$;

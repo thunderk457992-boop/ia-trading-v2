@@ -46,13 +46,4 @@ export interface AIAnalysis {
   created_at: string
 }
 
-export interface CryptoPrice {
-  symbol: string
-  name: string
-  price: number
-  change24h: number
-  change7d: number
-  marketCap: number
-  volume24h: number
-  image: string
-}
+export type { CryptoPrice } from "@/lib/coingecko"

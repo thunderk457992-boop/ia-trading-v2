@@ -2,25 +2,21 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "IA Trading Sens — Intelligence Artificielle pour le Trading Crypto",
+  title: "IA Trading Sens — Conseiller Crypto Intelligent",
   description:
-    "Optimisez votre portfolio crypto grâce à notre conseiller IA avancé. Analyses personnalisées, signaux de trading, et allocation intelligente.",
-  keywords: "crypto, trading, IA, intelligence artificielle, bitcoin, portfolio",
+    "Obtenez une allocation crypto personnalisée basée sur votre profil, vos objectifs et les conditions du marché. Propulsé par l'IA.",
+  keywords: "crypto, trading, IA, intelligence artificielle, bitcoin, portfolio, allocation",
   openGraph: {
     title: "IA Trading Sens",
-    description: "Le conseiller crypto IA le plus avancé",
+    description: "Votre conseiller crypto IA — allocations personnalisées en quelques secondes",
     type: "website",
   },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className="dark">
-      <body className="min-h-screen bg-black text-white antialiased">
+    <html lang="fr">
+      <body className="min-h-screen bg-background text-foreground antialiased">
         {children}
       </body>
     </html>

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Check, Loader2, Zap, Crown, Sparkles } from "lucide-react"
+import React, { useState, useEffect } from "react"
+import { Check, Loader2, Zap, Crown, Sparkles, AlertCircle, ArrowRight, Shield, Cpu } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface PricingClientProps {
@@ -9,91 +9,112 @@ interface PricingClientProps {
   hasSubscription: boolean
 }
 
-const PLANS = [
+interface Plan {
+  id: string
+  name: string
+  icon: React.ElementType
+  price: { monthly: number; yearly: number }
+  description: string
+  badge?: string
+  features: string[]
+  addons?: string
+  highlighted: boolean
+  tier: "free" | "pro" | "premium"
+}
+
+const PLANS: Plan[] = [
   {
     id: "free",
-    name: "Free",
+    name: "Gratuit",
     icon: Sparkles,
+    tier: "free",
     price: { monthly: 0, yearly: 0 },
-    priceId: { monthly: null, yearly: null },
-    description: "Pour découvrir la plateforme",
+    description: "Découvrez l'IA crypto sans risque",
     features: [
-      "1 analyse IA par mois",
-      "1 portfolio",
-      "Données avec 15min de délai",
-      "Support email",
+      "1 analyse IA / mois (Claude Haiku)",
+      "Tableau de bord marché en direct",
+      "8 cryptos majeures + courbes 7j",
+      "Historique des 3 dernières analyses",
+      "Score de confiance IA (0–100)",
+      "Profil investisseur personnalisé",
     ],
-    cta: "Plan actuel",
     highlighted: false,
   },
   {
     id: "pro",
     name: "Pro",
     icon: Zap,
+    tier: "pro",
     price: { monthly: 29, yearly: 290 },
-    priceId: {
-      monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY ?? "price_pro",
-      yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY ?? "price_pro_yearly",
-    },
-    description: "Pour les investisseurs sérieux",
+    description: "Investissez avec méthode, chaque mois",
+    badge: "Populaire",
     features: [
-      "20 analyses IA par mois",
-      "3 portfolios",
-      "Données en temps réel",
-      "Alertes de prix",
-      "Rapports PDF exportables",
-      "Support prioritaire",
+      "20 analyses IA / mois (Claude Sonnet)",
+      "Historique complet — 10 analyses",
+      "Justification détaillée par actif",
+      "Signal marché temps réel intégré",
+      "Export PDF des rapports",
+      "Support prioritaire (< 24h)",
     ],
-    cta: "Passer au Pro",
+    addons: "Tout le plan Gratuit, plus :",
     highlighted: true,
   },
   {
     id: "premium",
     name: "Premium",
     icon: Crown,
+    tier: "premium",
     price: { monthly: 79, yearly: 790 },
-    priceId: {
-      monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_MONTHLY ?? "price_premium",
-      yearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_YEARLY ?? "price_premium_yearly",
-    },
-    description: "Pour les professionnels",
+    description: "Stratégie institutionnelle, modèle le plus puissant",
     features: [
-      "Analyses IA illimitées",
-      "Portfolios illimités",
-      "Données temps réel + historique",
-      "Signaux de trading avancés",
-      "Accès API complet",
-      "Gestionnaire de compte dédié",
-      "Accès bêta exclusif",
+      "Analyses illimitées (Claude Opus 4.7)",
+      "Historique complet — 20 analyses",
+      "Stratégie d'entrée chiffrée",
+      "Seuils de rééquilibrage précis",
+      "Accès anticipé aux nouvelles fonctions",
+      "Support dédié (< 4h)",
     ],
-    cta: "Passer au Premium",
+    addons: "Tout le plan Pro, plus :",
     highlighted: false,
   },
+]
+
+const TRUST_SIGNALS = [
+  { icon: Shield,   text: "Paiement sécurisé Stripe · SSL 256-bit" },
+  { icon: Cpu,      text: "Alimenté par Claude · Anthropic AI" },
+  { icon: Sparkles, text: "Annulez à tout moment · Sans engagement" },
 ]
 
 export function PricingClient({ currentPlan, hasSubscription }: PricingClientProps) {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly")
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+  const [priceIds, setPriceIds] = useState<Record<string, Record<string, string | null>>>({})
+  const [priceError, setPriceError] = useState(false)
 
-  const handleSubscribe = async (plan: typeof PLANS[0]) => {
-    if (plan.id === "free" || plan.id === currentPlan) return
-    const priceId = plan.priceId[billing]
-    if (!priceId) return
+  useEffect(() => {
+    fetch("/api/stripe/plans")
+      .then((r) => r.json())
+      .then(setPriceIds)
+      .catch(() => setPriceError(true))
+  }, [])
 
-    setLoadingPlan(plan.id)
+  const handleSubscribe = async (planId: string) => {
+    if (planId === "free" || planId === currentPlan) return
+    const priceId = priceIds[planId]?.[billing]
+    if (!priceId) { alert("Configuration de paiement indisponible. Contactez le support."); return }
+    setLoadingPlan(planId)
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId, plan: plan.id }),
+        body: JSON.stringify({ priceId, plan: planId }),
       })
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
       if (data.url) window.location.href = data.url
-    } catch (error) {
-      console.error(error)
-    } finally {
-      setLoadingPlan(null)
-    }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur de paiement")
+    } finally { setLoadingPlan(null) }
   }
 
   const handleManageSubscription = async () => {
@@ -101,27 +122,38 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" })
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
       if (data.url) window.location.href = data.url
-    } catch (error) {
-      console.error(error)
-    } finally {
-      setLoadingPlan(null)
-    }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur portail")
+    } finally { setLoadingPlan(null) }
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-8">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold mb-3">Plans & Tarifs</h1>
-        <p className="text-white/40 mb-8">Choisissez le plan adapté à vos besoins</p>
+    <div className="max-w-5xl mx-auto py-6 animate-slide-up">
+
+      {/* Header */}
+      <div className="text-center mb-14">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 mb-5">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse-dot" />
+          <span className="text-xs font-bold text-amber-700 uppercase tracking-widest">Tarifs transparents</span>
+        </div>
+        <h1 className="text-5xl font-black text-foreground mb-3 tracking-tight">
+          Choisissez votre plan
+        </h1>
+        <p className="text-muted-foreground text-lg mb-8 max-w-md mx-auto leading-relaxed">
+          Commencez gratuitement. Passez au Pro quand vous êtes prêt.
+        </p>
 
         {/* Billing toggle */}
-        <div className="inline-flex items-center gap-1 p-1 glass rounded-xl border border-white/8">
+        <div className="inline-flex items-center gap-1 p-1 bg-secondary rounded-2xl border border-border">
           <button
             onClick={() => setBilling("monthly")}
             className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-              billing === "monthly" ? "bg-indigo-600 text-white" : "text-white/50 hover:text-white"
+              "px-5 py-2.5 rounded-xl text-sm font-bold transition-all",
+              billing === "monthly"
+                ? "bg-card text-foreground border border-border shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
             Mensuel
@@ -129,107 +161,167 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
           <button
             onClick={() => setBilling("yearly")}
             className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
-              billing === "yearly" ? "bg-indigo-600 text-white" : "text-white/50 hover:text-white"
+              "px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
+              billing === "yearly"
+                ? "bg-card text-foreground border border-border shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
             Annuel
-            <span className="text-xs bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md">-17%</span>
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-md font-black">−17%</span>
           </button>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      {priceError && (
+        <div className="mb-8 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-amber-700 text-sm max-w-lg mx-auto">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          Paiement en cours de configuration. Contactez-nous pour upgrader.
+        </div>
+      )}
+
+      {/* Plans grid */}
+      <div className="grid md:grid-cols-3 gap-5 items-start mb-12">
         {PLANS.map((plan) => {
           const isCurrent = currentPlan === plan.id
           const Icon = plan.icon
           const price = plan.price[billing]
           const isLoading = loadingPlan === plan.id
+          const isPremium = plan.tier === "premium"
+          const isPro = plan.tier === "pro"
 
           return (
             <div
               key={plan.id}
               className={cn(
-                "p-8 rounded-2xl relative flex flex-col",
-                plan.highlighted
-                  ? "bg-indigo-600/15 border border-indigo-500/30 glow-purple"
-                  : "glass border border-white/5"
+                "relative flex flex-col rounded-2xl transition-all",
+                isPremium
+                  ? "card-premium-light p-8"
+                  : isPro
+                  ? "bg-gradient-to-b from-amber-50 to-card border border-amber-200 p-8"
+                  : "bg-card border border-border p-8"
               )}
             >
-              {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-indigo-600 text-white text-xs font-semibold rounded-full">
-                  Le plus populaire
-                </div>
+              {/* Gradient top line */}
+              {isPro && (
+                <div className="absolute top-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-amber-400/60 to-transparent rounded-full" />
+              )}
+              {isPremium && (
+                <div className="absolute top-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-amber-400/80 to-transparent rounded-full" />
               )}
 
+              {/* Badge */}
+              {plan.badge && !isCurrent && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-amber-500 text-black text-[10px] font-black rounded-full shadow-lg whitespace-nowrap uppercase tracking-widest">
+                  {plan.badge}
+                </div>
+              )}
+              {isPremium && !isCurrent && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1.5 text-[10px] font-black rounded-full whitespace-nowrap uppercase tracking-widest badge-premium">
+                  Élite
+                </div>
+              )}
               {isCurrent && (
-                <div className="absolute -top-3 right-4 px-3 py-1 bg-emerald-600 text-white text-xs font-semibold rounded-full">
+                <div className={cn(
+                  "absolute -top-3.5 right-5 px-3 py-1 text-[10px] font-black rounded-full",
+                  isPro ? "bg-amber-500 text-black" : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                )}>
                   Plan actuel
                 </div>
               )}
 
+              {/* Icon + Name */}
               <div className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-3 mb-4">
                   <div className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center",
-                    plan.highlighted ? "bg-indigo-600" : "bg-white/10"
+                    "w-10 h-10 rounded-2xl flex items-center justify-center",
+                    isPremium ? "bg-gradient-to-br from-amber-500/20 to-amber-600/5 border border-amber-500/20"
+                      : isPro ? "bg-amber-100 border border-amber-200"
+                      : "bg-secondary border border-border"
                   )}>
-                    <Icon className="w-4 h-4" />
+                    <Icon className={cn("w-5 h-5", isPremium || isPro ? "text-amber-500" : "text-muted-foreground")} />
                   </div>
-                  <h3 className="font-bold text-lg">{plan.name}</h3>
+                  <div>
+                    <h3 className={cn("font-black text-xl leading-none", isPremium ? "gradient-text-gold" : "text-foreground")}>{plan.name}</h3>
+                  </div>
                 </div>
-                <p className="text-sm text-white/40 mb-4">{plan.description}</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">{price === 0 ? "Gratuit" : `${price}€`}</span>
-                  {price > 0 && <span className="text-white/40 text-sm">/{billing === "monthly" ? "mois" : "an"}</span>}
+                <p className={cn("text-sm mb-5 leading-relaxed", isPremium ? "text-muted-foreground" : "text-muted-foreground")}>{plan.description}</p>
+
+                {/* Price */}
+                <div className="flex items-baseline gap-1.5 mb-1">
+                  <span className={cn("text-4xl font-black tracking-tight", isPremium ? "gradient-text-gold" : "text-foreground")}>
+                    {price === 0 ? "Gratuit" : `${price}€`}
+                  </span>
+                  {price > 0 && (
+                    <span className={cn("text-sm", isPremium ? "text-muted-foreground" : "text-muted-foreground")}>/{billing === "monthly" ? "mois" : "an"}</span>
+                  )}
                 </div>
                 {billing === "yearly" && price > 0 && (
-                  <p className="text-xs text-emerald-400 mt-1">
+                  <p className="text-xs font-semibold text-emerald-600">
                     Soit {Math.round(price / 12)}€/mois — économisez {plan.price.monthly * 12 - price}€
                   </p>
                 )}
               </div>
 
+              {/* Features */}
               <ul className="space-y-3 flex-1 mb-8">
+                {plan.addons && (
+                  <li className="pb-1">
+                    <span className={cn("text-[10px] font-bold uppercase tracking-widest", isPremium ? "text-muted-foreground" : "text-muted-foreground")}>
+                      {plan.addons}
+                    </span>
+                  </li>
+                )}
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2.5 text-sm">
-                    <div className={cn("w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5", plan.highlighted ? "bg-indigo-600" : "bg-white/10")}>
-                      <Check className="w-2.5 h-2.5" />
+                    <div className={cn(
+                      "w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+                      isPremium ? "bg-amber-500/15 border border-amber-500/20"
+                        : isPro ? "bg-amber-100"
+                        : "bg-secondary"
+                    )}>
+                      <Check className={cn("w-2.5 h-2.5", isPremium || isPro ? "text-amber-500" : "text-muted-foreground")} />
                     </div>
-                    <span className="text-white/70">{feature}</span>
+                    <span className={cn("leading-relaxed", isPremium ? "text-muted-foreground" : "text-muted-foreground")}>{feature}</span>
                   </li>
                 ))}
               </ul>
 
-              {isCurrent ? (
-                hasSubscription ? (
-                  <button
-                    onClick={handleManageSubscription}
-                    disabled={loadingPlan === "manage"}
-                    className="w-full py-3 glass-strong border border-white/10 text-sm font-medium rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-2"
-                  >
-                    {loadingPlan === "manage" ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    Gérer l&apos;abonnement
-                  </button>
-                ) : (
-                  <div className="w-full py-3 text-center text-sm font-medium text-white/30 border border-white/5 rounded-xl">
-                    Plan actuel
-                  </div>
-                )
+              {/* CTA */}
+              {isCurrent && hasSubscription ? (
+                <button
+                  onClick={handleManageSubscription}
+                  disabled={loadingPlan === "manage"}
+                  className="w-full py-3.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-secondary text-foreground hover:bg-secondary/80 border border-border"
+                >
+                  {loadingPlan === "manage" && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Gérer l&apos;abonnement
+                </button>
+              ) : isCurrent ? (
+                <div className="w-full py-3.5 text-center text-sm font-semibold rounded-xl bg-secondary text-muted-foreground border border-border">
+                  Plan actuel
+                </div>
+              ) : plan.id === "free" ? (
+                <div className="w-full py-3.5 text-center text-xs text-muted-foreground border border-border rounded-xl bg-transparent">
+                  Toujours gratuit · aucune carte requise
+                </div>
               ) : (
                 <button
-                  onClick={() => handleSubscribe(plan)}
-                  disabled={isLoading || plan.id === "free"}
+                  onClick={() => handleSubscribe(plan.id)}
+                  disabled={isLoading || priceError}
                   className={cn(
-                    "w-full py-3 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2",
-                    plan.highlighted
-                      ? "bg-indigo-600 hover:bg-indigo-500 text-white"
-                      : "glass-strong border border-white/10 hover:bg-white/10 text-white",
-                    plan.id === "free" && "opacity-50 cursor-not-allowed"
+                    "w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50",
+                    isPremium
+                      ? "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black glow-sm-gold"
+                      : isPro
+                      ? "bg-amber-500 hover:bg-amber-400 text-black glow-sm-gold"
+                      : "bg-secondary hover:bg-secondary/80 text-foreground border border-border"
                   )}
                 >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  {plan.id === "free" ? "Plan gratuit" : plan.cta}
+                  {isLoading
+                    ? <><Loader2 className="w-4 h-4 animate-spin" />Redirection…</>
+                    : <><ArrowRight className="w-4 h-4" />Passer au {plan.name}</>
+                  }
                 </button>
               )}
             </div>
@@ -237,8 +329,14 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
         })}
       </div>
 
-      <div className="mt-12 text-center text-sm text-white/30">
-        <p>Paiement sécurisé par Stripe. Annulez à tout moment. Sans engagement.</p>
+      {/* Trust signals */}
+      <div className="flex items-center justify-center gap-8 flex-wrap">
+        {TRUST_SIGNALS.map(({ icon: Icon, text }) => (
+          <div key={text} className="flex items-center gap-2 text-muted-foreground">
+            <Icon className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-xs">{text}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
