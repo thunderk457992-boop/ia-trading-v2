@@ -61,6 +61,38 @@ interface AnalysisResult {
   disclaimer: string
 }
 
+function parseEuroAmount(value: string): number {
+  const normalized = value
+    .replace(/\s/g, "")
+    .replace(/€/g, "")
+    .replace(",", ".")
+    .trim()
+
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function computePortfolioSnapshot(
+  allocations: AllocationItem[],
+  prices: CryptoPrice[],
+  investedAmount: number
+) {
+  if (!investedAmount || investedAmount <= 0) {
+    return { portfolioValue: 0, performancePercent: 0 }
+  }
+
+  const weightedChange = allocations.reduce((sum, allocation) => {
+    const price = prices.find((item) => item.symbol === allocation.asset)
+    if (!price) return sum
+    return sum + (allocation.percentage / 100) * price.change24h
+  }, 0)
+
+  return {
+    performancePercent: Number(weightedChange.toFixed(4)),
+    portfolioValue: Number((investedAmount * (1 + weightedChange / 100)).toFixed(2)),
+  }
+}
+
 function sanitize(s: unknown, maxLen = 300): string {
   return String(s ?? "").replace(/[<>{}$\\]/g, "").slice(0, maxLen).trim()
 }
@@ -867,7 +899,14 @@ export async function POST(request: Request) {
     // Save to DB (allocation without notes for compatibility)
     const { data: savedAnalysis, error: dbError } = await supabase
       .from("ai_analyses")
-      .insert({
+      .insert({await supabase.from("portfolio_history").insert({
+  user_id: user.id,
+  analysis_id: analysis.id,
+  portfolio_value: portfolioValue,
+  invested_amount: investedAmount,
+  performance_percent: performancePercent,
+  allocations: allocations,
+})
         user_id:          user.id,
         investor_profile: {
           riskTolerance: cleanRisk,
@@ -919,6 +958,43 @@ export async function POST(request: Request) {
       coinGeckoAvailable,
       krakenAvailable,
     })
+
+    const investedAmount = parseEuroAmount(cleanCapital)
+    const { portfolioValue, performancePercent } = computePortfolioSnapshot(
+      analysisData.allocation,
+      prices,
+      investedAmount
+    )
+
+    const { error: portfolioHistoryError } = await supabase
+      .from("portfolio_history")
+      .insert({
+        user_id: user.id,
+        analysis_id: savedAnalysis.id,
+        portfolio_value: portfolioValue,
+        invested_amount: investedAmount,
+        performance_percent: performancePercent,
+        allocations: analysisData.allocation.map((allocation) => ({
+          symbol: allocation.asset,
+          percentage: allocation.percentage,
+        })),
+      })
+
+    if (portfolioHistoryError) {
+      console.error("[advisor] failed to save portfolio_history", {
+        userId: user.id,
+        analysisId: savedAnalysis.id,
+        error: portfolioHistoryError,
+      })
+    } else {
+      console.info("[advisor] portfolio_history saved", {
+        userId: user.id,
+        analysisId: savedAnalysis.id,
+        portfolioValue,
+        investedAmount,
+        performancePercent,
+      })
+    }
 
     return NextResponse.json({
       ...analysisData,
