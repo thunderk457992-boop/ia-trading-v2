@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createClient } from "@/lib/supabase/server"
 import { fetchMarketSnapshot } from "@/lib/coingecko"
 import type { CryptoPrice, MarketGlobal } from "@/lib/coingecko"
+import { fetchKrakenTickers, type KrakenTicker } from "@/lib/kraken"
+import { buildMarketDecision } from "@/lib/market-agent"
 
 export const maxDuration = 60
 
@@ -67,6 +69,33 @@ function fmtPrice(price: number): string {
   if (price >= 1000) return `$${Math.round(price).toLocaleString("en-US")}`
   if (price >= 1) return `$${price.toFixed(2)}`
   return `$${price.toFixed(4)}`
+}
+
+function formatKrakenPrice(price: number): string {
+  if (!Number.isFinite(price)) return "n/a"
+  if (price >= 1000) return `$${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+  if (price >= 1) return `$${price.toFixed(4)}`
+  return `$${price.toFixed(6)}`
+}
+
+function formatKrakenVolume(volume: number): string {
+  if (!Number.isFinite(volume)) return "n/a"
+  if (volume >= 1e6) return `${(volume / 1e6).toFixed(2)}M`
+  if (volume >= 1e3) return `${(volume / 1e3).toFixed(1)}K`
+  return volume.toFixed(2)
+}
+
+function buildKrakenContext(tickers: KrakenTicker[]): string {
+  if (!tickers.length) return "Flux Kraken indisponible."
+
+  return [
+    "FLUX KRAKEN:",
+    ...tickers.slice(0, 4).map((ticker) => {
+      const spread = ticker.ask - ticker.bid
+      const spreadPct = ticker.bid > 0 ? (spread / ticker.bid) * 100 : 0
+      return `- ${ticker.symbol}: spot ${formatKrakenPrice(ticker.price)} | bid ${formatKrakenPrice(ticker.bid)} | ask ${formatKrakenPrice(ticker.ask)} | volume 24h ${formatKrakenVolume(ticker.volume24h)} | spread ${spreadPct.toFixed(3)}%`
+    }),
+  ].join("\n")
 }
 
 function buildMarketContext(
@@ -168,7 +197,7 @@ LOGIQUE MARCHÉ OBLIGATOIRE — chaque décision repose sur ces principes:
 × Volatilité: inversement proportionnelle à la cap. — petite cap = risque élevé, position réduite
 × Corrélation: en phase de correction, tout converge vers 1 — la diversification ne protège pas en crash brutal
 × Cycle marché: adapter l'exposition à la phase (expansion → offensif; consolidation → neutre; correction → défensif)
-× Liquidité: top 20 CoinGecko uniquement — garantit la sortie de position sans slippage
+× Liquidité: rester sur les actifs réellement présents dans le snapshot CoinGecko fourni
 × Adoption: projets à utilité réelle (L1 établis, infrastructure DeFi) > spéculation pure
 
 Ces principes DOIVENT justifier chaque allocation et apparaître dans l'explication.
@@ -185,14 +214,22 @@ function buildPrompt(
   plan: string,
   p: {
     riskLabel: string; horizonLabel: string
-    cleanCapital: string; cleanMonthly: string
-    cleanGoals: string; cleanExcluded: string
+    cleanCapital: string; cleanMonthly: string; cleanMonthlyIncome: string
+    cleanGoals: string; cleanPreciseObjective: string; cleanExcluded: string
     cleanExperience: string; cleanStrategy: string
-    cleanExpLevel: string
+    cleanExpLevel: string; lossToleranceLabel: string; investmentFrequencyLabel: string
   },
-  marketCtx: string
+  marketCtx: string,
+  krakenCtx: string,
+  marketDecisionJson: string,
+  availableAssets: string,
+  marketDataAvailable: boolean
 ): string {
-  const { riskLabel, horizonLabel, cleanCapital, cleanMonthly, cleanGoals, cleanExcluded, cleanExperience, cleanStrategy, cleanExpLevel } = p
+  const {
+    riskLabel, horizonLabel, cleanCapital, cleanMonthly, cleanMonthlyIncome,
+    cleanGoals, cleanPreciseObjective, cleanExcluded, cleanExperience,
+    cleanStrategy, cleanExpLevel, lossToleranceLabel, investmentFrequencyLabel,
+  } = p
 
   const pedagogyInstruction = cleanExpLevel === "beginner"
     ? "3-4 phrases simples, zéro jargon: (1) pourquoi CES actifs précisément et pas d'autres, (2) où est le risque pour ce profil, (3) comment agir en pratique. Aucune explication sur la blockchain ou la cryptographie."
@@ -206,6 +243,24 @@ function buildPrompt(
     ? "ADAPTE le plan pour un expert: direct, chiffré, technique. Market bias, execution triggers, risk management."
     : "ADAPTE le plan pour un investisseur intermédiaire: terminologie technique OK, logique claire, chiffres précis."
 
+  const profileDetails = [
+    `- Revenu mensuel: ${cleanMonthlyIncome}€`,
+    cleanMonthly ? `- Apport mensuel: ${cleanMonthly}€` : "",
+    `- Tolérance à la perte: ${lossToleranceLabel}`,
+    `- Objectif précis: ${cleanPreciseObjective}`,
+    `- Fréquence d'investissement: ${investmentFrequencyLabel}`,
+  ].filter(Boolean).join("\n")
+
+  const planFeatureRules = plan === "free"
+    ? "FREE UNIQUEMENT: répondre avec une allocation de base, une explication courte, une exécution immédiate et une pédagogie simple. Ne pas fournir de signal marché détaillé, de plan dans le temps, de projection, de rééquilibrage ou de stratégie avancée."
+    : plan === "pro"
+    ? "PRO UNIQUEMENT: inclure le signal marché, le verdict et un plan dans le temps. Ne pas fournir de projection de scénarios, de rééquilibrage ni de stratégie d'entrée premium."
+    : "PREMIUM: inclure la lecture de marché approfondie, les alertes de risque, les projections de scénarios, la stratégie d'entrée et le rééquilibrage."
+
+  const marketAvailabilityRule = marketDataAvailable
+    ? "DONNÉES LIVE DISPONIBLES: appuie-toi explicitement sur les données CoinGecko et le flux Kraken fournis."
+    : "DONNÉES LIVE PARTIELLES OU ABSENTES: dis-le clairement, n'invente aucun prix, aucune variation ni aucun signal live."
+
   if (plan === "free") {
     return `Tu es un analyste crypto. Génère une allocation concise et directement utilisable.
 
@@ -215,12 +270,19 @@ PROFIL:
 - Expérience: ${cleanExperience}
 - Stratégie: ${cleanStrategy}
 - Capital: ${cleanCapital}€
+${profileDetails}
 - Objectifs: ${cleanGoals}
 ${cleanExcluded ? `- Exclusions: ${cleanExcluded}` : ""}
 
 ${marketCtx}
+${krakenCtx}
 ${STYLE_RULES}
 ${MARKET_LOGIC}
+${planFeatureRules}
+${marketAvailabilityRule}
+
+MOTEUR DE DÉCISION STRUCTURÉ:
+${marketDecisionJson}
 
 ${planAdaptation}
 
@@ -231,7 +293,7 @@ RÈGLES D'ALLOCATION:
 - Agressif: BTC+ETH ≥ 35%
 - Court terme: BTC, ETH, BNB uniquement
 - Exclure: ${cleanExcluded || "rien"}
-- Actifs disponibles: BTC, ETH, SOL, BNB, XRP, ADA, AVAX, DOT
+- Actifs disponibles: ${availableAssets}
 
 PLAN OBLIGATOIRE — 4 étapes:
 1. Action immédiate: que faire maintenant (actif + montant ou %)
@@ -291,13 +353,20 @@ PROFIL INVESTISSEUR:
 - Horizon: ${horizonLabel}
 - Expérience: ${cleanExperience}
 - Stratégie d'achat: ${cleanStrategy}
-- Capital: ${cleanCapital}€${cleanMonthly ? `\n- Apport mensuel: ${cleanMonthly}€` : ""}
+- Capital: ${cleanCapital}€
+${profileDetails}
 - Objectifs: ${cleanGoals}
 ${cleanExcluded ? `- À exclure: ${cleanExcluded}` : ""}
 
 ${marketCtx}
+${krakenCtx}
 ${STYLE_RULES}
 ${MARKET_LOGIC}
+${planFeatureRules}
+${marketAvailabilityRule}
+
+MOTEUR DE DÉCISION STRUCTURÉ:
+${marketDecisionJson}
 
 ${planAdaptation}
 
@@ -314,7 +383,7 @@ Règles d'allocation:
 - Agressif: BTC+ETH ≥ 30%, altcoins établis uniquement
 - Court terme: BTC, ETH, BNB en priorité
 
-Actifs: BTC, ETH, SOL, BNB, XRP, ADA, AVAX, DOT, LINK, NEAR, MATIC
+Actifs: ${availableAssets}
 
 Réponds UNIQUEMENT avec ce JSON valide, sans texte autour:
 {
@@ -371,13 +440,20 @@ PROFIL CLIENT:
 - Horizon: ${horizonLabel}
 - Expérience: ${cleanExperience}
 - Stratégie d'achat: ${cleanStrategy}
-- Capital: ${cleanCapital}€${cleanMonthly ? `\n- Apports: ${cleanMonthly}€/mois` : ""}
+- Capital: ${cleanCapital}€
+${profileDetails}
 - Objectifs: ${cleanGoals}
 ${cleanExcluded ? `- Exclusions: ${cleanExcluded}` : ""}
 
 ${marketCtx}
+${krakenCtx}
 ${STYLE_RULES}
 ${MARKET_LOGIC}
+${planFeatureRules}
+${marketAvailabilityRule}
+
+MOTEUR DE DÉCISION STRUCTURÉ:
+${marketDecisionJson}
 
 ${planAdaptation}
 
@@ -394,9 +470,9 @@ INSTRUCTIONS PREMIUM:
 Règles d'allocation:
 - Conservateur: BTC+ETH ≥ 70%, pas d'actif < 5%
 - Modéré: BTC+ETH ≥ 50%, max 3 altcoins, pas d'actif < 4%
-- Agressif: BTC+ETH ≥ 25%, altcoins top 20 CoinGecko, DCA obligatoire
+- Agressif: BTC+ETH ≥ 25%, altcoins parmi les actifs fournis, DCA obligatoire
 
-Actifs: BTC, ETH, SOL, BNB, XRP, ADA, AVAX, DOT, LINK, NEAR, MATIC
+Actifs: ${availableAssets}
 
 Réponds UNIQUEMENT avec ce JSON valide, sans texte autour:
 {
@@ -447,6 +523,93 @@ Réponds UNIQUEMENT avec ce JSON valide, sans texte autour:
   ],
   "disclaimer": "Analyse stratégique à titre informatif. Ne constitue pas un conseil en investissement réglementé. Les cryptomonnaies comportent un risque de perte totale du capital investi."
 }`
+}
+
+function cleanJsonEnvelope(raw: string): string {
+  return raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()
+}
+
+function extractJsonObject(raw: string): string | null {
+  const start = raw.indexOf("{")
+  const end = raw.lastIndexOf("}")
+  if (start === -1 || end === -1 || end <= start) return null
+  return raw.slice(start, end + 1)
+}
+
+function tryParseAnalysisResult(raw: string): AnalysisResult | null {
+  const normalized = cleanJsonEnvelope(raw)
+  const extracted = extractJsonObject(normalized)
+  const candidates = Array.from(new Set([
+    normalized,
+    extracted ?? "",
+    normalized.replace(/,\s*([}\]])/g, "$1"),
+    extracted ? extracted.replace(/,\s*([}\]])/g, "$1") : "",
+  ].filter(Boolean)))
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as AnalysisResult
+    } catch {
+      // continue to next candidate
+    }
+  }
+
+  return null
+}
+
+async function repairAnalysisJson(raw: string, parseError: string): Promise<AnalysisResult> {
+  const repairMessage = await getAnthropic().messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 2200,
+    messages: [
+      {
+        role: "user",
+        content: [
+          "Répare ce JSON mal formé pour qu'il soit strictement valide.",
+          "Conserve les mêmes clés et le même sens.",
+          "Retourne uniquement un objet JSON valide, sans markdown ni commentaire.",
+          `Erreur de parsing: ${parseError}`,
+          "",
+          cleanJsonEnvelope(raw),
+        ].join("\n"),
+      },
+    ],
+  })
+
+  const repairedBlock = repairMessage.content.find((c) => c.type === "text")
+  if (!repairedBlock || repairedBlock.type !== "text") {
+    throw new Error("Réponse inattendue de l'IA lors de la réparation JSON")
+  }
+
+  const repaired = tryParseAnalysisResult(repairedBlock.text)
+  if (!repaired) {
+    throw new Error("L'IA n'a pas retourné de JSON exploitable après réparation")
+  }
+
+  return repaired
+}
+
+function applyPlanFeatureGate(analysisData: AnalysisResult, plan: string) {
+  const isPro = plan === "pro" || plan === "premium"
+  const isPremium = plan === "premium"
+
+  if (!isPro) {
+    analysisData.allocation = analysisData.allocation.map((item) => ({ ...item, note: undefined }))
+    analysisData.marketSignal = undefined
+    analysisData.marketVerdict = undefined
+    analysisData.marketVerdictNote = undefined
+    analysisData.marketInsight = undefined
+    analysisData.timePlan = []
+  }
+
+  if (!isPremium) {
+    analysisData.entryStrategy = undefined
+    analysisData.rebalanceNote = undefined
+    analysisData.marketInsight = undefined
+    analysisData.aiSignature = undefined
+    analysisData.errorsToAvoid = []
+    analysisData.projection = []
+  }
 }
 
 export async function POST(request: Request) {
@@ -506,38 +669,76 @@ export async function POST(request: Request) {
     cooldowns.set(user.id, Date.now())
 
     const body = await request.json()
-    const { riskTolerance, horizon, capital, monthlyContribution, goals, excludedCryptos, experience, buyStrategy } = body
+    const {
+      riskTolerance, horizon, capital, monthlyIncome, monthlyContribution,
+      lossTolerance, preciseObjective, investmentFrequency,
+      goals, excludedCryptos, experience, buyStrategy,
+    } = body
 
-    if (!riskTolerance || !horizon || !capital || !Array.isArray(goals) || goals.length === 0) {
+    if (!riskTolerance || !horizon || !capital || !monthlyIncome || !preciseObjective || !Array.isArray(goals) || goals.length === 0) {
       return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 })
     }
 
+    if (!["low", "medium", "high"].includes(lossTolerance) || !["once", "weekly", "monthly", "opportunistic"].includes(investmentFrequency)) {
+      return NextResponse.json({ error: "Paramètres invalides" }, { status: 400 })
+    }
+
     const cleanCapital    = sanitize(capital, 20)
+    const cleanMonthlyIncome = sanitize(monthlyIncome, 20)
     const cleanMonthly    = sanitize(monthlyContribution, 20)
+    const cleanPreciseObjective = sanitize(preciseObjective, 160)
     const cleanExcluded   = sanitize(excludedCryptos, 100)
     const cleanGoals      = (goals as unknown[]).map((g) => sanitize(g, 50)).join(", ")
+
+    if (!cleanMonthlyIncome || !cleanPreciseObjective) {
+      return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 })
+    }
+
     const cleanRisk       = ["conservative", "moderate", "aggressive"].includes(riskTolerance) ? riskTolerance : "moderate"
     const cleanHorizon    = ["short", "medium", "long"].includes(horizon) ? horizon : "medium"
     const cleanExpLevel   = ["beginner", "intermediate", "expert"].includes(experience) ? experience : "intermediate"
     const cleanBuyStrat   = ["lumpsum", "dca-monthly", "dca-weekly"].includes(buyStrategy) ? buyStrategy : "lumpsum"
+    const cleanLossTolerance = lossTolerance as "low" | "medium" | "high"
+    const cleanInvestmentFrequency = investmentFrequency as "once" | "weekly" | "monthly" | "opportunistic"
 
     const riskLabel       = cleanRisk === "conservative" ? "conservateur" : cleanRisk === "moderate" ? "modéré" : "agressif"
     const horizonLabel    = cleanHorizon === "short" ? "court terme (< 1 an)" : cleanHorizon === "medium" ? "moyen terme (1-3 ans)" : "long terme (> 3 ans)"
     const cleanExperience = cleanExpLevel === "beginner" ? "débutant (< 1 an)" : cleanExpLevel === "expert" ? "expert (> 3 ans)" : "intermédiaire (1-3 ans)"
     const cleanStrategy   = cleanBuyStrat === "lumpsum" ? "investissement unique (lump-sum)" : cleanBuyStrat === "dca-monthly" ? "DCA mensuel" : "DCA hebdomadaire"
+    const lossToleranceLabel = cleanLossTolerance === "low" ? "faible (perte acceptable autour de 10%)" : cleanLossTolerance === "medium" ? "moyenne (perte acceptable autour de 25%)" : "forte (perte acceptable de 40% ou plus)"
+    const investmentFrequencyLabel = cleanInvestmentFrequency === "once" ? "une fois" : cleanInvestmentFrequency === "weekly" ? "chaque semaine" : cleanInvestmentFrequency === "monthly" ? "chaque mois" : "opportuniste"
 
-    // Fetch live market data (cached 30s server-side)
-    const { prices, global: globalData } = await fetchMarketSnapshot()
+    // Fetch live market data (cached server-side)
+    const [{ prices, global: globalData }, krakenTickers] = await Promise.all([
+      fetchMarketSnapshot(),
+      fetchKrakenTickers().catch(() => [] as KrakenTicker[]),
+    ])
 
     const marketLevel: "basic" | "standard" | "full" =
       plan === "premium" ? "full" : plan === "pro" ? "standard" : "basic"
 
     const marketCtx = buildMarketContext(prices, globalData, marketLevel)
+    const krakenCtx = buildKrakenContext(krakenTickers)
+    const marketDecision = buildMarketDecision(prices, globalData, null)
+    const availableAssets = prices.length
+      ? Array.from(new Set(prices.map((price) => price.symbol))).join(", ")
+      : "BTC, ETH, SOL, BNB, XRP, ADA, AVAX, LINK, DOT"
+    const coinGeckoAvailable = prices.length > 0
+    const krakenAvailable = krakenTickers.length > 0
+    const marketDataAvailable = coinGeckoAvailable || krakenAvailable
 
     const prompt = buildPrompt(
       plan,
-      { riskLabel, horizonLabel, cleanCapital, cleanMonthly, cleanGoals, cleanExcluded, cleanExperience, cleanStrategy, cleanExpLevel },
-      marketCtx
+      {
+        riskLabel, horizonLabel, cleanCapital, cleanMonthly, cleanMonthlyIncome,
+        cleanGoals, cleanPreciseObjective, cleanExcluded, cleanExperience,
+        cleanStrategy, cleanExpLevel, lossToleranceLabel, investmentFrequencyLabel,
+      },
+      marketCtx,
+      krakenCtx,
+      JSON.stringify(marketDecision, null, 2),
+      availableAssets,
+      marketDataAvailable
     )
 
     const config = MODEL_CONFIG[plan] ?? MODEL_CONFIG.free
@@ -557,17 +758,17 @@ export async function POST(request: Request) {
       throw new Error("Réponse inattendue de l'IA — aucun bloc texte trouvé")
     }
 
-    let raw = textBlock.text.trim()
-    raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()
+    const raw = cleanJsonEnvelope(textBlock.text)
 
-    let analysisData: AnalysisResult
-    try {
-      analysisData = JSON.parse(raw)
-    } catch {
-      const match = raw.match(/\{[\s\S]*\}/)
-      if (!match) throw new Error("L'IA n'a pas retourné de JSON valide")
-      analysisData = JSON.parse(match[0])
+    let analysisData = tryParseAnalysisResult(raw)
+    if (!analysisData) {
+      try {
+        JSON.parse(raw)
+      } catch (error) {
+        analysisData = await repairAnalysisJson(raw, error instanceof Error ? error.message : "JSON invalide")
+      }
     }
+    if (!analysisData) throw new Error("L'IA n'a pas retourné de JSON valide")
 
     // ── Robust normalization — defensive against any AI format variance ──────
     // score
@@ -661,13 +862,33 @@ export async function POST(request: Request) {
     }
     const finalTotal = analysisData.allocation.reduce((s, a) => s + a.percentage, 0)
     if (finalTotal !== 100) analysisData.allocation[0].percentage += 100 - finalTotal
+    applyPlanFeatureGate(analysisData, plan)
 
     // Save to DB (allocation without notes for compatibility)
     const { data: savedAnalysis, error: dbError } = await supabase
       .from("ai_analyses")
       .insert({
         user_id:          user.id,
-        investor_profile: { riskTolerance: cleanRisk, horizon: cleanHorizon, capital: cleanCapital, monthlyContribution: cleanMonthly, goals, excludedCryptos: cleanExcluded, experience: cleanExpLevel, buyStrategy: cleanBuyStrat },
+        investor_profile: {
+          riskTolerance: cleanRisk,
+          horizon: cleanHorizon,
+          capital: cleanCapital,
+          monthlyIncome: cleanMonthlyIncome,
+          monthlyContribution: cleanMonthly,
+          lossTolerance: cleanLossTolerance,
+          preciseObjective: cleanPreciseObjective,
+          investmentFrequency: cleanInvestmentFrequency,
+          goals,
+          excludedCryptos: cleanExcluded,
+          experience: cleanExpLevel,
+          buyStrategy: cleanBuyStrat,
+          advisorOutput: {
+            executionNow: analysisData.executionNow ?? [],
+            entryStrategy: analysisData.entryStrategy ?? null,
+            nextReview: analysisData.nextReview ?? null,
+            errorsToAvoid: analysisData.errorsToAvoid ?? [],
+          },
+        },
         allocations:      analysisData.allocation.map((a) => ({ symbol: a.asset, percentage: a.percentage })),
         total_score:      analysisData.score,
         market_context:   analysisData.explanation,
@@ -681,10 +902,23 @@ export async function POST(request: Request) {
 
     if (dbError) {
       console.error("Failed to save analysis:", dbError)
-      return NextResponse.json({ ...analysisData, plan, saved: false })
+      return NextResponse.json({
+        ...analysisData,
+        plan,
+        saved: false,
+        marketDataAvailable,
+        marketSources: { coinGecko: coinGeckoAvailable, kraken: krakenAvailable },
+      })
     }
 
-    return NextResponse.json({ ...analysisData, plan, id: savedAnalysis.id, saved: true })
+    return NextResponse.json({
+      ...analysisData,
+      plan,
+      id: savedAnalysis.id,
+      saved: true,
+      marketDataAvailable,
+      marketSources: { coinGecko: coinGeckoAvailable, kraken: krakenAvailable },
+    })
   } catch (error) {
     console.error("Advisor API error:", error)
     return NextResponse.json(

@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { User, CreditCard, Shield, Bell, Loader2, Check, ExternalLink, AlertCircle, Crown, Zap, Sparkles } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 
 interface Subscription {
   id: string
@@ -38,6 +39,7 @@ const TABS = [
   { id: "security",      label: "Sécurité",      icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
 ]
+type SettingsTab = typeof TABS[number]["id"]
 
 const PLAN_META = {
   free:    { label: "Free",    icon: Sparkles, color: "text-slate-600",   bg: "bg-secondary",   border: "border-border" },
@@ -46,11 +48,14 @@ const PLAN_META = {
 } as const
 
 export function SettingsClient({ user, profile, subscription, payments }: Props) {
-  const [activeTab, setActiveTab] = useState("profile")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
   const [fullName, setFullName] = useState(profile?.full_name ?? "")
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle")
   const [portalLoading, setPortalLoading] = useState(false)
+  const [portalError, setPortalError] = useState("")
   const [resetLoading, setResetLoading] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -59,28 +64,50 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
   const plan = (profile?.plan ?? "free") as keyof typeof PLAN_META
   const planMeta = PLAN_META[plan] ?? PLAN_META.free
   const PlanIcon = planMeta.icon
+  const requestedTab = searchParams.get("tab")
+
+  useEffect(() => {
+    if (requestedTab && TABS.some((tab) => tab.id === requestedTab)) {
+      setActiveTab(requestedTab as SettingsTab)
+    }
+  }, [requestedTab])
 
   const handleSaveProfile = async () => {
     setSaving(true)
     setSaveStatus("idle")
     const supabase = createClient()
-    const { error } = await supabase
+    const cleanedFullName = fullName.trim()
+    const { data, error } = await supabase
       .from("profiles")
-      .upsert({ id: user.id, full_name: fullName.trim(), updated_at: new Date().toISOString() })
+      .update({ full_name: cleanedFullName, updated_at: new Date().toISOString() })
+      .eq("id", user.id)
+      .select("full_name")
+      .maybeSingle()
+
     setSaving(false)
-    setSaveStatus(error ? "error" : "success")
-    if (!error) setTimeout(() => setSaveStatus("idle"), 3000)
+
+    if (error || !data) {
+      console.error("Failed to save profile", error)
+      setSaveStatus("error")
+      return
+    }
+
+    setFullName(data.full_name ?? "")
+    setSaveStatus("success")
+    router.refresh()
+    setTimeout(() => setSaveStatus("idle"), 3000)
   }
 
   const handleManageSubscription = async () => {
     setPortalLoading(true)
+    setPortalError("")
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       if (data.url) window.location.href = data.url
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur portail")
+      setPortalError(err instanceof Error ? err.message : "Le portail de facturation est indisponible pour le moment.")
     } finally {
       setPortalLoading(false)
     }
@@ -144,7 +171,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/50 text-sm transition-all"
+              className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring text-sm transition-all"
             />
           </div>
 
@@ -169,7 +196,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
           <button
             onClick={handleSaveProfile}
             disabled={saving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-2.5 bg-foreground hover:bg-foreground/90 text-background rounded-xl text-sm font-bold transition-all disabled:opacity-50"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {saveStatus === "success" && <Check className="w-4 h-4" />}
@@ -214,12 +241,18 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
               ) : (
                 <Link
                   href="/pricing"
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-sm rounded-xl transition-colors font-bold"
+                  className="px-4 py-2 bg-foreground hover:bg-foreground/90 text-background text-sm rounded-xl transition-colors font-bold"
                 >
                   Upgrader
                 </Link>
               )}
             </div>
+            {portalError && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>{portalError}</p>
+              </div>
+            )}
           </div>
 
           <div className="p-6 rounded-2xl bg-card border border-border">
@@ -299,7 +332,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
             {!deleteConfirm ? (
               <button
                 onClick={() => setDeleteConfirm(true)}
-                className="text-xs text-red-600 hover:text-red-700 transition-colors font-medium border border-red-200 px-3 py-1.5 rounded-lg"
+                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
               >
                 Supprimer mon compte
               </button>
@@ -310,7 +343,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                   <button
                     onClick={handleDeleteAccount}
                     disabled={deleting}
-                    className="text-xs text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg transition-colors font-semibold flex items-center gap-1.5 disabled:opacity-60"
+                    className="flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-60"
                   >
                     {deleting && <Loader2 className="w-3 h-3 animate-spin" />}
                     Oui, supprimer
@@ -335,6 +368,9 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
             <h2 className="font-semibold text-lg text-foreground">Préférences de notifications</h2>
             <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">Bientôt disponible</span>
           </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Les notifications ne sont pas encore actives. Les réglages ci-dessous sont affichés à titre indicatif et resteront désactivés jusqu’à leur mise en service.
+          </div>
           {[
             { label: "Alertes de prix",        desc: "Notifié quand une crypto atteint votre cible",           default: true },
             { label: "Nouvelles analyses IA",  desc: "Quand l'IA détecte une opportunité de marché",           default: true },
@@ -342,20 +378,45 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
             { label: "Actualités importantes", desc: "Régulations, hacks, actualités majeures",               default: true },
             { label: "Facturation",            desc: "Renouvellement, paiements, factures",                   default: true },
           ].map((item) => (
-            <label key={item.label} className="flex items-center justify-between p-4 rounded-xl bg-secondary border border-border cursor-pointer hover:border-foreground/20 transition-colors">
+            <label key={item.label} className="flex items-center justify-between p-4 rounded-xl bg-secondary border border-border opacity-75 cursor-not-allowed">
               <div>
                 <div className="text-sm font-semibold text-foreground">{item.label}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
               </div>
               <div className="relative ml-4 shrink-0">
-                <input type="checkbox" className="sr-only peer" defaultChecked={item.default} />
-                <div className="w-10 h-5 bg-border peer-checked:bg-amber-500 rounded-full transition-colors" />
-                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all peer-checked:translate-x-5" />
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={item.default}
+                  readOnly
+                  disabled
+                  aria-label={`${item.label} indisponible pour le moment`}
+                />
+                <div className={cn("w-10 h-5 rounded-full transition-colors", item.default ? "bg-foreground/70" : "bg-border")} />
+                <div className={cn("absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all", item.default && "translate-x-5")} />
               </div>
             </label>
           ))}
         </div>
       )}
+
+      <div className="mt-6 rounded-2xl border border-border bg-card/80 px-4 py-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Légal</p>
+        <div className="mt-3 flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/legal/cgu"
+            className="rounded-lg border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            Conditions d&apos;utilisation
+          </Link>
+          <Link
+            href="/legal/privacy"
+            className="rounded-lg border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            Politique de confidentialité
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }

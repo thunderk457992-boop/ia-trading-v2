@@ -8,7 +8,27 @@ const securityHeaders = [
   { key: "Permissions-Policy",      value: "camera=(), microphone=(), geolocation=()" },
 ]
 
+function getHostnameFromUrl(value?: string) {
+  if (!value) return null
+
+  try {
+    return new URL(value).hostname
+  } catch {
+    return value.trim() || null
+  }
+}
+
+const envOriginHosts = [
+  process.env.NEXT_PUBLIC_SITE_URL,
+  process.env.SITE_URL,
+  process.env.APP_URL,
+  process.env.NEXT_PUBLIC_APP_URL,
+]
+  .map(getHostnameFromUrl)
+  .filter((value): value is string => Boolean(value))
+
 const nextConfig: NextConfig = {
+  allowedDevOrigins: [...new Set(["192.168.*.*", ...envOriginHosts])],
   async headers() {
     return [
       {

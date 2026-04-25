@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Loader2, AlertCircle, Check } from "lucide-react"
+import { AxiomLogo } from "@/components/branding/AxiomLogo"
 import { createClient } from "@/lib/supabase/client"
 
 function LoginForm() {
@@ -72,7 +73,7 @@ function LoginForm() {
           placeholder="vous@exemple.com"
           required
           autoComplete="email"
-          className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/50 transition-all text-sm"
+          className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all text-sm"
         />
       </div>
 
@@ -83,10 +84,10 @@ function LoginForm() {
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="Votre mot de passe"
             required
             autoComplete="current-password"
-            className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/50 transition-all text-sm pr-10"
+            className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all text-sm pr-10"
           />
           <button
             type="button"
@@ -115,10 +116,10 @@ function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-1"
+        className="w-full py-3 bg-foreground hover:bg-foreground/90 disabled:opacity-60 disabled:cursor-not-allowed text-background font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-1"
       >
         {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-        {loading ? "Connexion…" : "Se connecter"}
+        {loading ? "Connexion..." : "Se connecter"}
       </button>
 
       {resetSent ? (
@@ -131,9 +132,9 @@ function LoginForm() {
           type="button"
           onClick={handleForgotPassword}
           disabled={resetLoading}
-          className="w-full text-center text-xs text-muted-foreground hover:text-amber-500 transition-colors py-1"
+          className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
         >
-          {resetLoading ? "Envoi…" : "Mot de passe oublié ?"}
+          {resetLoading ? "Envoi..." : "Mot de passe oublié ?"}
         </button>
       )}
     </form>
@@ -142,23 +143,17 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-6">
+    <div className="min-h-screen bg-background overflow-y-auto flex items-start justify-center px-4 py-10 sm:items-center sm:px-6 sm:py-12">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
+        <div className="text-center mb-7 sm:mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
-            <div className="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M2 4L8 13L14 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <span className="font-black text-foreground text-lg tracking-tight">Vela</span>
-            <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md">AI</span>
+            <AxiomLogo />
           </Link>
           <h1 className="text-2xl font-bold text-foreground mb-1.5">Bon retour</h1>
           <p className="text-muted-foreground text-sm">Connectez-vous à votre compte</p>
         </div>
 
-        <div className="bg-card rounded-2xl border border-border p-6">
+        <div className="bg-card rounded-2xl border border-border p-5 sm:p-6">
           <Suspense fallback={
             <div className="space-y-4 animate-pulse">
               <div className="h-12 bg-secondary rounded-xl"/>
@@ -171,7 +166,7 @@ export default function LoginPage() {
 
           <div className="mt-6 pt-5 border-t border-border text-center text-sm text-muted-foreground">
             Pas encore de compte ?{" "}
-            <Link href="/register" className="text-amber-600 hover:text-amber-500 transition-colors font-semibold">
+            <Link href="/register" className="text-foreground font-semibold underline underline-offset-4 hover:opacity-75 transition-opacity">
               Créer un compte
             </Link>
           </div>

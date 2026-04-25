@@ -2,11 +2,13 @@ import { createClient } from "@/lib/supabase/server"
 import { createServerClient } from "@supabase/ssr"
 import { redirect } from "next/navigation"
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview"
-import { fetchMarketSnapshot } from "@/lib/coingecko"
+import { fetchMarketSnapshot, fetchPortfolioMarketHistory } from "@/lib/coingecko"
+import { buildMarketDecision } from "@/lib/market-agent"
 import { stripe } from "@/lib/stripe"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type StripeSub = Record<string, any>
+const HISTORY_LIMIT: Record<string, number> = { free: 3, pro: 10, premium: 20 }
 
 const PRICE_TO_PLAN: Record<string, string> = Object.fromEntries(
   [
@@ -72,6 +74,26 @@ export default async function DashboardPage({
     fetchMarketSnapshot(),
   ])
 
+  const plan = (subscription?.status === "active" || subscription?.status === "trialing")
+    ? subscription.plan
+    : profile?.plan ?? "free"
+  const lastAnalysis = (analyses ?? []).slice(0, HISTORY_LIMIT[plan] ?? 3)[0] ?? null
+  const portfolioHistory = lastAnalysis
+    ? await fetchPortfolioMarketHistory(lastAnalysis.allocations ?? [], market.prices, 8)
+    : []
+  const marketDecision = buildMarketDecision(market.prices, market.global, lastAnalysis?.allocations ?? null)
+
+  console.info("[dashboard] portfolio history summary", {
+    userId: user.id,
+    lastAnalysisCreatedAt: lastAnalysis?.created_at ?? null,
+    allocationCount: lastAnalysis?.allocations?.length ?? 0,
+    portfolioHistoryAssets: portfolioHistory.map((asset) => ({
+      symbol: asset.symbol,
+      points: asset.prices.length,
+    })),
+    marketFetchedAt: market.fetchedAt,
+  })
+
   return (
     <DashboardOverview
       user={user}
@@ -81,7 +103,9 @@ export default async function DashboardPage({
       justUpgraded={params.upgraded === "true" ? (params.plan ?? null) : null}
       monthlyCount={monthlyCount ?? 0}
       cryptoPrices={market.prices}
+      portfolioHistory={portfolioHistory}
       marketGlobal={market.global}
+      marketDecision={marketDecision}
       marketFetchedAt={market.fetchedAt}
     />
   )

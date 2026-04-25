@@ -24,6 +24,16 @@ export interface MarketSnapshot {
   fetchedAt: number
 }
 
+export interface MarketChartPoint {
+  timestamp: number
+  price: number
+}
+
+export interface PortfolioAssetHistory {
+  symbol: string
+  prices: MarketChartPoint[]
+}
+
 function cgHeaders(): HeadersInit {
   const key = process.env.COINGECKO_API_KEY
   return {
@@ -67,7 +77,7 @@ export async function fetchCryptoPrices(): Promise<CryptoPrice[]> {
     const timeout = setTimeout(() => controller.abort(), 8000)
 
     const res = await fetch(
-      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,binancecoin,ripple,cardano,avalanche-2,polkadot&order=market_cap_desc&per_page=8&sparkline=true&price_change_percentage=1h,24h,7d",
+      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,ripple,binancecoin,cardano,dogecoin,the-open-network,avalanche-2,chainlink,matic-network,polkadot,tron,litecoin,bitcoin-cash&order=market_cap_desc&per_page=15&sparkline=true&price_change_percentage=1h,24h,7d",
       { next: { revalidate: 30 }, headers: cgHeaders(), signal: controller.signal }
     ).finally(() => clearTimeout(timeout))
 
@@ -124,6 +134,94 @@ export async function fetchMarketGlobal(): Promise<MarketGlobal | null> {
     console.error("[CoinGecko] fetchMarketGlobal error:", err)
     return null
   }
+}
+
+export async function fetchCoinMarketChart(coinId: string, days = 7): Promise<MarketChartPoint[]> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`,
+      { next: { revalidate: 60 }, headers: cgHeaders(), signal: controller.signal }
+    ).finally(() => clearTimeout(timeout))
+
+    if (!res.ok) return []
+    const data = await res.json()
+    const rawPrices: unknown[] = Array.isArray(data?.prices) ? data.prices : []
+
+    return rawPrices
+      .filter((point: unknown): point is [number, number] => (
+        Array.isArray(point)
+        && point.length >= 2
+        && Number.isFinite(point[0])
+        && Number.isFinite(point[1])
+      ))
+      .sort((a, b) => a[0] - b[0])
+      .map((point) => ({ timestamp: point[0], price: point[1] }))
+  } catch (err) {
+    console.error(`[CoinGecko] fetchCoinMarketChart error for ${coinId}:`, err)
+    return []
+  }
+}
+
+export async function fetchPortfolioMarketHistory(
+  allocations: Array<{ symbol: string; percentage: number }>,
+  prices: CryptoPrice[],
+  days = 7
+): Promise<PortfolioAssetHistory[]> {
+  if (!allocations.length || !prices.length) return []
+
+  const symbols = Array.from(new Set(allocations.map((alloc) => alloc.symbol)))
+  let universe = prices
+  const missingSymbols = symbols.filter((symbol) => !universe.some((price) => price.symbol === symbol))
+
+  if (missingSymbols.length > 0) {
+    console.info("[CoinGecko] portfolio history missing from dashboard universe", {
+      symbols,
+      missingSymbols,
+    })
+    const extendedMarkets = await fetchMarketsData(100)
+    if (extendedMarkets.length > 0) {
+      const bySymbol = new Map<string, CryptoPrice>()
+      for (const coin of [...universe, ...extendedMarkets]) {
+        if (!bySymbol.has(coin.symbol)) bySymbol.set(coin.symbol, coin)
+      }
+      universe = Array.from(bySymbol.values())
+    }
+  }
+
+  const histories = await Promise.all(symbols.map(async (symbol) => {
+    const coin = universe.find((price) => price.symbol === symbol)
+    if (!coin) {
+      console.warn("[CoinGecko] portfolio asset unresolved", { symbol })
+      return null
+    }
+
+    const chart = await fetchCoinMarketChart(coin.id, days)
+    if (chart.length <= 1) {
+      console.warn("[CoinGecko] market_chart unavailable for portfolio asset", {
+        symbol,
+        coinId: coin.id,
+        points: chart.length,
+        days,
+      })
+      return null
+    }
+
+    return { symbol, prices: chart }
+  }))
+
+  if (histories.some((history) => history === null)) {
+    console.warn("[CoinGecko] portfolio history incomplete", {
+      symbols,
+      resolvedSymbols: histories
+        .filter((history): history is PortfolioAssetHistory => history !== null)
+        .map((history) => history.symbol),
+    })
+    return []
+  }
+  return histories as PortfolioAssetHistory[]
 }
 
 export async function fetchMarketSnapshot(): Promise<MarketSnapshot> {

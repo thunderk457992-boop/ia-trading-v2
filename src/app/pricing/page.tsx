@@ -7,16 +7,31 @@ export default async function PricingPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("plan, stripe_subscription_id")
-    .eq("id", user.id)
-    .maybeSingle()
+  const [{ data: profile }, { data: subscription }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("plan, stripe_subscription_id")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("subscriptions")
+      .select("plan, status")
+      .eq("user_id", user.id)
+      .in("status", ["active", "trialing"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  const hasActiveSubscription = subscription?.status === "active" || subscription?.status === "trialing"
+  const currentPlan = hasActiveSubscription
+    ? (subscription.plan ?? profile?.plan ?? "free")
+    : (profile?.plan ?? "free")
 
   return (
     <PricingClient
-      currentPlan={profile?.plan ?? "free"}
-      hasSubscription={!!profile?.stripe_subscription_id}
+      currentPlan={currentPlan}
+      hasSubscription={hasActiveSubscription || !!profile?.stripe_subscription_id}
     />
   )
 }

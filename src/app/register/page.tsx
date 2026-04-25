@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Loader2, Check, AlertCircle, Mail } from "lucide-react"
+import { AxiomLogo } from "@/components/branding/AxiomLogo"
 import { createClient } from "@/lib/supabase/client"
 
 export default function RegisterPage() {
@@ -73,7 +74,7 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-6">
+      <div className="min-h-screen bg-background overflow-y-auto flex items-start justify-center px-4 py-10 sm:items-center sm:px-6 sm:py-12">
         <div className="text-center max-w-sm">
           <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-6">
             <Mail className="w-7 h-7 text-emerald-600" />
@@ -84,7 +85,7 @@ export default function RegisterPage() {
             <strong className="text-foreground">{email}</strong>.
             <br />Cliquez sur le lien pour activer votre compte.
           </p>
-          <Link href="/login" className="text-amber-600 hover:text-amber-500 text-sm font-semibold transition-colors">
+          <Link href="/login" className="text-foreground text-sm font-semibold underline underline-offset-4 hover:opacity-75 transition-opacity">
             ← Retour à la connexion
           </Link>
         </div>
@@ -93,23 +94,17 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-6 py-12">
+    <div className="min-h-screen bg-background overflow-y-auto flex items-start justify-center px-4 py-10 sm:items-center sm:px-6 sm:py-12">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
+        <div className="text-center mb-7 sm:mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
-            <div className="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M2 4L8 13L14 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <span className="font-black text-foreground text-lg tracking-tight">Vela</span>
-            <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md">AI</span>
+            <AxiomLogo />
           </Link>
           <h1 className="text-2xl font-bold text-foreground mb-1.5">Créer votre compte</h1>
           <p className="text-muted-foreground text-sm">Commencez gratuitement, sans carte de crédit</p>
         </div>
 
-        <div className="bg-card rounded-2xl border border-border p-6">
+        <div className="bg-card rounded-2xl border border-border p-5 sm:p-6">
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-muted-foreground mb-1.5">Nom complet</label>
@@ -120,7 +115,7 @@ export default function RegisterPage() {
                 placeholder="Jean Dupont"
                 required
                 autoComplete="name"
-                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/50 transition-all text-sm"
+                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all text-sm"
               />
             </div>
 
@@ -133,7 +128,7 @@ export default function RegisterPage() {
                 placeholder="vous@exemple.com"
                 required
                 autoComplete="email"
-                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/50 transition-all text-sm"
+                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all text-sm"
               />
             </div>
 
@@ -147,7 +142,7 @@ export default function RegisterPage() {
                   placeholder="8 caractères minimum"
                   required
                   autoComplete="new-password"
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/50 transition-all text-sm pr-10"
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all text-sm pr-10"
                 />
                 <button
                   type="button"
@@ -179,10 +174,10 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-2"
+              className="w-full py-3 bg-foreground hover:bg-foreground/90 disabled:opacity-60 disabled:cursor-not-allowed text-background font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? "Création du compte…" : "Créer mon compte gratuit"}
+              {loading ? "Création du compte..." : "Créer mon compte gratuit"}
             </button>
 
             <p className="text-xs text-muted-foreground text-center">
@@ -195,7 +190,7 @@ export default function RegisterPage() {
 
           <div className="mt-5 pt-5 border-t border-border text-center text-sm text-muted-foreground">
             Déjà un compte ?{" "}
-            <Link href="/login" className="text-amber-600 hover:text-amber-500 transition-colors font-semibold">
+            <Link href="/login" className="text-foreground font-semibold underline underline-offset-4 hover:opacity-75 transition-opacity">
               Se connecter
             </Link>
           </div>

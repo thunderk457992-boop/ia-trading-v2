@@ -1,7 +1,21 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { Check, Loader2, Zap, Crown, Sparkles, AlertCircle, ArrowRight, Shield, Cpu } from "lucide-react"
+import React, { useEffect, useState } from "react"
+import { loadStripe } from "@stripe/stripe-js"
+import {
+  AlertCircle,
+  ArrowRight,
+  Check,
+  CreditCard,
+  Cpu,
+  Crown,
+  Loader2,
+  Lock,
+  MessageSquare,
+  Shield,
+  Sparkles,
+  Zap,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface PricingClientProps {
@@ -17,9 +31,44 @@ interface Plan {
   description: string
   badge?: string
   features: string[]
+  locked?: string[]
   addons?: string
   highlighted: boolean
   tier: "free" | "pro" | "premium"
+}
+
+interface WalletSupportState {
+  loading: boolean
+  applePay: boolean
+  googlePay: boolean
+  secureContext: boolean
+  reason: string
+}
+
+const EURO_FORMATTER = new Intl.NumberFormat("fr-FR", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+function formatEuro(value: number) {
+  return EURO_FORMATTER.format(value)
+}
+
+function getYearlySavings(plan: Plan) {
+  if (plan.price.monthly <= 0 || plan.price.yearly <= 0) return 0
+  return (plan.price.monthly * 12) - plan.price.yearly
+}
+
+function getYearlyDiscount(plan: Plan) {
+  if (plan.price.monthly <= 0 || plan.price.yearly <= 0) return 0
+  return Math.round((getYearlySavings(plan) / (plan.price.monthly * 12)) * 100)
+}
+
+function getMonthlyEquivalent(plan: Plan) {
+  if (plan.price.yearly <= 0) return 0
+  return plan.price.yearly / 12
 }
 
 const PLANS: Plan[] = [
@@ -29,14 +78,20 @@ const PLANS: Plan[] = [
     icon: Sparkles,
     tier: "free",
     price: { monthly: 0, yearly: 0 },
-    description: "Découvrez l'IA crypto sans risque",
+    description: "Découvrez le produit sans risque, avec les bases.",
     features: [
       "1 analyse IA / mois (Claude Haiku)",
-      "Tableau de bord marché en direct",
-      "8 cryptos majeures + courbes 7j",
-      "Historique des 3 dernières analyses",
-      "Score de confiance IA (0–100)",
+      "12 messages de chat IA / mois",
+      "Allocation et plan d'action de base",
+      "Tableau de bord marché",
+      "Historique limité à 3 analyses",
       "Profil investisseur personnalisé",
+    ],
+    locked: [
+      "Signal marché détaillé",
+      "Export PDF",
+      "Chat relié aux analyses personnelles",
+      "Projections et alertes premium",
     ],
     highlighted: false,
   },
@@ -45,16 +100,24 @@ const PLANS: Plan[] = [
     name: "Pro",
     icon: Zap,
     tier: "pro",
-    price: { monthly: 29, yearly: 290 },
-    description: "Investissez avec méthode, chaque mois",
+    price: { monthly: 24.99, yearly: 219.99 },
+    description: "Investissez avec une méthode claire et plus de contexte.",
     badge: "Populaire",
     features: [
       "20 analyses IA / mois (Claude Sonnet)",
-      "Historique complet — 10 analyses",
+      "120 messages de chat IA / mois",
+      "Historique étendu - 10 analyses",
       "Justification détaillée par actif",
-      "Signal marché temps réel intégré",
+      "Signal marché et verdict Pro",
+      "Plan dans le temps",
       "Export PDF des rapports",
-      "Support prioritaire (< 24h)",
+      "Chat relié aux 2 dernières analyses",
+    ],
+    locked: [
+      "Stratégie d'entrée avancée",
+      "Chat Premium avec contexte enrichi",
+      "Projections de scénarios",
+      "Alertes de risque premium",
     ],
     addons: "Tout le plan Gratuit, plus :",
     highlighted: true,
@@ -64,15 +127,18 @@ const PLANS: Plan[] = [
     name: "Premium",
     icon: Crown,
     tier: "premium",
-    price: { monthly: 79, yearly: 790 },
-    description: "Stratégie institutionnelle, modèle le plus puissant",
+    price: { monthly: 59.99, yearly: 499.99 },
+    description: "Analyse plus profonde, contexte plus riche, usage étendu.",
     features: [
       "Analyses illimitées (Claude Opus 4.7)",
-      "Historique complet — 20 analyses",
+      "Chat IA Premium sans quota mensuel dur",
+      "Historique complet - 20 analyses",
+      "Lecture de marché approfondie",
       "Stratégie d'entrée chiffrée",
       "Seuils de rééquilibrage précis",
-      "Accès anticipé aux nouvelles fonctions",
-      "Support dédié (< 4h)",
+      "Projections selon les marchés",
+      "Alertes de risque à éviter",
+      "Chat relié aux 5 dernières analyses",
     ],
     addons: "Tout le plan Pro, plus :",
     highlighted: false,
@@ -80,79 +146,200 @@ const PLANS: Plan[] = [
 ]
 
 const TRUST_SIGNALS = [
-  { icon: Shield,   text: "Paiement sécurisé Stripe · SSL 256-bit" },
-  { icon: Cpu,      text: "Alimenté par Claude · Anthropic AI" },
-  { icon: Sparkles, text: "Annulez à tout moment · Sans engagement" },
+  { icon: Shield, text: "Paiement sécurisé Stripe" },
+  { icon: Cpu, text: "Claude IA intégré au produit" },
+  { icon: MessageSquare, text: "Chat IA relié au plan utilisateur" },
 ]
+
+const MAX_YEARLY_DISCOUNT = Math.max(
+  ...PLANS.map((plan) => getYearlyDiscount(plan))
+)
 
 export function PricingClient({ currentPlan, hasSubscription }: PricingClientProps) {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly")
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
   const [priceIds, setPriceIds] = useState<Record<string, Record<string, string | null>>>({})
   const [priceError, setPriceError] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [walletSupport, setWalletSupport] = useState<WalletSupportState>({
+    loading: true,
+    applePay: false,
+    googlePay: false,
+    secureContext: false,
+    reason: "Vérification des moyens de paiement sur cet appareil.",
+  })
 
   useEffect(() => {
-    fetch("/api/stripe/plans")
-      .then((r) => r.json())
+    fetch("/api/stripe/plans", { cache: "no-store" })
+      .then((response) => response.json())
       .then(setPriceIds)
       .catch(() => setPriceError(true))
   }, [])
 
+  useEffect(() => {
+    let active = true
+
+    const detectWallets = async () => {
+      if (typeof window === "undefined") return
+
+      const secureContext =
+        window.isSecureContext ||
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1"
+
+      const publicKey = process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY
+
+      if (!publicKey) {
+        if (!active) return
+        setWalletSupport({
+          loading: false,
+          applePay: false,
+          googlePay: false,
+          secureContext,
+          reason: "La configuration Stripe est incomplète ici. Le paiement par carte reste le fallback attendu.",
+        })
+        return
+      }
+
+      if (!secureContext) {
+        if (!active) return
+        setWalletSupport({
+          loading: false,
+          applePay: false,
+          googlePay: false,
+          secureContext: false,
+          reason: "Le paiement rapide demande un contexte sécurisé. Sans HTTPS, Stripe repasse sur la carte bancaire.",
+        })
+        return
+      }
+
+      let applePay = false
+      let googlePay = false
+
+      const applePaySession = (
+        window as Window & {
+          ApplePaySession?: {
+            canMakePayments?: () => boolean
+          }
+        }
+      ).ApplePaySession
+
+      applePay = !!applePaySession?.canMakePayments?.()
+
+      try {
+        const stripe = await loadStripe(publicKey)
+        if (stripe) {
+          const paymentRequest = stripe.paymentRequest({
+            country: "FR",
+            currency: "eur",
+            total: { label: "Axiom", amount: 2499 },
+            requestPayerName: true,
+            requestPayerEmail: true,
+          })
+
+          const result = await paymentRequest.canMakePayment()
+          const walletResult = result as { applePay?: boolean; googlePay?: boolean } | null
+
+          applePay = applePay || !!walletResult?.applePay
+          googlePay = !!walletResult?.googlePay
+        }
+      } catch {
+        // Stripe Checkout remains available as the reliable fallback.
+      }
+
+      if (!active) return
+
+      setWalletSupport({
+        loading: false,
+        applePay,
+        googlePay,
+        secureContext,
+        reason:
+          applePay || googlePay
+            ? "Les wallets disponibles apparaîtront automatiquement sur Stripe Checkout."
+            : "Aucun wallet compatible détecté sur cet appareil. Stripe proposera la carte bancaire.",
+      })
+    }
+
+    void detectWallets()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   const handleSubscribe = async (planId: string) => {
     if (planId === "free" || planId === currentPlan) return
+
+    setCheckoutError(null)
     const priceId = priceIds[planId]?.[billing]
-    if (!priceId) { alert("Configuration de paiement indisponible. Contactez le support."); return }
+    if (!priceId) {
+      setCheckoutError("Le paiement n’est pas disponible pour le moment. Réessayez un peu plus tard.")
+      return
+    }
+
     setLoadingPlan(planId)
+
     try {
-      const res = await fetch("/api/stripe/checkout", {
+      const response = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ priceId, plan: planId }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      if (data.url) window.location.href = data.url
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur de paiement")
-    } finally { setLoadingPlan(null) }
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+      if (!data.url || typeof data.url !== "string") {
+        throw new Error("Stripe Checkout n'a pas renvoyé d'URL de redirection.")
+      }
+      if (data.url) window.location.assign(data.url)
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : "Le paiement n’a pas pu démarrer. Réessayez.")
+    } finally {
+      setLoadingPlan(null)
+    }
   }
 
   const handleManageSubscription = async () => {
+    setCheckoutError(null)
     setLoadingPlan("manage")
+
     try {
-      const res = await fetch("/api/stripe/portal", { method: "POST" })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      if (data.url) window.location.href = data.url
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur portail")
-    } finally { setLoadingPlan(null) }
+      const response = await fetch("/api/stripe/portal", { method: "POST" })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+      if (data.url) window.location.assign(data.url)
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : "L’espace abonnement est indisponible pour le moment.")
+    } finally {
+      setLoadingPlan(null)
+    }
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-6 animate-slide-up">
-
-      {/* Header */}
-      <div className="text-center mb-14">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 mb-5">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse-dot" />
-          <span className="text-xs font-bold text-amber-700 uppercase tracking-widest">Tarifs transparents</span>
+    <div className="mx-auto max-w-5xl animate-slide-up py-4 sm:py-6">
+      <div className="mb-10 text-center sm:mb-14">
+        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 shadow-card-xs">
+          <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Tarifs transparents
+          </span>
         </div>
-        <h1 className="text-5xl font-black text-foreground mb-3 tracking-tight">
+
+        <h1 className="mb-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
           Choisissez votre plan
         </h1>
-        <p className="text-muted-foreground text-lg mb-8 max-w-md mx-auto leading-relaxed">
-          Commencez gratuitement. Passez au Pro quand vous êtes prêt.
+        <p className="mx-auto mb-8 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg">
+          Commencez gratuitement. Passez au Pro ou au Premium quand vous avez besoin de plus d’analyses, d’historique et de contexte.
         </p>
 
-        {/* Billing toggle */}
-        <div className="inline-flex items-center gap-1 p-1 bg-secondary rounded-2xl border border-border">
+        <div className="inline-flex w-full max-w-sm flex-col items-stretch gap-1 rounded-2xl border border-border bg-secondary p-1 sm:w-auto sm:max-w-none sm:flex-row sm:items-center">
           <button
             onClick={() => setBilling("monthly")}
             className={cn(
-              "px-5 py-2.5 rounded-xl text-sm font-bold transition-all",
+              "w-full rounded-xl px-5 py-2.5 text-sm font-semibold transition-all sm:w-auto",
               billing === "monthly"
-                ? "bg-card text-foreground border border-border shadow-sm"
+                ? "border border-border bg-card text-foreground shadow-card-xs"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -161,27 +348,71 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
           <button
             onClick={() => setBilling("yearly")}
             className={cn(
-              "px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
+              "flex w-full items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all sm:w-auto",
               billing === "yearly"
-                ? "bg-card text-foreground border border-border shadow-sm"
+                ? "border border-border bg-card text-foreground shadow-card-xs"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
             Annuel
-            <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-md font-black">−17%</span>
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              Jusqu&apos;à -{MAX_YEARLY_DISCOUNT}%
+            </span>
           </button>
         </div>
       </div>
 
       {priceError && (
-        <div className="mb-8 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-amber-700 text-sm max-w-lg mx-auto">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          Paiement en cours de configuration. Contactez-nous pour upgrader.
+        <div className="mx-auto mb-8 flex max-w-lg items-center gap-2 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card-xs">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          Le paiement est indisponible pour le moment. Réessayez plus tard ou contactez-nous.
         </div>
       )}
 
-      {/* Plans grid */}
-      <div className="grid md:grid-cols-3 gap-5 items-start mb-12">
+      {checkoutError && (
+        <div className="mx-auto mb-8 flex max-w-lg items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-card-xs">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{checkoutError}</span>
+        </div>
+      )}
+
+      <div className="mx-auto mb-8 max-w-3xl rounded-3xl border border-border bg-card p-4 shadow-card-xs sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Paiement
+            </p>
+            <h2 className="mt-2 text-base font-semibold text-foreground">
+              Paiement rapide via Stripe Checkout
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {walletSupport.loading ? "Détection en cours sur cet appareil." : walletSupport.reason}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              Apple Pay et Google Pay n&apos;apparaissent que si l&apos;appareil, le navigateur et Stripe les autorisent.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {walletSupport.applePay ? (
+              <span className="inline-flex items-center rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-foreground">
+                Apple Pay
+              </span>
+            ) : null}
+            {walletSupport.googlePay ? (
+              <span className="inline-flex items-center rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-foreground">
+                Google Pay
+              </span>
+            ) : null}
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-foreground">
+              <CreditCard className="h-3.5 w-3.5" />
+              Carte bancaire
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-12 grid items-start gap-4 md:grid-cols-3 md:gap-5">
         {PLANS.map((plan) => {
           const isCurrent = currentPlan === plan.id
           const Icon = plan.icon
@@ -189,139 +420,174 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
           const isLoading = loadingPlan === plan.id
           const isPremium = plan.tier === "premium"
           const isPro = plan.tier === "pro"
+          const yearlySavings = getYearlySavings(plan)
+          const yearlyDiscount = getYearlyDiscount(plan)
+          const monthlyEquivalent = getMonthlyEquivalent(plan)
+          const yearlyReference = plan.price.monthly * 12
 
           return (
             <div
               key={plan.id}
               className={cn(
-                "relative flex flex-col rounded-2xl transition-all",
+                "relative flex flex-col rounded-3xl border bg-card p-6 shadow-card transition-all sm:p-8",
                 isPremium
-                  ? "card-premium-light p-8"
-                  : isPro
-                  ? "bg-gradient-to-b from-amber-50 to-card border border-amber-200 p-8"
-                  : "bg-card border border-border p-8"
+                  ? "card-premium-light"
+                  : "border-border",
               )}
             >
-              {/* Gradient top line */}
-              {isPro && (
-                <div className="absolute top-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-amber-400/60 to-transparent rounded-full" />
-              )}
-              {isPremium && (
-                <div className="absolute top-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-amber-400/80 to-transparent rounded-full" />
+              {(isPro || isPremium) && (
+                <div className="absolute left-8 right-8 top-0 h-px rounded-full bg-gradient-to-r from-transparent via-foreground/18 to-transparent" />
               )}
 
-              {/* Badge */}
               {plan.badge && !isCurrent && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-amber-500 text-black text-[10px] font-black rounded-full shadow-lg whitespace-nowrap uppercase tracking-widest">
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full border border-foreground bg-foreground px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-background shadow-card-xs">
                   {plan.badge}
                 </div>
               )}
+
               {isPremium && !isCurrent && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1.5 text-[10px] font-black rounded-full whitespace-nowrap uppercase tracking-widest badge-premium">
-                  Élite
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full border border-border bg-card px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground shadow-card-xs">
+                  Elite
                 </div>
               )}
+
               {isCurrent && (
                 <div className={cn(
-                  "absolute -top-3.5 right-5 px-3 py-1 text-[10px] font-black rounded-full",
-                  isPro ? "bg-amber-500 text-black" : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                  "absolute -top-3.5 right-5 rounded-full px-3 py-1 text-[10px] font-semibold",
+                  isPremium
+                    ? "border border-foreground bg-foreground text-background"
+                    : "border border-border bg-secondary text-foreground"
                 )}>
                   Plan actuel
                 </div>
               )}
 
-              {/* Icon + Name */}
               <div className="mb-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={cn(
-                    "w-10 h-10 rounded-2xl flex items-center justify-center",
-                    isPremium ? "bg-gradient-to-br from-amber-500/20 to-amber-600/5 border border-amber-500/20"
-                      : isPro ? "bg-amber-100 border border-amber-200"
-                      : "bg-secondary border border-border"
-                  )}>
-                    <Icon className={cn("w-5 h-5", isPremium || isPro ? "text-amber-500" : "text-muted-foreground")} />
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-secondary">
+                    <Icon className="h-5 w-5 text-foreground" />
                   </div>
-                  <div>
-                    <h3 className={cn("font-black text-xl leading-none", isPremium ? "gradient-text-gold" : "text-foreground")}>{plan.name}</h3>
-                  </div>
+                  <h3 className="text-xl font-semibold leading-none text-foreground">{plan.name}</h3>
                 </div>
-                <p className={cn("text-sm mb-5 leading-relaxed", isPremium ? "text-muted-foreground" : "text-muted-foreground")}>{plan.description}</p>
 
-                {/* Price */}
-                <div className="flex items-baseline gap-1.5 mb-1">
-                  <span className={cn("text-4xl font-black tracking-tight", isPremium ? "gradient-text-gold" : "text-foreground")}>
-                    {price === 0 ? "Gratuit" : `${price}€`}
+                <p className="mb-5 text-sm leading-relaxed text-muted-foreground">{plan.description}</p>
+
+                <div className="mb-1 flex items-baseline gap-1.5">
+                  <span className="text-4xl font-semibold tracking-tight text-foreground">
+                    {price === 0 ? "Gratuit" : formatEuro(price)}
                   </span>
                   {price > 0 && (
-                    <span className={cn("text-sm", isPremium ? "text-muted-foreground" : "text-muted-foreground")}>/{billing === "monthly" ? "mois" : "an"}</span>
+                    <span className="text-sm text-muted-foreground">/{billing === "monthly" ? "mois" : "an"}</span>
                   )}
                 </div>
-                {billing === "yearly" && price > 0 && (
-                  <p className="text-xs font-semibold text-emerald-600">
-                    Soit {Math.round(price / 12)}€/mois — économisez {plan.price.monthly * 12 - price}€
-                  </p>
+
+                {price > 0 && billing === "monthly" && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-emerald-700">
+                      {formatEuro(plan.price.yearly)} / an - économisez {formatEuro(yearlySavings)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Facturation annuelle à -{yearlyDiscount}% par rapport au mensuel.
+                    </p>
+                  </div>
+                )}
+
+                {price > 0 && billing === "yearly" && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                        -{yearlyDiscount}%
+                      </span>
+                      <span className="text-xs font-medium text-emerald-700">
+                        Économisez {formatEuro(yearlySavings)}
+                      </span>
+                    </div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Soit {formatEuro(monthlyEquivalent)} / mois
+                    </p>
+                    <p className="text-xs text-muted-foreground line-through">
+                      Au lieu de {formatEuro(yearlyReference)} / an
+                    </p>
+                  </div>
                 )}
               </div>
 
-              {/* Features */}
-              <ul className="space-y-3 flex-1 mb-8">
+              <ul className="mb-8 flex-1 space-y-3">
                 {plan.addons && (
                   <li className="pb-1">
-                    <span className={cn("text-[10px] font-bold uppercase tracking-widest", isPremium ? "text-muted-foreground" : "text-muted-foreground")}>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       {plan.addons}
                     </span>
                   </li>
                 )}
+
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2.5 text-sm">
-                    <div className={cn(
-                      "w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                      isPremium ? "bg-amber-500/15 border border-amber-500/20"
-                        : isPro ? "bg-amber-100"
-                        : "bg-secondary"
-                    )}>
-                      <Check className={cn("w-2.5 h-2.5", isPremium || isPro ? "text-amber-500" : "text-muted-foreground")} />
+                    <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border bg-secondary">
+                      <Check className="h-2.5 w-2.5 text-foreground" />
                     </div>
-                    <span className={cn("leading-relaxed", isPremium ? "text-muted-foreground" : "text-muted-foreground")}>{feature}</span>
+                    <span className="leading-relaxed text-foreground">{feature}</span>
                   </li>
                 ))}
+
+                {plan.locked && plan.locked.length > 0 && (
+                  <>
+                    <li className="pt-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Non inclus
+                        </span>
+                      </li>
+                    {plan.locked.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2.5 text-sm">
+                        <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border bg-secondary">
+                          <Lock className="h-2.5 w-2.5 text-muted-foreground" />
+                        </div>
+                        <span className="leading-relaxed text-muted-foreground">{feature}</span>
+                      </li>
+                    ))}
+                  </>
+                )}
               </ul>
 
-              {/* CTA */}
               {isCurrent && hasSubscription ? (
                 <button
                   onClick={handleManageSubscription}
                   disabled={loadingPlan === "manage"}
-                  className="w-full py-3.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-secondary text-foreground hover:bg-secondary/80 border border-border"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-secondary py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-secondary/80"
                 >
-                  {loadingPlan === "manage" && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Gérer l&apos;abonnement
+                  {loadingPlan === "manage" && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Gérer mon abonnement
                 </button>
               ) : isCurrent ? (
-                <div className="w-full py-3.5 text-center text-sm font-semibold rounded-xl bg-secondary text-muted-foreground border border-border">
+                <div className="w-full rounded-2xl border border-border bg-secondary py-3.5 text-center text-sm font-medium text-muted-foreground">
                   Plan actuel
                 </div>
               ) : plan.id === "free" ? (
-                <div className="w-full py-3.5 text-center text-xs text-muted-foreground border border-border rounded-xl bg-transparent">
-                  Toujours gratuit · aucune carte requise
+                <div className="w-full rounded-2xl border border-border bg-transparent py-3.5 text-center text-xs text-muted-foreground">
+                  Toujours gratuit, sans carte bancaire
                 </div>
               ) : (
                 <button
                   onClick={() => handleSubscribe(plan.id)}
                   disabled={isLoading || priceError}
                   className={cn(
-                    "w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50",
-                    isPremium
-                      ? "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black glow-sm-gold"
-                      : isPro
-                      ? "bg-amber-500 hover:bg-amber-400 text-black glow-sm-gold"
-                      : "bg-secondary hover:bg-secondary/80 text-foreground border border-border"
+                    "flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold transition-all disabled:opacity-50",
+                    isPro || isPremium
+                      ? "border border-foreground bg-foreground text-background hover:bg-foreground/92"
+                      : "border border-border bg-secondary text-foreground hover:bg-secondary/80"
                   )}
                 >
-                  {isLoading
-                    ? <><Loader2 className="w-4 h-4 animate-spin" />Redirection…</>
-                    : <><ArrowRight className="w-4 h-4" />Passer au {plan.name}</>
-                  }
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Redirection...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight className="h-4 w-4" />
+                      Choisir {plan.name}
+                    </>
+                  )}
                 </button>
               )}
             </div>
@@ -329,11 +595,10 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
         })}
       </div>
 
-      {/* Trust signals */}
-      <div className="flex items-center justify-center gap-8 flex-wrap">
+      <div className="flex flex-wrap items-center justify-center gap-8">
         {TRUST_SIGNALS.map(({ icon: Icon, text }) => (
           <div key={text} className="flex items-center gap-2 text-muted-foreground">
-            <Icon className="w-3.5 h-3.5 shrink-0" />
+            <Icon className="h-3.5 w-3.5 shrink-0" />
             <span className="text-xs">{text}</span>
           </div>
         ))}

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe"
 import { createClient } from "@/lib/supabase/server"
+import { resolveAppUrl } from "@/lib/app-url"
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -18,9 +19,11 @@ export async function POST() {
       return NextResponse.json({ error: "Aucun abonnement actif" }, { status: 400 })
     }
 
+    const appUrl = resolveAppUrl(request)
+
     const session = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")}/settings`,
+      return_url: `${appUrl}/settings`,
     })
 
     return NextResponse.json({ url: session.url })

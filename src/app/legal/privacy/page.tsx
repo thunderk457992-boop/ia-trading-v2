@@ -1,171 +1,221 @@
 import Link from "next/link"
-
-function VelaLogo() {
-  return (
-    <Link href="/" className="flex items-center gap-2.5">
-      <div className="w-7 h-7 rounded-md bg-slate-900 flex items-center justify-center">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M2 4L8 13L14 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </div>
-      <span className="font-bold text-slate-900 tracking-tight">Vela</span>
-    </Link>
-  )
-}
+import { AxiomLogo } from "@/components/branding/AxiomLogo"
+import { createClient } from "@/lib/supabase/server"
+import { HomeLink } from "@/components/legal/HomeLink"
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-10">
-      <h2 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">{title}</h2>
-      <div className="space-y-3 text-slate-600 text-sm leading-relaxed">{children}</div>
+      <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-bold text-slate-900">{title}</h2>
+      <div className="space-y-3 text-sm leading-relaxed text-slate-600">{children}</div>
     </section>
   )
 }
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const homeHref = user ? "/dashboard" : "/"
+
   return (
     <div className="min-h-screen bg-white">
-      <nav className="border-b border-slate-100 bg-white/95 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
-          <VelaLogo />
-          <Link href="/" className="text-sm text-slate-400 hover:text-slate-700 transition-colors">← Accueil</Link>
+      <nav className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6">
+          <HomeLink fallbackHref={homeHref} className="inline-flex items-center">
+            <AxiomLogo showBadge={false} className="gap-2" nameClassName="text-base font-bold text-slate-900" />
+          </HomeLink>
+          <HomeLink fallbackHref={homeHref} className="text-sm text-slate-400 transition-colors hover:text-slate-700">
+            ← Accueil
+          </HomeLink>
         </div>
       </nav>
 
-      <main className="max-w-3xl mx-auto px-6 py-16">
+      <main className="mx-auto max-w-3xl px-6 py-16">
         <div className="mb-12">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Légal</p>
-          <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-3">Politique de confidentialité</h1>
-          <p className="text-slate-400 text-sm">Dernière mise à jour : 20 avril 2026</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Légal</p>
+          <h1 className="mb-3 text-4xl font-bold tracking-tight text-slate-900">
+            Politique de confidentialité
+          </h1>
+          <p className="text-sm text-slate-400">Dernière mise à jour : 24 avril 2026</p>
         </div>
 
         <Section title="1. Responsable du traitement">
           <p>
-            Vela SAS, ci-après « Vela », est responsable du traitement de vos données personnelles collectées via la plateforme accessible à l&apos;adresse vela.ai.
+            <strong>Axiom</strong>, en qualité d&apos;éditeur et d&apos;exploitant du service Axiom, est
+            responsable du traitement des données personnelles collectées dans le cadre de l&apos;utilisation
+            de l&apos;application.
           </p>
           <p>
-            Pour toute question relative à la protection de vos données, contactez-nous à : <strong>privacy@vela.ai</strong>
+            Pour toute question relative à la protection des données personnelles, vous pouvez écrire à{" "}
+            <strong>support.axiom.support@gmail.com</strong>.
           </p>
         </Section>
 
         <Section title="2. Données collectées">
-          <p>Nous collectons uniquement les données strictement nécessaires au fonctionnement du Service :</p>
-          <ul className="list-disc pl-5 space-y-2">
+          <p>Nous collectons uniquement les données nécessaires au fonctionnement du Service, notamment :</p>
+          <ul className="list-disc space-y-2 pl-5">
             <li>
-              <strong>Données d&apos;identification :</strong> adresse email, prénom et nom (optionnel), lors de la création du compte.
+              <strong>Données de compte :</strong> adresse email, nom complet facultatif et informations
+              d&apos;authentification gérées via Supabase Auth.
             </li>
             <li>
-              <strong>Données de profil investisseur :</strong> tolérance au risque, horizon d&apos;investissement, capital indicatif, objectifs — nécessaires au fonctionnement de l&apos;IA.
+              <strong>Données de profil investisseur :</strong> capital indicatif, revenu mensuel,
+              tolérance à la perte, horizon, fréquence d&apos;investissement, objectifs et préférences
+              nécessaires à la génération des analyses.
             </li>
             <li>
-              <strong>Données d&apos;utilisation :</strong> analyses générées, scores, allocations recommandées — stockées pour l&apos;historique personnel.
+              <strong>Données d&apos;usage :</strong> analyses générées, allocations recommandées, scores,
+              limites de plan, historique accessible selon l&apos;abonnement et métadonnées techniques liées
+              au fonctionnement du produit.
             </li>
             <li>
-              <strong>Données de facturation :</strong> gérées exclusivement par Stripe. Vela ne stocke aucun numéro de carte bancaire.
+              <strong>Données de facturation :</strong> informations d&apos;abonnement, identifiant client
+              Stripe et statut de souscription. Les données bancaires complètes restent traitées par Stripe.
             </li>
             <li>
-              <strong>Données techniques :</strong> adresse IP, type de navigateur, logs d&apos;accès — à des fins de sécurité et de débogage.
+              <strong>Données techniques :</strong> journaux d&apos;accès, adresse IP, type de navigateur et
+              événements nécessaires à la sécurité, au débogage et à la fiabilité du service.
             </li>
           </ul>
         </Section>
 
-        <Section title="3. Finalités et base légale du traitement">
-          <ul className="list-disc pl-5 space-y-2">
-            <li><strong>Exécution du contrat :</strong> fourniture du Service, gestion du compte, traitement des paiements.</li>
-            <li><strong>Intérêt légitime :</strong> sécurité du Service, prévention des fraudes, amélioration des algorithmes d&apos;IA (données anonymisées).</li>
-            <li><strong>Obligation légale :</strong> conservation des données de facturation (10 ans).</li>
-            <li><strong>Consentement :</strong> envoi de communications marketing (désactivable à tout moment).</li>
+        <Section title="3. Finalités et bases légales">
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <strong>Exécution du contrat :</strong> création du compte, fourniture des analyses, gestion
+              des abonnements, accès au dashboard, au chat IA et aux limitations par plan.
+            </li>
+            <li>
+              <strong>Intérêt légitime :</strong> sécurisation du service, prévention des abus, amélioration
+              de la qualité produit et résolution des incidents techniques.
+            </li>
+            <li>
+              <strong>Obligation légale :</strong> conservation des éléments de facturation et respect des
+              obligations comptables ou réglementaires applicables.
+            </li>
+            <li>
+              <strong>Consentement, lorsqu&apos;il est requis :</strong> certaines communications non essentielles
+              ou futures fonctionnalités marketing.
+            </li>
           </ul>
         </Section>
 
         <Section title="4. Partage des données">
-          <p>Vos données ne sont jamais vendues à des tiers. Elles peuvent être partagées avec :</p>
-          <ul className="list-disc pl-5 space-y-2">
-            <li><strong>Supabase (Supabase Inc., USA) :</strong> base de données et authentification — hébergement UE disponible, couvert par les clauses contractuelles types de la Commission européenne.</li>
-            <li><strong>Stripe (Stripe Inc., USA) :</strong> traitement des paiements — certifié PCI DSS niveau 1.</li>
-            <li><strong>Anthropic (Anthropic PBC, USA) :</strong> génération des analyses IA — les prompts contiennent uniquement des données de profil anonymisées (capital, risque, horizon) sans données personnellement identifiables.</li>
-            <li><strong>Vercel (Vercel Inc., USA) :</strong> hébergement de l&apos;application — SOC 2 Type II.</li>
+          <p>Les données personnelles ne sont pas vendues. Elles peuvent être partagées avec des prestataires agissant pour notre compte, notamment :</p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <strong>Supabase :</strong> authentification, base de données et infrastructure applicative.
+            </li>
+            <li>
+              <strong>Stripe :</strong> gestion des abonnements et des paiements.
+            </li>
+            <li>
+              <strong>Anthropic :</strong> génération de contenus IA à partir des données nécessaires à la
+              réponse ou à l&apos;analyse demandée.
+            </li>
+            <li>
+              <strong>Vercel :</strong> hébergement et exécution de l&apos;application.
+            </li>
           </ul>
           <p>
-            Tous nos prestataires sont liés par des accords de traitement des données conformes au RGPD.
+            Lorsque cela est nécessaire, ces transferts sont encadrés par des garanties contractuelles
+            appropriées.
           </p>
         </Section>
 
         <Section title="5. Durée de conservation">
-          <ul className="list-disc pl-5 space-y-2">
-            <li>Données de compte : pendant la durée de l&apos;abonnement + 3 ans après la résiliation.</li>
-            <li>Analyses IA : pendant la durée de l&apos;abonnement actif.</li>
-            <li>Données de facturation : 10 ans (obligation légale).</li>
-            <li>Logs techniques : 90 jours.</li>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>Données de compte : pendant la durée d&apos;utilisation du compte, puis pendant la période nécessaire à la gestion des obligations légales ou des litiges éventuels.</li>
+            <li>Données d&apos;analyses : selon les limites du produit, du plan souscrit et les contraintes techniques du service.</li>
+            <li>Données de facturation : pendant la durée légalement requise en matière comptable et fiscale.</li>
+            <li>Journaux techniques et sécurité : pendant la période strictement nécessaire à la fiabilité et à la protection du service.</li>
           </ul>
         </Section>
 
-        <Section title="6. Vos droits (RGPD)">
-          <p>Conformément au Règlement Général sur la Protection des Données (RGPD), vous disposez des droits suivants :</p>
-          <ul className="list-disc pl-5 space-y-2">
-            <li><strong>Droit d&apos;accès :</strong> obtenir une copie de vos données personnelles.</li>
-            <li><strong>Droit de rectification :</strong> corriger des données inexactes.</li>
-            <li><strong>Droit à l&apos;effacement :</strong> supprimer votre compte et vos données (accessible depuis Paramètres → Compte).</li>
-            <li><strong>Droit à la portabilité :</strong> recevoir vos données dans un format structuré.</li>
-            <li><strong>Droit d&apos;opposition :</strong> vous opposer à certains traitements, notamment à des fins marketing.</li>
-            <li><strong>Droit à la limitation :</strong> restreindre temporairement le traitement de vos données.</li>
-          </ul>
+        <Section title="6. Vos droits">
           <p>
-            Pour exercer vos droits : <strong>privacy@vela.ai</strong>. Réponse sous 30 jours maximum.
+            Conformément au RGPD, vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement,
+            d&apos;opposition, de limitation du traitement et, lorsque cela est applicable, de portabilité
+            de vos données personnelles.
           </p>
           <p>
-            Si vous estimez que vos droits ne sont pas respectés, vous pouvez introduire une réclamation auprès de la <strong>CNIL</strong> (Commission Nationale de l&apos;Informatique et des Libertés) : www.cnil.fr.
+            Vous pouvez également demander la suppression de votre compte depuis les paramètres lorsqu&apos;une
+            telle option est disponible, ou en nous écrivant à <strong>support.axiom.support@gmail.com</strong>.
+          </p>
+          <p>
+            Si vous estimez que vos droits ne sont pas respectés, vous pouvez introduire une réclamation
+            auprès de la <strong>CNIL</strong>.
           </p>
         </Section>
 
         <Section title="7. Cookies et traceurs">
           <p>
-            Vela utilise uniquement les cookies strictement nécessaires au fonctionnement du Service (session d&apos;authentification). Aucun cookie publicitaire ou de tracking tiers n&apos;est déposé.
+            Axiom utilise principalement les cookies ou mécanismes techniques nécessaires à
+            l&apos;authentification, à la sécurité de session et au bon fonctionnement de l&apos;application.
           </p>
           <p>
-            Les cookies de session sont automatiquement supprimés à la fermeture du navigateur ou après 7 jours d&apos;inactivité.
+            Aucun cookie publicitaire tiers n&apos;est déployé à ce jour dans le cadre du fonctionnement
+            standard du produit.
           </p>
         </Section>
 
         <Section title="8. Sécurité">
           <p>
-            Vela met en œuvre les mesures techniques et organisationnelles suivantes pour protéger vos données :
+            Nous mettons en œuvre des mesures techniques et organisationnelles raisonnables pour protéger
+            les données personnelles, notamment le chiffrement des communications, la restriction d&apos;accès
+            aux environnements sensibles et la journalisation des opérations critiques.
           </p>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>Chiffrement SSL/TLS sur toutes les communications</li>
-            <li>Mots de passe hachés avec bcrypt (via Supabase Auth)</li>
-            <li>Accès aux données de production restreint et journalisé</li>
-            <li>Séparation stricte des environnements de développement et production</li>
-          </ul>
         </Section>
 
-        <Section title="9. Transferts hors UE">
+        <Section title="9. Transferts hors Union européenne">
           <p>
-            Certains de nos prestataires (Supabase, Stripe, Anthropic, Vercel) sont établis aux États-Unis. Ces transferts sont encadrés par les Clauses Contractuelles Types (CCT) de la Commission européenne, assurant un niveau de protection équivalent au RGPD.
+            Certains prestataires peuvent traiter des données en dehors de l&apos;Union européenne. Lorsque
+            c&apos;est le cas, nous nous appuyons sur les mécanismes juridiques appropriés prévus par la
+            réglementation applicable, notamment les clauses contractuelles types lorsque cela est requis.
           </p>
         </Section>
 
         <Section title="10. Modifications de la politique">
           <p>
-            Nous nous réservons le droit de modifier la présente politique. Toute modification substantielle sera notifiée par email avec un préavis de 15 jours. La date de dernière mise à jour est indiquée en tête de document.
+            La présente politique peut évoluer pour refléter les changements du produit, de nos prestataires
+            ou du cadre réglementaire. La date de mise à jour figurant en tête de page permet d&apos;identifier
+            la version en vigueur.
           </p>
         </Section>
 
         <Section title="11. Contact">
           <p>
-            DPO / Responsable données : <strong>privacy@vela.ai</strong><br />
-            Vela SAS — Paris, France
+            Support Axiom :{" "}
+            <a
+              href="mailto:support.axiom.support@gmail.com?subject=Support%20Axiom%20%E2%80%93%20Demande%20utilisateur"
+              className="font-semibold text-slate-900 underline underline-offset-2 hover:text-slate-700"
+            >
+              support.axiom.support@gmail.com
+            </a>
+            <br />
+            Responsable du traitement : <strong>Axiom</strong>, Paris, France
           </p>
         </Section>
       </main>
 
-      <footer className="border-t border-slate-100 bg-white py-8 px-6">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <VelaLogo />
+      <footer className="border-t border-slate-100 bg-white px-6 py-8">
+        <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-4 sm:flex-row">
+          <HomeLink fallbackHref={homeHref} className="inline-flex items-center">
+            <AxiomLogo showBadge={false} className="gap-2" nameClassName="text-base font-bold text-slate-900" />
+          </HomeLink>
           <div className="flex items-center gap-5 text-xs text-slate-400">
-            <Link href="/legal/cgu" className="hover:text-slate-700 transition-colors">CGU</Link>
-            <Link href="/legal/privacy" className="hover:text-slate-700 transition-colors font-medium text-slate-700">Confidentialité</Link>
-            <Link href="/" className="hover:text-slate-700 transition-colors">Accueil</Link>
+            <Link href="/legal/cgu" className="transition-colors hover:text-slate-700">
+              CGU
+            </Link>
+            <Link href="/legal/privacy" className="font-medium text-slate-700 transition-colors hover:text-slate-700">
+              Confidentialité
+            </Link>
+            <HomeLink fallbackHref={homeHref} className="transition-colors hover:text-slate-700">
+              Accueil
+            </HomeLink>
           </div>
         </div>
       </footer>

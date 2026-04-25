@@ -74,6 +74,7 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
 body {
@@ -81,7 +82,20 @@ body {
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
     "Inter", "Helvetica Neue", Arial, sans-serif;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
+}
+
+button,
+[role="button"],
+a[href] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+a[href]:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--foreground) 18%, transparent);
+  outline-offset: 2px;
 }
 
 /* ── Scrollbar ───────────────────────────────────────────────────────────── */
@@ -312,16 +326,18 @@ body {
 
 /* ── Premium badge ───────────────────────────────────────────────────────── */
 .badge-premium {
-  background: linear-gradient(135deg, rgba(245,166,35,0.18), rgba(245,166,35,0.06));
-  border: 1px solid rgba(245,166,35,0.35);
-  color: #fbbf24;
+  background: #111111;
+  border: 1px solid rgba(17,17,17,0.9);
+  color: #ffffff;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 2px 8px;
-  border-radius: 5px;
-  box-shadow: 0 0 12px rgba(245,166,35,0.10);
+  border-radius: 999px;
+  box-shadow:
+    0 1px 2px rgba(17,24,39,0.05),
+    0 8px 22px rgba(17,24,39,0.10);
 }
 .badge-pro {
   background: rgba(79,142,247,0.1);
@@ -347,22 +363,22 @@ body {
 /* ── Light card depth (advisor — light theme) ────────────────────────────── */
 .shadow-card {
   box-shadow:
-    0 1px 2px rgba(0,0,0,0.04),
-    0 4px 16px rgba(0,0,0,0.05);
+    0 1px 2px rgba(17,24,39,0.05),
+    0 12px 32px rgba(17,24,39,0.06);
 }
 .shadow-card-xs {
   box-shadow:
-    0 1px 2px rgba(0,0,0,0.03),
-    0 2px 8px rgba(0,0,0,0.04);
+    0 1px 2px rgba(17,24,39,0.05),
+    0 6px 18px rgba(17,24,39,0.05);
 }
 
 /* ── Premium card — light version ────────────────────────────────────────── */
 .card-premium-light {
-  background: #fffcf5;
-  border: 1px solid rgba(245,166,35,0.22);
+  background: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+  border: 1px solid rgba(17,24,39,0.10);
   box-shadow:
-    0 2px 12px rgba(245,166,35,0.08),
-    0 1px 2px rgba(0,0,0,0.04);
+    0 1px 2px rgba(17,24,39,0.05),
+    0 16px 40px rgba(17,24,39,0.08);
 }
 
 /* ── Section line (gold top) ─────────────────────────────────────────────── */
@@ -374,6 +390,6 @@ body {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(245,166,35,0.18) 40%, rgba(245,166,35,0.18) 60%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(17,24,39,0.12) 40%, rgba(17,24,39,0.12) 60%, transparent 100%);
   z-index: 1;
 }

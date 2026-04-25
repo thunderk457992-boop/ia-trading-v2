@@ -124,6 +124,21 @@ create index if not exists ai_analyses_user_id_idx    on public.ai_analyses(user
 create index if not exists ai_analyses_created_at_idx on public.ai_analyses(created_at desc);
 
 -- ============================================================
+-- TABLE 6: chat_messages (chat usage + optional history)
+-- ============================================================
+create table if not exists public.chat_messages (
+  id               uuid        primary key default gen_random_uuid(),
+  user_id          uuid        not null references public.profiles(id) on delete cascade,
+  role             text        not null check (role in ('user','assistant')),
+  content          text        not null,
+  created_at       timestamptz not null default now()
+);
+
+comment on table public.chat_messages is 'Chat usage and optional message history';
+create index if not exists chat_messages_user_id_idx on public.chat_messages(user_id);
+create index if not exists chat_messages_created_at_idx on public.chat_messages(created_at desc);
+
+-- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
 alter table public.profiles      enable row level security;
@@ -131,6 +146,7 @@ alter table public.subscriptions enable row level security;
 alter table public.payments      enable row level security;
 alter table public.strategies    enable row level security;
 alter table public.ai_analyses   enable row level security;
+alter table public.chat_messages enable row level security;
 
 -- profiles: users see and edit only their own row
 create policy "profiles: own row read"
@@ -165,6 +181,12 @@ create policy "ai_analyses: own rows read"
   on public.ai_analyses for select using (auth.uid() = user_id);
 create policy "ai_analyses: own rows insert"
   on public.ai_analyses for insert with check (auth.uid() = user_id);
+
+-- chat_messages: read + insert by owner
+create policy "chat_messages: own rows read"
+  on public.chat_messages for select using (auth.uid() = user_id);
+create policy "chat_messages: own rows insert"
+  on public.chat_messages for insert with check (auth.uid() = user_id);
 
 -- ============================================================
 -- TRIGGERS

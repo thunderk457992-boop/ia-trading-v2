@@ -1,6 +1,7 @@
 "use client"
 
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
+import { useEffect, useRef, useState } from "react"
+import { PieChart, Pie, Cell, Tooltip } from "recharts"
 
 const ASSET_COLORS: Record<string, string> = {
   BTC: "#f59e0b", ETH: "#3b82f6", SOL: "#a855f7",
@@ -45,6 +46,36 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
 }
 
 export function PortfolioChart({ allocations }: { allocations: Allocation[] }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const updateSize = (width: number, height: number) => {
+      if (width <= 0 || height <= 0) return
+      setChartSize((current) => (
+        current.width === width && current.height === height
+          ? current
+          : { width, height }
+      ))
+    }
+
+    updateSize(container.clientWidth, container.clientHeight)
+
+    if (typeof ResizeObserver === "undefined") return
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      updateSize(entry.contentRect.width, entry.contentRect.height)
+    })
+
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [])
+
   if (!allocations.length) return null
 
   const data   = allocations.map((a) => ({ name: a.asset, value: a.percentage }))
@@ -52,7 +83,7 @@ export function PortfolioChart({ allocations }: { allocations: Allocation[] }) {
   const top    = allocations[0]
 
   return (
-    <div className="relative w-full h-full">
+    <div ref={containerRef} className="relative h-full w-full min-h-0 min-w-0">
       {/* Center label */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">
@@ -63,8 +94,8 @@ export function PortfolioChart({ allocations }: { allocations: Allocation[] }) {
         </span>
       </div>
 
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
+      {chartSize.width > 0 && chartSize.height > 0 && (
+        <PieChart width={chartSize.width} height={chartSize.height}>
           <Pie
             data={data}
             cx="50%"
@@ -83,7 +114,7 @@ export function PortfolioChart({ allocations }: { allocations: Allocation[] }) {
           </Pie>
           <Tooltip content={<CustomTooltip />} />
         </PieChart>
-      </ResponsiveContainer>
+      )}
     </div>
   )
 }
