@@ -92,7 +92,8 @@ export default async function DashboardPage({
     ? subscription.plan
     : profile?.plan ?? "free"
   const lastAnalysis = (analyses ?? []).slice(0, HISTORY_LIMIT[plan] ?? 3)[0] ?? null
-  const portfolioHistory = lastAnalysis
+  const hasPortfolioSnapshots = (portfolioSnapshots?.length ?? 0) > 0
+  const portfolioHistory = !hasPortfolioSnapshots && lastAnalysis
     ? await fetchPortfolioMarketHistory(lastAnalysis.allocations ?? [], market.prices, 8)
     : []
   const marketDecision = buildMarketDecision(market.prices, market.global, lastAnalysis?.allocations ?? null)

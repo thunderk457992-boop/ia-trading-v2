@@ -304,16 +304,24 @@ function getPreferredTimeframe(availability: Record<TF, TimeframeAvailability>):
 
 interface PortfolioSnapshotChartPoint {
   timestamp: number
-  portfolio: number
+  performance: number
   portfolioValue: number
 }
 
 interface PortfolioChartDataPoint {
   name: string
   portfolio: number
+  performance: number
   portfolioValue: number | null
   btc: number | null
   eth: number | null
+}
+
+function formatPortfolioValue(value: number) {
+  return `${value.toLocaleString("fr-FR", {
+    minimumFractionDigits: value < 100 ? 2 : 0,
+    maximumFractionDigits: value < 100 ? 2 : 0,
+  })}€`
 }
 
 function normalizePortfolioSnapshots(snapshots: PortfolioSnapshot[]) {
@@ -342,23 +350,23 @@ function buildPortfolioSnapshotData(
   timeframe: "1H" | "1D" | "7D"
 ): PortfolioSnapshotChartPoint[] {
   const normalized = normalizePortfolioSnapshots(snapshots)
-  if (normalized.length < 2) return []
+  if (!normalized.length) return []
 
   const endTime = normalized[normalized.length - 1]?.timestamp
   if (!endTime) return []
 
   const periodMs = timeframe === "7D" ? 7 * DAY_MS : timeframe === "1D" ? DAY_MS : HOUR_MS
   const startTime = endTime - periodMs
-  const baseline = [...normalized].reverse().find((snapshot) => snapshot.timestamp <= startTime) ?? normalized[0]
   const inWindow = normalized.filter((snapshot) => snapshot.timestamp >= startTime && snapshot.timestamp <= endTime)
-  const series = [baseline, ...inWindow.filter((snapshot) => snapshot.timestamp > baseline.timestamp)]
+  const series = inWindow.length > 0 ? inWindow : [normalized[normalized.length - 1]]
+  const baseline = series[0]
 
-  if (series.length < 2 || baseline.portfolioValue <= 0) return []
+  if (!baseline || baseline.portfolioValue <= 0) return []
 
   return series.map((snapshot) => ({
     timestamp: snapshot.timestamp,
     portfolioValue: snapshot.portfolioValue,
-    portfolio: Number((((snapshot.portfolioValue / baseline.portfolioValue) - 1) * 100).toFixed(3)),
+    performance: Number((((snapshot.portfolioValue / baseline.portfolioValue) - 1) * 100).toFixed(3)),
   }))
 }
 
@@ -367,7 +375,7 @@ function getPortfolioSnapshotChange(
   timeframe: "1H" | "1D" | "7D"
 ) {
   const data = buildPortfolioSnapshotData(snapshots, timeframe)
-  return data.length > 1 ? data[data.length - 1].portfolio : null
+  return data.length ? data[data.length - 1].performance : null
 }
 
 function PortfolioLineChart({
@@ -390,13 +398,13 @@ function PortfolioLineChart({
   const chartContainerRef = useRef<HTMLDivElement | null>(null)
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
   const uid = useId().replace(/:/g, "")
-  const useSnapshotHistory = portfolioSnapshots.length >= 2
+  const useSnapshotHistory = portfolioSnapshots.length > 0
   const snapshotData1h = useMemo(() => buildPortfolioSnapshotData(portfolioSnapshots, "1H"), [portfolioSnapshots])
   const snapshotData1d = useMemo(() => buildPortfolioSnapshotData(portfolioSnapshots, "1D"), [portfolioSnapshots])
   const snapshotData7d = useMemo(() => buildPortfolioSnapshotData(portfolioSnapshots, "7D"), [portfolioSnapshots])
   const selectedSnapshotData = tf === "7D" ? snapshotData7d : tf === "1H" ? snapshotData1h : snapshotData1d
   const selectedChange = tf === "7D" ? portfolioChange7d : tf === "1H" ? portfolioChange1h : portfolioChange24h
-  const selectedValueChange = useSnapshotHistory && selectedSnapshotData.length > 1
+  const selectedValueChange = useSnapshotHistory && selectedSnapshotData.length > 0
     ? selectedSnapshotData[selectedSnapshotData.length - 1].portfolioValue - selectedSnapshotData[0].portfolioValue
     : tf === "1D"
     ? portfolioValueChange
@@ -440,16 +448,17 @@ function PortfolioLineChart({
   }, [])
 
   const mergedData = useMemo<PortfolioChartDataPoint[]>(() => {
-    if (!selectedTimeframeAvailable || selectedChange === null) return []
+    if (!selectedTimeframeAvailable) return []
 
-    if (useSnapshotHistory && selectedSnapshotData.length > 1) {
+    if (useSnapshotHistory && selectedSnapshotData.length > 0) {
       return selectedSnapshotData.map((point) => ({
         name: tf === "7D"
           ? new Date(point.timestamp).toLocaleDateString("fr-FR", { weekday: "short" })
           : tf === "1H"
           ? new Date(point.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
           : new Date(point.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit" }),
-        portfolio: point.portfolio,
+        portfolio: point.portfolioValue,
+        performance: point.performance,
         portfolioValue: point.portfolioValue,
         btc: null,
         eth: null,
@@ -469,17 +478,17 @@ function PortfolioLineChart({
         : tf === "1H"
         ? new Date(point.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
         : new Date(point.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit" })
-      return { name, portfolio: point.portfolio, portfolioValue: null, btc: btcPoints[i], eth: ethPoints[i] }
+      return { name, portfolio: point.portfolio, performance: point.portfolio, portfolioValue: null, btc: btcPoints[i], eth: ethPoints[i] }
     })
-  }, [allocations, portfolioHistory, selectedChange, selectedSnapshotData, selectedTimeframeAvailable, tf, useSnapshotHistory])
+  }, [allocations, portfolioHistory, selectedSnapshotData, selectedTimeframeAvailable, tf, useSnapshotHistory])
 
-  const lastValue = mergedData[mergedData.length - 1]?.portfolio ?? selectedChange ?? 0
+  const lastValue = mergedData[mergedData.length - 1]?.performance ?? selectedChange ?? 0
   const isUp = lastValue >= 0
-  const maxVal = mergedData.length ? Math.max(...mergedData.map(d => d.portfolio)) : 0
-  const minVal = mergedData.length ? Math.min(...mergedData.map(d => d.portfolio)) : 0
+  const maxVal = mergedData.length ? Math.max(...mergedData.map(d => d.performance)) : 0
+  const minVal = mergedData.length ? Math.min(...mergedData.map(d => d.performance)) : 0
   const color = isUp ? "#3b82f6" : "#ef4444"
   const gradId = `grad-${uid}`
-  const missingHistoryData = allocations.length > 0 && selectedChange === null
+  const missingHistoryData = allocations.length > 0 && mergedData.length === 0
   const unavailableReason = timeframeAvailability[tf].reason
   const pendingHistoryReason = (["1H", "1D", "7D"] as const)
     .map((timeframe) => timeframeAvailability[timeframe].reason)
@@ -491,8 +500,8 @@ function PortfolioLineChart({
     : missingHistoryData
     ? pendingHistoryReason || unavailableReason || "Données historiques indisponibles"
     : unavailableReason || "Période indisponible"
-  const hasBtcData = mergedData.some((point) => point.btc !== null)
-  const hasEthData = mergedData.some((point) => point.eth !== null)
+  const hasBtcData = !useSnapshotHistory && mergedData.some((point) => point.btc !== null)
+  const hasEthData = !useSnapshotHistory && mergedData.some((point) => point.eth !== null)
 
   return (
     <div className="rounded-xl border border-border bg-card">
@@ -501,7 +510,7 @@ function PortfolioLineChart({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Performance Portfolio</span>
-              {portfolioHistory.length > 0 && (
+              {(useSnapshotHistory || portfolioHistory.length > 0) && (
                 <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-dot" />
               )}
             </div>
@@ -643,9 +652,9 @@ function PortfolioLineChart({
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: "#94a3b8", fontSize: 10 }}
-                tickFormatter={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`}
+                tickFormatter={(v) => useSnapshotHistory ? formatPortfolioValue(v) : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`}
                 dx={-4}
-                width={52}
+                width={useSnapshotHistory ? 72 : 52}
                 domain={["auto", "auto"]}
               />
               <RechartsTooltip
@@ -658,6 +667,7 @@ function PortfolioLineChart({
                       {payload.map((entry, i) => {
                         const val = entry.value as number | null
                         if (val === null || val === undefined) return null
+                        const point = entry.payload as PortfolioChartDataPoint
                         return (
                           <div key={i} className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-1.5">
@@ -668,13 +678,33 @@ function PortfolioLineChart({
                             </div>
                             <span className={cn(
                               "text-[12px] font-medium tabular-nums",
-                              val >= 0 ? "text-success" : "text-destructive"
+                              useSnapshotHistory
+                                ? (point.performance >= 0 ? "text-success" : "text-destructive")
+                                : val >= 0
+                                ? "text-success"
+                                : "text-destructive"
                             )}>
-                              {val >= 0 ? "+" : ""}{val.toFixed(2)}%
+                              {useSnapshotHistory
+                                ? entry.dataKey === "portfolio"
+                                  ? formatPortfolioValue(val)
+                                  : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`
+                                : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`}
                             </span>
                           </div>
                         )
                       })}
+                      {useSnapshotHistory && payload[0]?.payload?.performance !== undefined && (
+                        <div className="mt-2 flex items-center justify-between gap-4 border-t border-border pt-2">
+                          <span className="text-[11px] text-muted-foreground">Performance</span>
+                          <span className={cn(
+                            "text-[12px] font-medium tabular-nums",
+                            (payload[0].payload as PortfolioChartDataPoint).performance >= 0 ? "text-success" : "text-destructive"
+                          )}>
+                            {(payload[0].payload as PortfolioChartDataPoint).performance >= 0 ? "+" : ""}
+                            {(payload[0].payload as PortfolioChartDataPoint).performance.toFixed(2)}%
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )
                 }}
@@ -999,7 +1029,7 @@ export function DashboardOverview({
   const planLimit = plan === "premium" ? null : plan === "pro" ? 20 : 1
   const analysesRemaining = planLimit === null ? null : Math.max(0, planLimit - monthlyCount)
   const normalizedPortfolioSnapshots = useMemo(() => normalizePortfolioSnapshots(portfolioSnapshots), [portfolioSnapshots])
-  const useSnapshotHistory = normalizedPortfolioSnapshots.length >= 2
+  const useSnapshotHistory = normalizedPortfolioSnapshots.length > 0
   const latestSnapshot = normalizedPortfolioSnapshots[normalizedPortfolioSnapshots.length - 1] ?? null
 
   const portfolioChange24h = useMemo(() => {
@@ -1033,6 +1063,19 @@ export function DashboardOverview({
       for (const timeframe of TIMEFRAMES) {
         availability[timeframe] = { available: false, reason: "Aucune analyse disponible" }
       }
+      return availability
+    }
+
+    if (useSnapshotHistory) {
+      availability["1H"] = portfolioChange1h !== null
+        ? { available: true, reason: "" }
+        : { available: false, reason: "Aucun point portfolio enregistré" }
+      availability["1D"] = portfolioChange24h !== null
+        ? { available: true, reason: "" }
+        : { available: false, reason: "Aucun point portfolio enregistré" }
+      availability["7D"] = portfolioChange7d !== null
+        ? { available: true, reason: "" }
+        : { available: false, reason: "Aucun point portfolio enregistré" }
       return availability
     }
 
