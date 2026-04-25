@@ -896,17 +896,21 @@ export async function POST(request: Request) {
     if (finalTotal !== 100) analysisData.allocation[0].percentage += 100 - finalTotal
     applyPlanFeatureGate(analysisData, plan)
 
+    const investedAmount = parseEuroAmount(cleanCapital)
+    const { portfolioValue, performancePercent } = computePortfolioSnapshot(
+      analysisData.allocation,
+      prices,
+      investedAmount
+    )
+    const portfolioAllocations = analysisData.allocation.map((allocation) => ({
+      symbol: allocation.asset,
+      percentage: allocation.percentage,
+    }))
+
     // Save to DB (allocation without notes for compatibility)
     const { data: savedAnalysis, error: dbError } = await supabase
       .from("ai_analyses")
-      .insert({await supabase.from("portfolio_history").insert({
-  user_id: user.id,
-  analysis_id: analysis.id,
-  portfolio_value: portfolioValue,
-  invested_amount: investedAmount,
-  performance_percent: performancePercent,
-  allocations: allocations,
-})
+      .insert({
         user_id:          user.id,
         investor_profile: {
           riskTolerance: cleanRisk,
@@ -928,7 +932,7 @@ export async function POST(request: Request) {
             errorsToAvoid: analysisData.errorsToAvoid ?? [],
           },
         },
-        allocations:      analysisData.allocation.map((a) => ({ symbol: a.asset, percentage: a.percentage })),
+        allocations:      portfolioAllocations,
         total_score:      analysisData.score,
         market_context:   analysisData.explanation,
         recommendations:  analysisData.plan,
@@ -959,41 +963,33 @@ export async function POST(request: Request) {
       krakenAvailable,
     })
 
-    const investedAmount = parseEuroAmount(cleanCapital)
-    const { portfolioValue, performancePercent } = computePortfolioSnapshot(
-      analysisData.allocation,
-      prices,
-      investedAmount
-    )
+    if (!dbError && savedAnalysis?.id) {
+      const { error: portfolioHistoryError } = await supabase
+        .from("portfolio_history")
+        .insert({
+          user_id: user.id,
+          analysis_id: savedAnalysis.id,
+          portfolio_value: portfolioValue,
+          invested_amount: investedAmount,
+          performance_percent: performancePercent,
+          allocations: portfolioAllocations,
+        })
 
-    const { error: portfolioHistoryError } = await supabase
-      .from("portfolio_history")
-      .insert({
-        user_id: user.id,
-        analysis_id: savedAnalysis.id,
-        portfolio_value: portfolioValue,
-        invested_amount: investedAmount,
-        performance_percent: performancePercent,
-        allocations: analysisData.allocation.map((allocation) => ({
-          symbol: allocation.asset,
-          percentage: allocation.percentage,
-        })),
-      })
-
-    if (portfolioHistoryError) {
-      console.error("[advisor] failed to save portfolio_history", {
-        userId: user.id,
-        analysisId: savedAnalysis.id,
-        error: portfolioHistoryError,
-      })
-    } else {
-      console.info("[advisor] portfolio_history saved", {
-        userId: user.id,
-        analysisId: savedAnalysis.id,
-        portfolioValue,
-        investedAmount,
-        performancePercent,
-      })
+      if (portfolioHistoryError) {
+        console.error("[advisor] failed to save portfolio_history", {
+          userId: user.id,
+          analysisId: savedAnalysis.id,
+          error: portfolioHistoryError,
+        })
+      } else {
+        console.info("[advisor] portfolio_history saved", {
+          userId: user.id,
+          analysisId: savedAnalysis.id,
+          portfolioValue,
+          investedAmount,
+          performancePercent,
+        })
+      }
     }
 
     return NextResponse.json({
