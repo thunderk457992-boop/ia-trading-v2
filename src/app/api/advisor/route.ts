@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient } from "@/lib/supabase/server"
+import { createServerClient } from "@supabase/ssr"
 import { fetchMarketSnapshot } from "@/lib/coingecko"
 import type { CryptoPrice, MarketGlobal } from "@/lib/coingecko"
 import { fetchKrakenTickers, type KrakenTicker } from "@/lib/kraken"
@@ -10,6 +11,14 @@ export const maxDuration = 60
 
 function getAnthropic() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+}
+
+function getAdmin() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } }
+  )
 }
 
 const PLAN_LIMITS: Record<string, number> = {
@@ -902,7 +911,7 @@ export async function POST(request: Request) {
       prices,
       investedAmount
     )
-    const portfolioAllocations = analysisData.allocation.map((allocation) => ({
+    const portfolioHistoryAllocations = analysisData.allocation.map((allocation) => ({
       symbol: allocation.asset,
       percentage: allocation.percentage,
     }))
@@ -932,7 +941,7 @@ export async function POST(request: Request) {
             errorsToAvoid: analysisData.errorsToAvoid ?? [],
           },
         },
-        allocations:      portfolioAllocations,
+        allocations:      portfolioHistoryAllocations,
         total_score:      analysisData.score,
         market_context:   analysisData.explanation,
         recommendations:  analysisData.plan,
@@ -963,8 +972,13 @@ export async function POST(request: Request) {
       krakenAvailable,
     })
 
-    if (!dbError && savedAnalysis?.id) {
-      const { error: portfolioHistoryError } = await supabase
+    if (!savedAnalysis?.id) {
+      console.error("[advisor] missing savedAnalysis.id for portfolio_history insert", {
+        userId: user.id,
+        savedAnalysis,
+      })
+    } else {
+      const { error: historyError } = await getAdmin()
         .from("portfolio_history")
         .insert({
           user_id: user.id,
@@ -972,22 +986,15 @@ export async function POST(request: Request) {
           portfolio_value: portfolioValue,
           invested_amount: investedAmount,
           performance_percent: performancePercent,
-          allocations: portfolioAllocations,
+          allocations: portfolioHistoryAllocations,
         })
 
-      if (portfolioHistoryError) {
-        console.error("[advisor] failed to save portfolio_history", {
-          userId: user.id,
-          analysisId: savedAnalysis.id,
-          error: portfolioHistoryError,
-        })
+      if (historyError) {
+        console.error("[advisor] portfolio_history insert failed", historyError)
       } else {
-        console.info("[advisor] portfolio_history saved", {
+        console.log("[advisor] portfolio_history inserted", {
           userId: user.id,
           analysisId: savedAnalysis.id,
-          portfolioValue,
-          investedAmount,
-          performancePercent,
         })
       }
     }
