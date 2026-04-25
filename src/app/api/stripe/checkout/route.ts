@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe"
 import { createClient } from "@/lib/supabase/server"
-import { createServerClient } from "@supabase/ssr"
 import { resolveAppUrl } from "@/lib/app-url"
 
 type StripePlan = "pro" | "premium"
 type BillingCycle = "monthly" | "yearly"
-
-function getAdmin() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
-  )
-}
 
 const PRICE_CATALOG = [
   { plan: "pro", billing: "monthly", priceId: process.env.STRIPE_PRICE_PRO_MONTHLY },
@@ -67,50 +58,12 @@ export async function POST(request: Request) {
       )
     }
 
-    // Use service role to bypass RLS for reliable reads/writes
-    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? getAdmin() : supabase
-
-    const { data: profile } = await db
-      .from("profiles")
-      .select("stripe_customer_id")
-      .eq("id", user.id)
-      .maybeSingle()
-
-    let customerId = profile?.stripe_customer_id
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: user.user_metadata?.full_name,
-        metadata: { supabase_user_id: user.id },
-      })
-      customerId = customer.id
-
-      // Upsert profile — creates row if missing, updates if exists
-      const { error: upsertError } = await db
-        .from("profiles")
-        .upsert(
-          {
-            id: user.id,
-            stripe_customer_id: customerId,
-            plan: "free",
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "id" }
-        )
-
-      if (upsertError) {
-        console.error("[checkout] profile upsert error:", upsertError)
-      }
-    }
-
     const appUrl = resolveAppUrl(request)
     console.info("[checkout] creating session", {
       userId: user.id,
       plan: selectedPrice.plan,
       billing: selectedPrice.billing,
       priceId,
-      hasCustomerId: Boolean(customerId),
       appUrl,
       requestUrl: request.url,
       host: request.headers.get("host"),
@@ -119,7 +72,6 @@ export async function POST(request: Request) {
     })
 
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       locale: "fr",
