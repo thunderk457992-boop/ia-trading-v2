@@ -85,7 +85,6 @@ export async function POST(request: Request) {
       },
       allow_promotion_codes: true,
       billing_address_collection: "auto",
-      customer_update: { address: "auto" },
     })
 
     console.info("[checkout] session created", {
