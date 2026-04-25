@@ -34,6 +34,10 @@ async function upsertSubscription(sub: Sub, userId: string, plan: string) {
   const db = getAdmin()
 
   const isActive = sub.status === "active" || sub.status === "trialing"
+  // Stripe customer field can be a string ID or an expanded Customer object
+  const customerId = typeof sub.customer === "string"
+    ? sub.customer
+    : (sub.customer as { id: string } | null)?.id
 
   // 1. Ensure profile row exists (UPSERT) — critical if trigger never fired
   const { error: profileErr } = await db
@@ -42,6 +46,7 @@ async function upsertSubscription(sub: Sub, userId: string, plan: string) {
       {
         id:                     userId,
         plan:                   isActive ? plan : "free",
+        ...(customerId ? { stripe_customer_id: customerId } : {}),
         stripe_subscription_id: isActive ? sub.id : null,
         updated_at:             new Date().toISOString(),
       },
@@ -195,6 +200,7 @@ export async function POST(request: Request) {
       case "invoice.payment_failed": {
         const invoice = event.data.object as Inv
         const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id
+        const invoiceSubId = typeof invoice.subscription === "string" ? invoice.subscription : null
         if (customerId) {
           const db = getAdmin()
           const { data: profile } = await db
@@ -203,11 +209,18 @@ export async function POST(request: Request) {
             .eq("stripe_customer_id", customerId)
             .single()
           if (profile) {
+            // Mark subscription past_due (Stripe also fires customer.subscription.updated but being explicit is safer)
+            if (invoiceSubId) {
+              await db.from("subscriptions").update({
+                status: "past_due",
+                updated_at: new Date().toISOString(),
+              }).eq("id", invoiceSubId)
+            }
             await db.from("payments").upsert(
               {
                 id: `failed_${invoice.id}`,
                 user_id: profile.id,
-                subscription_id: typeof invoice.subscription === "string" ? invoice.subscription : null,
+                subscription_id: invoiceSubId,
                 amount: invoice.amount_due,
                 currency: invoice.currency,
                 status: "failed",
