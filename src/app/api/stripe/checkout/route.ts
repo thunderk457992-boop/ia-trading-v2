@@ -58,6 +58,26 @@ export async function POST(request: Request) {
       )
     }
 
+    // Block checkout if user already has an active subscription — they must use the portal
+    const { data: activeSub } = await supabase
+      .from("subscriptions")
+      .select("id, plan, status")
+      .eq("user_id", user.id)
+      .in("status", ["active", "trialing"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (activeSub) {
+      return NextResponse.json(
+        {
+          error: "Vous avez déjà un abonnement actif. Utilisez le portail de facturation pour modifier votre plan.",
+          manageBilling: true,
+        },
+        { status: 409 }
+      )
+    }
+
     const appUrl = resolveAppUrl(request)
     console.info("[checkout] creating session", {
       userId: user.id,

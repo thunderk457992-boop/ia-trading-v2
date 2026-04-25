@@ -288,11 +288,24 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
       })
 
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
+      if (!response.ok) {
+        if (data.manageBilling) {
+          // Active subscription exists — redirect to portal instead
+          setLoadingPlan("manage")
+          const portalRes = await fetch("/api/stripe/portal", { method: "POST" })
+          const portalData = await portalRes.json()
+          if (portalRes.ok && portalData.url) {
+            window.location.assign(portalData.url)
+            return
+          }
+          throw new Error(portalData.error ?? "Le portail de facturation est indisponible.")
+        }
+        throw new Error(data.error)
+      }
       if (!data.url || typeof data.url !== "string") {
         throw new Error("Stripe Checkout n'a pas renvoyé d'URL de redirection.")
       }
-      if (data.url) window.location.assign(data.url)
+      window.location.assign(data.url)
     } catch (error) {
       setCheckoutError(error instanceof Error ? error.message : "Le paiement n’a pas pu démarrer. Réessayez.")
     } finally {
@@ -566,6 +579,24 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
                 <div className="w-full rounded-2xl border border-border bg-transparent py-3.5 text-center text-xs text-muted-foreground">
                   Toujours gratuit, sans carte bancaire
                 </div>
+              ) : hasSubscription ? (
+                <button
+                  onClick={handleManageSubscription}
+                  disabled={loadingPlan === "manage"}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-foreground bg-foreground py-3.5 text-sm font-semibold text-background transition-all hover:bg-foreground/92 disabled:opacity-50"
+                >
+                  {loadingPlan === "manage" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Redirection...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight className="h-4 w-4" />
+                      Modifier mon abonnement
+                    </>
+                  )}
+                </button>
               ) : (
                 <button
                   onClick={() => handleSubscribe(plan.id)}
