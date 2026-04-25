@@ -911,6 +911,15 @@ export async function POST(request: Request) {
       })
     }
 
+    console.info("[advisor] analysis saved", {
+      userId: user.id,
+      analysisId: savedAnalysis.id,
+      allocationCount: analysisData.allocation.length,
+      marketDataAvailable,
+      coinGeckoAvailable,
+      krakenAvailable,
+    })
+
     return NextResponse.json({
       ...analysisData,
       plan,

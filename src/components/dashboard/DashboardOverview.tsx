@@ -288,6 +288,11 @@ function getCurrentPortfolioStartedAt(analyses: Analysis[], current: Analysis | 
   return startedAt
 }
 
+function getPreferredTimeframe(availability: Record<TF, TimeframeAvailability>): TF {
+  if (availability["1H"]?.available) return "1H"
+  return TIMEFRAMES.find((timeframe) => availability[timeframe]?.available) ?? "1H"
+}
+
 function PortfolioLineChart({
   allocations, portfolioHistory, capital, portfolioChange1h, portfolioChange24h, portfolioChange7d, portfolioValueChange, timeframeAvailability, lastUpdated,
 }: {
@@ -301,7 +306,7 @@ function PortfolioLineChart({
   timeframeAvailability: Record<TF, TimeframeAvailability>
   lastUpdated: string | null
 }) {
-  const [tf, setTf] = useState<TF>("1D")
+  const [tf, setTf] = useState<TF>(() => getPreferredTimeframe(timeframeAvailability))
   const [showBtc, setShowBtc] = useState(false)
   const [showEth, setShowEth] = useState(false)
   const chartContainerRef = useRef<HTMLDivElement | null>(null)
@@ -316,8 +321,10 @@ function PortfolioLineChart({
   const selectedTimeframeAvailable = timeframeAvailability[tf].available
 
   useEffect(() => {
-    const firstAvailable = TIMEFRAMES.find((t) => timeframeAvailability[t].available)
-    if (firstAvailable && !timeframeAvailability[tf].available) setTf(firstAvailable)
+    const preferredTimeframe = getPreferredTimeframe(timeframeAvailability)
+    if (preferredTimeframe !== tf && !timeframeAvailability[tf].available) {
+      setTf(preferredTimeframe)
+    }
   }, [tf, timeframeAvailability])
 
   useEffect(() => {
@@ -930,22 +937,22 @@ export function DashboardOverview({
       return availability
     }
 
-    availability["1H"] = portfolioChange1h !== null
-      ? ageMs >= HOUR_MS
-        ? { available: true, reason: "" }
-        : { available: false, reason: "Disponible après 1h d'historique réel" }
+    availability["1H"] = ageMs < HOUR_MS
+      ? { available: false, reason: "Disponible après 1h d'historique réel" }
+      : portfolioChange1h !== null
+      ? { available: true, reason: "" }
       : { available: false, reason: "Historique CoinGecko 1h indisponible" }
 
-    availability["1D"] = portfolioChange24h !== null
-      ? ageMs >= DAY_MS
-        ? { available: true, reason: "" }
-        : { available: false, reason: "Disponible après 24h d'historique réel" }
+    availability["1D"] = ageMs < DAY_MS
+      ? { available: false, reason: "Disponible après 24h d'historique réel" }
+      : portfolioChange24h !== null
+      ? { available: true, reason: "" }
       : { available: false, reason: "Historique CoinGecko 24h indisponible" }
 
-    availability["7D"] = portfolioChange7d !== null
-      ? ageMs >= 7 * DAY_MS
-        ? { available: true, reason: "" }
-        : { available: false, reason: "Disponible après 7j d'historique réel" }
+    availability["7D"] = ageMs < 7 * DAY_MS
+      ? { available: false, reason: "Disponible après 7j d'historique réel" }
+      : portfolioChange7d !== null
+      ? { available: true, reason: "" }
       : { available: false, reason: "Historique CoinGecko 7j indisponible" }
 
     return availability

@@ -81,7 +81,13 @@ export async function fetchCryptoPrices(): Promise<CryptoPrice[]> {
       { next: { revalidate: 30 }, headers: cgHeaders(), signal: controller.signal }
     ).finally(() => clearTimeout(timeout))
 
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.warn("[CoinGecko] fetchCryptoPrices non-ok response", {
+        status: res.status,
+        statusText: res.statusText,
+      })
+      return []
+    }
     const data = await res.json()
     if (!Array.isArray(data)) return []
     return data.map(mapCoin)
@@ -101,7 +107,14 @@ export async function fetchMarketsData(count = 50): Promise<CryptoPrice[]> {
       { next: { revalidate: 60 }, headers: cgHeaders(), signal: controller.signal }
     ).finally(() => clearTimeout(timeout))
 
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.warn("[CoinGecko] fetchMarketsData non-ok response", {
+        count,
+        status: res.status,
+        statusText: res.statusText,
+      })
+      return []
+    }
     const data = await res.json()
     if (!Array.isArray(data)) return []
     return data.map(mapCoin)
@@ -121,7 +134,13 @@ export async function fetchMarketGlobal(): Promise<MarketGlobal | null> {
       { next: { revalidate: 60 }, headers: cgHeaders(), signal: controller.signal }
     ).finally(() => clearTimeout(timeout))
 
-    if (!res.ok) return null
+    if (!res.ok) {
+      console.warn("[CoinGecko] fetchMarketGlobal non-ok response", {
+        status: res.status,
+        statusText: res.statusText,
+      })
+      return null
+    }
     const json = await res.json()
     const d = json?.data
     if (!d) return null
@@ -146,7 +165,15 @@ export async function fetchCoinMarketChart(coinId: string, days = 7): Promise<Ma
       { next: { revalidate: 60 }, headers: cgHeaders(), signal: controller.signal }
     ).finally(() => clearTimeout(timeout))
 
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.warn("[CoinGecko] fetchCoinMarketChart non-ok response", {
+        coinId,
+        days,
+        status: res.status,
+        statusText: res.statusText,
+      })
+      return []
+    }
     const data = await res.json()
     const rawPrices: unknown[] = Array.isArray(data?.prices) ? data.prices : []
 

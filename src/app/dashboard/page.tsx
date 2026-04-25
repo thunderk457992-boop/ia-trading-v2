@@ -87,6 +87,8 @@ export default async function DashboardPage({
     userId: user.id,
     lastAnalysisCreatedAt: lastAnalysis?.created_at ?? null,
     allocationCount: lastAnalysis?.allocations?.length ?? 0,
+    allocationSymbols: (lastAnalysis?.allocations ?? []).map((allocation: { symbol: string }) => allocation.symbol),
+    marketPriceCount: market.prices.length,
     portfolioHistoryAssets: portfolioHistory.map((asset) => ({
       symbol: asset.symbol,
       points: asset.prices.length,
