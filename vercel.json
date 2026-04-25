@@ -4,12 +4,6 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "regions": ["cdg1"],
-  "crons": [
-    {
-      "path": "/api/cron/portfolio-snapshot",
-      "schedule": "*/30 * * * *"
-    }
-  ],
   "functions": {
     "src/app/api/advisor/route.ts": {
       "maxDuration": 60
