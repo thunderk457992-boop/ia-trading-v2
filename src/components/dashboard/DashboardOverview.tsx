@@ -38,6 +38,14 @@ interface Analysis {
   warnings?: string[] | null
   model_used?: string | null
 }
+interface PortfolioSnapshot {
+  analysis_id: string | null
+  created_at: string
+  portfolio_value: number | null
+  invested_amount: number | null
+  performance_percent: number | null
+  allocations: Array<{ symbol: string; percentage: number }> | null
+}
 interface Props {
   user: { email?: string }
   profile: { full_name?: string; plan?: string } | null
@@ -47,6 +55,7 @@ interface Props {
   monthlyCount: number
   cryptoPrices: CryptoPrice[]
   portfolioHistory: PortfolioAssetHistory[]
+  portfolioSnapshots: PortfolioSnapshot[]
   marketGlobal: MarketGlobal | null
   marketDecision: MarketDecision | null
   marketFetchedAt?: number
@@ -293,11 +302,80 @@ function getPreferredTimeframe(availability: Record<TF, TimeframeAvailability>):
   return TIMEFRAMES.find((timeframe) => availability[timeframe]?.available) ?? "1H"
 }
 
+interface PortfolioSnapshotChartPoint {
+  timestamp: number
+  portfolio: number
+  portfolioValue: number
+}
+
+interface PortfolioChartDataPoint {
+  name: string
+  portfolio: number
+  portfolioValue: number | null
+  btc: number | null
+  eth: number | null
+}
+
+function normalizePortfolioSnapshots(snapshots: PortfolioSnapshot[]) {
+  return snapshots
+    .map((snapshot) => {
+      const timestamp = Date.parse(snapshot.created_at)
+      const portfolioValue = snapshot.portfolio_value
+      const investedAmount = snapshot.invested_amount
+
+      if (!Number.isFinite(timestamp) || typeof portfolioValue !== "number" || !Number.isFinite(portfolioValue) || portfolioValue <= 0) {
+        return null
+      }
+
+      return {
+        timestamp,
+        portfolioValue,
+        investedAmount: typeof investedAmount === "number" && Number.isFinite(investedAmount) ? investedAmount : null,
+      }
+    })
+    .filter((snapshot): snapshot is { timestamp: number; portfolioValue: number; investedAmount: number | null } => snapshot !== null)
+    .sort((left, right) => left.timestamp - right.timestamp)
+}
+
+function buildPortfolioSnapshotData(
+  snapshots: PortfolioSnapshot[],
+  timeframe: "1H" | "1D" | "7D"
+): PortfolioSnapshotChartPoint[] {
+  const normalized = normalizePortfolioSnapshots(snapshots)
+  if (normalized.length < 2) return []
+
+  const endTime = normalized[normalized.length - 1]?.timestamp
+  if (!endTime) return []
+
+  const periodMs = timeframe === "7D" ? 7 * DAY_MS : timeframe === "1D" ? DAY_MS : HOUR_MS
+  const startTime = endTime - periodMs
+  const baseline = [...normalized].reverse().find((snapshot) => snapshot.timestamp <= startTime) ?? normalized[0]
+  const inWindow = normalized.filter((snapshot) => snapshot.timestamp >= startTime && snapshot.timestamp <= endTime)
+  const series = [baseline, ...inWindow.filter((snapshot) => snapshot.timestamp > baseline.timestamp)]
+
+  if (series.length < 2 || baseline.portfolioValue <= 0) return []
+
+  return series.map((snapshot) => ({
+    timestamp: snapshot.timestamp,
+    portfolioValue: snapshot.portfolioValue,
+    portfolio: Number((((snapshot.portfolioValue / baseline.portfolioValue) - 1) * 100).toFixed(3)),
+  }))
+}
+
+function getPortfolioSnapshotChange(
+  snapshots: PortfolioSnapshot[],
+  timeframe: "1H" | "1D" | "7D"
+) {
+  const data = buildPortfolioSnapshotData(snapshots, timeframe)
+  return data.length > 1 ? data[data.length - 1].portfolio : null
+}
+
 function PortfolioLineChart({
-  allocations, portfolioHistory, capital, portfolioChange1h, portfolioChange24h, portfolioChange7d, portfolioValueChange, timeframeAvailability, lastUpdated,
+  allocations, portfolioHistory, portfolioSnapshots, capital, portfolioChange1h, portfolioChange24h, portfolioChange7d, portfolioValueChange, timeframeAvailability, lastUpdated,
 }: {
   allocations: Array<{ symbol: string; percentage: number }>
   portfolioHistory: PortfolioAssetHistory[]
+  portfolioSnapshots: PortfolioSnapshot[]
   capital: number
   portfolioChange1h: number | null
   portfolioChange24h: number | null
@@ -312,8 +390,15 @@ function PortfolioLineChart({
   const chartContainerRef = useRef<HTMLDivElement | null>(null)
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
   const uid = useId().replace(/:/g, "")
+  const useSnapshotHistory = portfolioSnapshots.length >= 2
+  const snapshotData1h = useMemo(() => buildPortfolioSnapshotData(portfolioSnapshots, "1H"), [portfolioSnapshots])
+  const snapshotData1d = useMemo(() => buildPortfolioSnapshotData(portfolioSnapshots, "1D"), [portfolioSnapshots])
+  const snapshotData7d = useMemo(() => buildPortfolioSnapshotData(portfolioSnapshots, "7D"), [portfolioSnapshots])
+  const selectedSnapshotData = tf === "7D" ? snapshotData7d : tf === "1H" ? snapshotData1h : snapshotData1d
   const selectedChange = tf === "7D" ? portfolioChange7d : tf === "1H" ? portfolioChange1h : portfolioChange24h
-  const selectedValueChange = tf === "1D"
+  const selectedValueChange = useSnapshotHistory && selectedSnapshotData.length > 1
+    ? selectedSnapshotData[selectedSnapshotData.length - 1].portfolioValue - selectedSnapshotData[0].portfolioValue
+    : tf === "1D"
     ? portfolioValueChange
     : selectedChange !== null && capital > 0
     ? capital * selectedChange / 100
@@ -354,8 +439,22 @@ function PortfolioLineChart({
     return () => observer.disconnect()
   }, [])
 
-  const mergedData = useMemo(() => {
+  const mergedData = useMemo<PortfolioChartDataPoint[]>(() => {
     if (!selectedTimeframeAvailable || selectedChange === null) return []
+
+    if (useSnapshotHistory && selectedSnapshotData.length > 1) {
+      return selectedSnapshotData.map((point) => ({
+        name: tf === "7D"
+          ? new Date(point.timestamp).toLocaleDateString("fr-FR", { weekday: "short" })
+          : tf === "1H"
+          ? new Date(point.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+          : new Date(point.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit" }),
+        portfolio: point.portfolio,
+        portfolioValue: point.portfolioValue,
+        btc: null,
+        eth: null,
+      }))
+    }
 
     const portfolioPoints = buildPortfolioPerformanceData(allocations, portfolioHistory, tf === "7D" ? "7D" : tf === "1H" ? "1H" : "1D")
     if (!portfolioPoints.length) return []
@@ -370,9 +469,9 @@ function PortfolioLineChart({
         : tf === "1H"
         ? new Date(point.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
         : new Date(point.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit" })
-      return { name, portfolio: point.portfolio, btc: btcPoints[i], eth: ethPoints[i] }
+      return { name, portfolio: point.portfolio, portfolioValue: null, btc: btcPoints[i], eth: ethPoints[i] }
     })
-  }, [allocations, portfolioHistory, selectedChange, selectedTimeframeAvailable, tf])
+  }, [allocations, portfolioHistory, selectedChange, selectedSnapshotData, selectedTimeframeAvailable, tf, useSnapshotHistory])
 
   const lastValue = mergedData[mergedData.length - 1]?.portfolio ?? selectedChange ?? 0
   const isUp = lastValue >= 0
@@ -632,7 +731,7 @@ function PortfolioLineChart({
 
       {/* Data source footer */}
       <div className="px-5 py-2 border-t border-border/60 flex items-center flex-wrap gap-x-3 gap-y-1">
-        <span className="text-[10px] text-muted-foreground/60">Source&nbsp;: CoinGecko market_chart</span>
+        <span className="text-[10px] text-muted-foreground/60">Source&nbsp;: {useSnapshotHistory ? "portfolio_history" : "CoinGecko market_chart"}</span>
         <span className="text-[10px] text-muted-foreground/40">·</span>
         <span className="text-[10px] text-muted-foreground/60">Actualisation auto 30s</span>
         {lastUpdated && (
@@ -859,7 +958,7 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function DashboardOverview({
   user, profile, analyses, subscription, justUpgraded,
-  monthlyCount, cryptoPrices, portfolioHistory, marketGlobal, marketDecision, marketFetchedAt,
+  monthlyCount, cryptoPrices, portfolioHistory, portfolioSnapshots, marketGlobal, marketDecision, marketFetchedAt,
 }: Props) {
   const router = useRouter()
   const [showUpgradeToast, setShowUpgradeToast] = useState(!!justUpgraded)
@@ -899,22 +998,30 @@ export function DashboardOverview({
 
   const planLimit = plan === "premium" ? null : plan === "pro" ? 20 : 1
   const analysesRemaining = planLimit === null ? null : Math.max(0, planLimit - monthlyCount)
+  const normalizedPortfolioSnapshots = useMemo(() => normalizePortfolioSnapshots(portfolioSnapshots), [portfolioSnapshots])
+  const useSnapshotHistory = normalizedPortfolioSnapshots.length >= 2
+  const latestSnapshot = normalizedPortfolioSnapshots[normalizedPortfolioSnapshots.length - 1] ?? null
 
-  const portfolioChange24h = useMemo(() => (
-    lastAnalysis ? getPortfolioHistoryChange(lastAnalysis.allocations, portfolioHistory, "1D") : null
-  ), [lastAnalysis, portfolioHistory])
+  const portfolioChange24h = useMemo(() => {
+    if (useSnapshotHistory) return getPortfolioSnapshotChange(portfolioSnapshots, "1D")
+    return lastAnalysis ? getPortfolioHistoryChange(lastAnalysis.allocations, portfolioHistory, "1D") : null
+  }, [lastAnalysis, portfolioHistory, portfolioSnapshots, useSnapshotHistory])
 
-  const portfolioChange1h = useMemo(() => (
-    lastAnalysis ? getPortfolioHistoryChange(lastAnalysis.allocations, portfolioHistory, "1H") : null
-  ), [lastAnalysis, portfolioHistory])
+  const portfolioChange1h = useMemo(() => {
+    if (useSnapshotHistory) return getPortfolioSnapshotChange(portfolioSnapshots, "1H")
+    return lastAnalysis ? getPortfolioHistoryChange(lastAnalysis.allocations, portfolioHistory, "1H") : null
+  }, [lastAnalysis, portfolioHistory, portfolioSnapshots, useSnapshotHistory])
 
-  const portfolioChange7d = useMemo(() => (
-    lastAnalysis ? getPortfolioHistoryChange(lastAnalysis.allocations, portfolioHistory, "7D") : null
-  ), [lastAnalysis, portfolioHistory])
+  const portfolioChange7d = useMemo(() => {
+    if (useSnapshotHistory) return getPortfolioSnapshotChange(portfolioSnapshots, "7D")
+    return lastAnalysis ? getPortfolioHistoryChange(lastAnalysis.allocations, portfolioHistory, "7D") : null
+  }, [lastAnalysis, portfolioHistory, portfolioSnapshots, useSnapshotHistory])
 
   const portfolioStartedAt = useMemo(() => (
-    getCurrentPortfolioStartedAt(analyses, lastAnalysis)
-  ), [analyses, lastAnalysis])
+    useSnapshotHistory
+      ? new Date(normalizedPortfolioSnapshots[0].timestamp).toISOString()
+      : getCurrentPortfolioStartedAt(analyses, lastAnalysis)
+  ), [analyses, lastAnalysis, normalizedPortfolioSnapshots, useSnapshotHistory])
 
   const timeframeAvailability = useMemo(() => {
     const availability = {} as Record<TF, TimeframeAvailability>
@@ -937,28 +1044,28 @@ export function DashboardOverview({
       return availability
     }
 
-    availability["1H"] = ageMs < HOUR_MS
+    availability["1H"] = ageMs < HOUR_MS && portfolioChange1h === null
       ? { available: false, reason: "Disponible après 1h d'historique réel" }
       : portfolioChange1h !== null
       ? { available: true, reason: "" }
-      : { available: false, reason: "Historique CoinGecko 1h indisponible" }
+      : { available: false, reason: useSnapshotHistory ? "Historique portfolio 1h indisponible" : "Historique CoinGecko 1h indisponible" }
 
-    availability["1D"] = ageMs < DAY_MS
+    availability["1D"] = ageMs < DAY_MS && portfolioChange24h === null
       ? { available: false, reason: "Disponible après 24h d'historique réel" }
       : portfolioChange24h !== null
       ? { available: true, reason: "" }
-      : { available: false, reason: "Historique CoinGecko 24h indisponible" }
+      : { available: false, reason: useSnapshotHistory ? "Historique portfolio 24h indisponible" : "Historique CoinGecko 24h indisponible" }
 
-    availability["7D"] = ageMs < 7 * DAY_MS
+    availability["7D"] = ageMs < 7 * DAY_MS && portfolioChange7d === null
       ? { available: false, reason: "Disponible après 7j d'historique réel" }
       : portfolioChange7d !== null
       ? { available: true, reason: "" }
-      : { available: false, reason: "Historique CoinGecko 7j indisponible" }
+      : { available: false, reason: useSnapshotHistory ? "Historique portfolio 7j indisponible" : "Historique CoinGecko 7j indisponible" }
 
     return availability
-  }, [lastAnalysis, portfolioStartedAt, marketFetchedAt, portfolioChange1h, portfolioChange24h, portfolioChange7d])
+  }, [lastAnalysis, portfolioStartedAt, marketFetchedAt, portfolioChange1h, portfolioChange24h, portfolioChange7d, useSnapshotHistory])
 
-  const capital = Number((lastAnalysis?.investor_profile as Record<string, unknown> | undefined)?.capital ?? 0)
+  const capital = Number((lastAnalysis?.investor_profile as Record<string, unknown> | undefined)?.capital ?? latestSnapshot?.investedAmount ?? 0)
   const portfolioValueChange = timeframeAvailability["1D"].available && portfolioChange24h !== null && capital > 0
     ? capital * portfolioChange24h / 100
     : null
@@ -1238,6 +1345,7 @@ export function DashboardOverview({
           <PortfolioLineChart
             allocations={lastAnalysis?.allocations ?? []}
             portfolioHistory={portfolioHistory}
+            portfolioSnapshots={portfolioSnapshots}
             capital={capital}
             portfolioChange1h={portfolioChange1h}
             portfolioChange24h={portfolioChange24h}
