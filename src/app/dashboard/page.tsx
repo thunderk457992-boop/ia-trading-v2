@@ -10,6 +10,15 @@ import { stripe } from "@/lib/stripe"
 type StripeSub = Record<string, any>
 const HISTORY_LIMIT: Record<string, number> = { free: 3, pro: 10, premium: 20 }
 
+interface PortfolioHistoryRow {
+  analysis_id: string | null
+  created_at: string
+  portfolio_value: number | null
+  invested_amount: number | null
+  performance_percent: number | null
+  allocations: Array<{ symbol: string; percentage: number }> | null
+}
+
 const PRICE_TO_PLAN: Record<string, string> = Object.fromEntries(
   [
     [process.env.STRIPE_PRICE_PRO_MONTHLY,     "pro"],
@@ -50,7 +59,7 @@ export default async function DashboardPage({
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
-  const [{ data: profile }, { data: analyses }, { data: subscription }, { count: monthlyCount }, market] = await Promise.all([
+  const [{ data: profile }, { data: analyses }, { data: subscription }, { count: monthlyCount }, market, { data: portfolioSnapshots }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     supabase
       .from("ai_analyses")
@@ -72,6 +81,11 @@ export default async function DashboardPage({
       .eq("user_id", user.id)
       .gte("created_at", startOfMonth.toISOString()),
     fetchMarketSnapshot(),
+    getAdmin()
+      .from("portfolio_history")
+      .select("analysis_id, created_at, portfolio_value, invested_amount, performance_percent, allocations")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true }),
   ])
 
   const plan = (subscription?.status === "active" || subscription?.status === "trialing")
@@ -89,6 +103,7 @@ export default async function DashboardPage({
     allocationCount: lastAnalysis?.allocations?.length ?? 0,
     allocationSymbols: (lastAnalysis?.allocations ?? []).map((allocation: { symbol: string }) => allocation.symbol),
     marketPriceCount: market.prices.length,
+    portfolioSnapshotCount: portfolioSnapshots?.length ?? 0,
     portfolioHistoryAssets: portfolioHistory.map((asset) => ({
       symbol: asset.symbol,
       points: asset.prices.length,
@@ -106,6 +121,7 @@ export default async function DashboardPage({
       monthlyCount={monthlyCount ?? 0}
       cryptoPrices={market.prices}
       portfolioHistory={portfolioHistory}
+      portfolioSnapshots={(portfolioSnapshots ?? []) as PortfolioHistoryRow[]}
       marketGlobal={market.global}
       marketDecision={marketDecision}
       marketFetchedAt={market.fetchedAt}
