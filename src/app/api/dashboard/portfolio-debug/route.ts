@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
       lastValue: payload?.lastValue ?? null,
       performancePercent: payload?.performancePercent ?? null,
       valueChange: payload?.valueChange ?? null,
+      livePortfolioValue: payload?.livePortfolioValue ?? null,
+      livePriceSource: payload?.livePriceSource ?? null,
     })
     console.info("[dashboard] chartSeries", {
       timeframe: payload?.timeframe ?? null,
@@ -24,6 +26,8 @@ export async function POST(request: NextRequest) {
       pointCount: payload?.pointCount ?? null,
       firstValue: payload?.firstValue ?? null,
       lastValue: payload?.lastValue ?? null,
+      livePortfolioValue: payload?.livePortfolioValue ?? null,
+      livePriceSource: payload?.livePriceSource ?? null,
     })
     console.info("[dashboard] portfolio timeframe selected", {
       timeframe: payload?.timeframe ?? null,
@@ -33,6 +37,8 @@ export async function POST(request: NextRequest) {
       lastValue: payload?.lastValue ?? null,
       performancePercent: payload?.performancePercent ?? null,
       valueChange: payload?.valueChange ?? null,
+      livePortfolioValue: payload?.livePortfolioValue ?? null,
+      livePriceSource: payload?.livePriceSource ?? null,
       available: payload?.available ?? null,
     })
 

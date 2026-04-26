@@ -46,6 +46,13 @@ interface PortfolioSnapshot {
   performance_percent: number | string | null
   allocations: Array<{ symbol: string; percentage: number }> | null
 }
+interface LivePortfolioPoint {
+  timestamp: number
+  created_at: string
+  portfolio_value: number
+  invested_amount: number | null
+  price_source: "kraken" | "coingecko"
+}
 interface Props {
   user: { email?: string }
   profile: { full_name?: string; plan?: string } | null
@@ -56,6 +63,7 @@ interface Props {
   cryptoPrices: CryptoPrice[]
   portfolioHistory: PortfolioAssetHistory[]
   portfolioSnapshots: PortfolioSnapshot[]
+  livePortfolioPoint: LivePortfolioPoint | null
   marketGlobal: MarketGlobal | null
   marketDecision: MarketDecision | null
   marketFetchedAt?: number
@@ -334,6 +342,12 @@ interface PortfolioSnapshotChartPoint {
   portfolioValue: number
 }
 
+interface NormalizedPortfolioSnapshot {
+  timestamp: number
+  portfolioValue: number
+  investedAmount: number | null
+}
+
 interface PortfolioChartDataPoint {
   name: string
   portfolio: number
@@ -359,7 +373,7 @@ function parseFiniteNumber(value: number | string | null | undefined) {
   return null
 }
 
-function normalizePortfolioSnapshots(snapshots: PortfolioSnapshot[]) {
+function normalizePortfolioSnapshots(snapshots: PortfolioSnapshot[]): NormalizedPortfolioSnapshot[] {
   return snapshots
     .map((snapshot) => {
       const timestamp = Date.parse(snapshot.created_at)
@@ -376,22 +390,47 @@ function normalizePortfolioSnapshots(snapshots: PortfolioSnapshot[]) {
         investedAmount,
       }
     })
-    .filter((snapshot): snapshot is { timestamp: number; portfolioValue: number; investedAmount: number | null } => snapshot !== null)
+    .filter((snapshot): snapshot is NormalizedPortfolioSnapshot => snapshot !== null)
     .sort((left, right) => left.timestamp - right.timestamp)
 }
 
-function buildPortfolioSnapshotData(
+function mergePortfolioSnapshots(
   snapshots: PortfolioSnapshot[],
+  livePortfolioPoint: LivePortfolioPoint | null
+): NormalizedPortfolioSnapshot[] {
+  const normalized = normalizePortfolioSnapshots(snapshots)
+
+  if (!livePortfolioPoint || !Number.isFinite(livePortfolioPoint.timestamp) || livePortfolioPoint.portfolio_value <= 0) {
+    return normalized
+  }
+
+  const livePoint: NormalizedPortfolioSnapshot = {
+    timestamp: livePortfolioPoint.timestamp,
+    portfolioValue: livePortfolioPoint.portfolio_value,
+    investedAmount: typeof livePortfolioPoint.invested_amount === "number" && Number.isFinite(livePortfolioPoint.invested_amount)
+      ? livePortfolioPoint.invested_amount
+      : null,
+  }
+
+  const lastSnapshot = normalized[normalized.length - 1]
+  if (!lastSnapshot) return [livePoint]
+  if (livePoint.timestamp < lastSnapshot.timestamp) return normalized
+  if (livePoint.timestamp === lastSnapshot.timestamp) return [...normalized.slice(0, -1), livePoint]
+
+  return [...normalized, livePoint]
+}
+
+function buildPortfolioSnapshotData(
+  snapshots: NormalizedPortfolioSnapshot[],
   timeframe: TF,
   anchorMs: number
 ): PortfolioSnapshotChartPoint[] {
-  const normalized = normalizePortfolioSnapshots(snapshots)
-  if (!normalized.length) return []
+  if (!snapshots.length) return []
 
   const periodMs = TIMEFRAME_WINDOWS_MS[timeframe]
   const series = periodMs === undefined
-    ? normalized.filter((snapshot) => snapshot.timestamp <= anchorMs)
-    : normalized.filter((snapshot) => snapshot.timestamp >= anchorMs - periodMs && snapshot.timestamp <= anchorMs)
+    ? snapshots.filter((snapshot) => snapshot.timestamp <= anchorMs)
+    : snapshots.filter((snapshot) => snapshot.timestamp >= anchorMs - periodMs && snapshot.timestamp <= anchorMs)
 
   if (series.length < 2) return []
 
@@ -406,7 +445,7 @@ function buildPortfolioSnapshotData(
 }
 
 function getPortfolioSnapshotChange(
-  snapshots: PortfolioSnapshot[],
+  snapshots: NormalizedPortfolioSnapshot[],
   timeframe: TF,
   anchorMs: number
 ) {
@@ -415,11 +454,12 @@ function getPortfolioSnapshotChange(
 }
 
 function PortfolioLineChart({
-  allocations, portfolioHistory, portfolioSnapshots, capital, portfolioChange1h, portfolioChange24h, portfolioChange7d, portfolioValueChange, timeframeAvailability, timeframeAnchorMs, lastUpdated,
+  allocations, portfolioHistory, portfolioSnapshots, livePortfolioPoint, capital, portfolioChange1h, portfolioChange24h, portfolioChange7d, portfolioValueChange, timeframeAvailability, timeframeAnchorMs, lastUpdated,
 }: {
   allocations: Array<{ symbol: string; percentage: number }>
   portfolioHistory: PortfolioAssetHistory[]
   portfolioSnapshots: PortfolioSnapshot[]
+  livePortfolioPoint: LivePortfolioPoint | null
   capital: number
   portfolioChange1h: number | null
   portfolioChange24h: number | null
@@ -436,15 +476,19 @@ function PortfolioLineChart({
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
   const uid = useId().replace(/:/g, "")
   const hasPortfolioSnapshotRows = portfolioSnapshots.length > 0
-  const useSnapshotHistory = portfolioSnapshots.length > 0
+  const mergedPortfolioSnapshots = useMemo(
+    () => mergePortfolioSnapshots(portfolioSnapshots, livePortfolioPoint),
+    [portfolioSnapshots, livePortfolioPoint]
+  )
+  const useSnapshotHistory = mergedPortfolioSnapshots.length > 0
   const snapshotSeriesByTimeframe = useMemo(() => (
     Object.fromEntries(
       TIMEFRAMES.map((timeframe) => [
         timeframe,
-        buildPortfolioSnapshotData(portfolioSnapshots, timeframe, timeframeAnchorMs),
+        buildPortfolioSnapshotData(mergedPortfolioSnapshots, timeframe, timeframeAnchorMs),
       ])
     ) as Record<TF, PortfolioSnapshotChartPoint[]>
-  ), [portfolioSnapshots, timeframeAnchorMs])
+  ), [mergedPortfolioSnapshots, timeframeAnchorMs])
   const selectedSnapshotData = snapshotSeriesByTimeframe[tf]
   const selectedChange = useSnapshotHistory
     ? selectedSnapshotData.length > 1
@@ -465,6 +509,19 @@ function PortfolioLineChart({
     ? capital * selectedChange / 100
     : null
   const selectedTimeframeAvailable = timeframeAvailability[tf].available
+  const fullSnapshotSeries = useMemo(
+    () => mergedPortfolioSnapshots.filter((snapshot) => snapshot.timestamp <= timeframeAnchorMs),
+    [mergedPortfolioSnapshots, timeframeAnchorMs]
+  )
+  const totalHistorySpanMs = fullSnapshotSeries.length > 1
+    ? fullSnapshotSeries[fullSnapshotSeries.length - 1].timestamp - fullSnapshotSeries[0].timestamp
+    : 0
+  const selectedWindowMs = TIMEFRAME_WINDOWS_MS[tf]
+  const selectedUsesFullHistory = selectedSnapshotData.length > 0 && selectedSnapshotData.length === fullSnapshotSeries.length
+  const shortHistoryNotice = useSnapshotHistory && selectedSnapshotData.length > 1 && (
+    (selectedWindowMs !== undefined && selectedUsesFullHistory && totalHistorySpanMs < selectedWindowMs)
+    || (tf === "ALL" && totalHistorySpanMs < 7 * DAY_MS)
+  )
 
   useEffect(() => {
     const container = chartContainerRef.current
@@ -560,6 +617,8 @@ function PortfolioLineChart({
       performancePercent: selectedChange,
       valueChange: selectedValueChange,
       available: selectedTimeframeAvailable,
+      livePortfolioValue: livePortfolioPoint?.portfolio_value ?? null,
+      livePriceSource: livePortfolioPoint?.price_source ?? null,
     }
 
     console.info("[dashboard] selectedTimeframe", {
@@ -575,10 +634,12 @@ function PortfolioLineChart({
       lastValue: lastPoint?.portfolioValue ?? null,
       performancePercent: selectedChange,
       valueChange: selectedValueChange,
+      livePortfolioValue: livePortfolioPoint?.portfolio_value ?? null,
+      livePriceSource: livePortfolioPoint?.price_source ?? null,
     })
     console.info("[dashboard] chartSeries", {
       timeframe: tf,
-      source: hasPortfolioSnapshotRows ? "portfolio_history" : "coingecko",
+      source: useSnapshotHistory ? "portfolio_history" : "coingecko",
       pointCount: mergedData.length,
       sample: mergedData.slice(0, 3).map((point) => ({
         name: point.name,
@@ -586,6 +647,8 @@ function PortfolioLineChart({
         performance: point.performance,
         portfolioValue: point.portfolioValue,
       })),
+      livePortfolioValue: livePortfolioPoint?.portfolio_value ?? null,
+      livePriceSource: livePortfolioPoint?.price_source ?? null,
     })
     console.info("[dashboard] portfolio timeframe debug", payload)
 
@@ -594,7 +657,7 @@ function PortfolioLineChart({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).catch(() => undefined)
-  }, [hasPortfolioSnapshotRows, mergedData, selectedChange, selectedSnapshotData, selectedTimeframeAvailable, selectedValueChange, tf])
+  }, [hasPortfolioSnapshotRows, livePortfolioPoint, mergedData, selectedChange, selectedSnapshotData, selectedTimeframeAvailable, selectedValueChange, tf, useSnapshotHistory])
 
   return (
     <div className="rounded-xl border border-border bg-card">
@@ -629,6 +692,11 @@ function PortfolioLineChart({
                     <p className="text-[12px] text-muted-foreground">
                       Variation {tf} sur <span className="font-medium text-foreground">{capital.toLocaleString("fr-FR")}€</span> investis
                     </p>
+                    {shortHistoryNotice && (
+                      <p className="mt-1 text-[12px] text-muted-foreground">
+                        Historique encore trop court pour différencier cette période.
+                      </p>
+                    )}
                   </>
                 )}
               </>
@@ -1082,7 +1150,7 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function DashboardOverview({
   user, profile, analyses, subscription, justUpgraded,
-  monthlyCount, cryptoPrices, portfolioHistory, portfolioSnapshots, marketGlobal, marketDecision, marketFetchedAt,
+  monthlyCount, cryptoPrices, portfolioHistory, portfolioSnapshots, livePortfolioPoint, marketGlobal, marketDecision, marketFetchedAt,
 }: Props) {
   const router = useRouter()
   const [showUpgradeToast, setShowUpgradeToast] = useState(!!justUpgraded)
@@ -1126,22 +1194,26 @@ export function DashboardOverview({
   const hasPortfolioSnapshotRows = portfolioSnapshots.length > 0
   const useSnapshotHistory = hasPortfolioSnapshotRows
   const latestSnapshot = normalizedPortfolioSnapshots[normalizedPortfolioSnapshots.length - 1] ?? null
-  const timeframeAnchorMs = marketFetchedAt ?? latestSnapshot?.timestamp ?? 0
+  const mergedPortfolioSnapshots = useMemo(
+    () => mergePortfolioSnapshots(portfolioSnapshots, livePortfolioPoint),
+    [portfolioSnapshots, livePortfolioPoint]
+  )
+  const timeframeAnchorMs = livePortfolioPoint?.timestamp ?? marketFetchedAt ?? latestSnapshot?.timestamp ?? 0
 
   const portfolioChange24h = useMemo(() => {
-    if (useSnapshotHistory) return getPortfolioSnapshotChange(portfolioSnapshots, "1D", timeframeAnchorMs)
+    if (useSnapshotHistory) return getPortfolioSnapshotChange(mergedPortfolioSnapshots, "1D", timeframeAnchorMs)
     return lastAnalysis ? getPortfolioHistoryChange(lastAnalysis.allocations, portfolioHistory, "1D") : null
-  }, [lastAnalysis, portfolioHistory, portfolioSnapshots, timeframeAnchorMs, useSnapshotHistory])
+  }, [lastAnalysis, mergedPortfolioSnapshots, portfolioHistory, timeframeAnchorMs, useSnapshotHistory])
 
   const portfolioChange1h = useMemo(() => {
-    if (useSnapshotHistory) return getPortfolioSnapshotChange(portfolioSnapshots, "1H", timeframeAnchorMs)
+    if (useSnapshotHistory) return getPortfolioSnapshotChange(mergedPortfolioSnapshots, "1H", timeframeAnchorMs)
     return lastAnalysis ? getPortfolioHistoryChange(lastAnalysis.allocations, portfolioHistory, "1H") : null
-  }, [lastAnalysis, portfolioHistory, portfolioSnapshots, timeframeAnchorMs, useSnapshotHistory])
+  }, [lastAnalysis, mergedPortfolioSnapshots, portfolioHistory, timeframeAnchorMs, useSnapshotHistory])
 
   const portfolioChange7d = useMemo(() => {
-    if (useSnapshotHistory) return getPortfolioSnapshotChange(portfolioSnapshots, "7D", timeframeAnchorMs)
+    if (useSnapshotHistory) return getPortfolioSnapshotChange(mergedPortfolioSnapshots, "7D", timeframeAnchorMs)
     return lastAnalysis ? getPortfolioHistoryChange(lastAnalysis.allocations, portfolioHistory, "7D") : null
-  }, [lastAnalysis, portfolioHistory, portfolioSnapshots, timeframeAnchorMs, useSnapshotHistory])
+  }, [lastAnalysis, mergedPortfolioSnapshots, portfolioHistory, timeframeAnchorMs, useSnapshotHistory])
 
   const portfolioStartedAt = useMemo(() => (
     useSnapshotHistory
@@ -1164,7 +1236,7 @@ export function DashboardOverview({
 
     if (useSnapshotHistory) {
       for (const timeframe of TIMEFRAMES) {
-        const series = buildPortfolioSnapshotData(portfolioSnapshots, timeframe, timeframeAnchorMs)
+        const series = buildPortfolioSnapshotData(mergedPortfolioSnapshots, timeframe, timeframeAnchorMs)
         availability[timeframe] = series.length > 1
           ? { available: true, reason: "" }
           : { available: false, reason: "Pas encore assez d’historique pour cette période." }
@@ -1199,7 +1271,7 @@ export function DashboardOverview({
       : { available: false, reason: useSnapshotHistory ? "Historique portfolio 7j indisponible" : "Historique CoinGecko 7j indisponible" }
 
     return availability
-  }, [lastAnalysis, marketFetchedAt, portfolioChange1h, portfolioChange24h, portfolioChange7d, portfolioSnapshots, portfolioStartedAt, timeframeAnchorMs, useSnapshotHistory])
+  }, [lastAnalysis, marketFetchedAt, mergedPortfolioSnapshots, portfolioChange1h, portfolioChange24h, portfolioChange7d, portfolioStartedAt, timeframeAnchorMs, useSnapshotHistory])
 
   const capital = Number(latestSnapshot?.investedAmount ?? (lastAnalysis?.investor_profile as Record<string, unknown> | undefined)?.capital ?? 0)
   const portfolioValueChange = timeframeAvailability["1D"].available && portfolioChange24h !== null && capital > 0
@@ -1482,6 +1554,7 @@ export function DashboardOverview({
             allocations={lastAnalysis?.allocations ?? []}
             portfolioHistory={portfolioHistory}
             portfolioSnapshots={portfolioSnapshots}
+            livePortfolioPoint={livePortfolioPoint}
             capital={capital}
             portfolioChange1h={portfolioChange1h}
             portfolioChange24h={portfolioChange24h}
