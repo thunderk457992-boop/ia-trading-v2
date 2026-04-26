@@ -13,10 +13,92 @@ const HISTORY_LIMIT: Record<string, number> = { free: 3, pro: 10, premium: 20 }
 interface PortfolioHistoryRow {
   analysis_id: string | null
   created_at: string
-  portfolio_value: number | null
-  invested_amount: number | null
-  performance_percent: number | null
+  portfolio_value: number | string | null
+  invested_amount: number | string | null
+  performance_percent: number | string | null
   allocations: Array<{ symbol: string; percentage: number }> | null
+}
+
+const TIMEFRAME_WINDOWS_MS = {
+  "1H": 60 * 60 * 1000,
+  "1D": 24 * 60 * 60 * 1000,
+  "7D": 7 * 24 * 60 * 60 * 1000,
+} as const
+
+function parseFiniteNumber(value: number | string | null | undefined) {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+function normalizePortfolioSnapshots(rows: PortfolioHistoryRow[]) {
+  return rows
+    .map((row) => {
+      const timestamp = Date.parse(row.created_at)
+      const portfolioValue = parseFiniteNumber(row.portfolio_value)
+      const investedAmount = parseFiniteNumber(row.invested_amount)
+
+      if (!Number.isFinite(timestamp) || portfolioValue === null || portfolioValue <= 0) {
+        return null
+      }
+
+      return {
+        timestamp,
+        portfolioValue,
+        investedAmount,
+      }
+    })
+    .filter((row): row is { timestamp: number; portfolioValue: number; investedAmount: number | null } => row !== null)
+    .sort((left, right) => left.timestamp - right.timestamp)
+}
+
+function summarizePortfolioSnapshots(rows: PortfolioHistoryRow[], anchorMs: number) {
+  const normalized = normalizePortfolioSnapshots(rows)
+
+  return {
+    normalizedCount: normalized.length,
+    byTimeframe: {
+      "1H": summarizePortfolioWindow(normalized, TIMEFRAME_WINDOWS_MS["1H"], anchorMs),
+      "1D": summarizePortfolioWindow(normalized, TIMEFRAME_WINDOWS_MS["1D"], anchorMs),
+      "7D": summarizePortfolioWindow(normalized, TIMEFRAME_WINDOWS_MS["7D"], anchorMs),
+      "ALL": summarizePortfolioWindow(normalized, null, anchorMs),
+    },
+  }
+}
+
+function summarizePortfolioWindow(
+  rows: Array<{ timestamp: number; portfolioValue: number }>,
+  windowMs: number | null,
+  anchorMs: number
+) {
+  const filtered = windowMs === null
+    ? rows.filter((row) => row.timestamp <= anchorMs)
+    : rows.filter((row) => row.timestamp >= anchorMs - windowMs && row.timestamp <= anchorMs)
+
+  if (filtered.length < 2) {
+    return {
+      pointCount: filtered.length,
+      firstValue: filtered[0]?.portfolioValue ?? null,
+      lastValue: filtered[filtered.length - 1]?.portfolioValue ?? null,
+      performancePercent: null,
+    }
+  }
+
+  const firstValue = filtered[0].portfolioValue
+  const lastValue = filtered[filtered.length - 1].portfolioValue
+  const performancePercent = firstValue > 0
+    ? Number((((lastValue - firstValue) / firstValue) * 100).toFixed(3))
+    : null
+
+  return {
+    pointCount: filtered.length,
+    firstValue,
+    lastValue,
+    performancePercent,
+  }
 }
 
 const PRICE_TO_PLAN: Record<string, string> = Object.fromEntries(
@@ -59,7 +141,7 @@ export default async function DashboardPage({
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
-  const [{ data: profile }, { data: analyses }, { data: subscription }, { count: monthlyCount }, market, { data: portfolioSnapshots }] = await Promise.all([
+  const [{ data: profile }, { data: analyses }, { data: subscription }, { count: monthlyCount }, market, portfolioHistoryResult] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     supabase
       .from("ai_analyses")
@@ -88,6 +170,14 @@ export default async function DashboardPage({
       .order("created_at", { ascending: true }),
   ])
 
+  const portfolioSnapshots = portfolioHistoryResult.data ?? []
+  if (portfolioHistoryResult.error) {
+    console.error("[dashboard] portfolio_history query failed", {
+      userId: user.id,
+      error: portfolioHistoryResult.error,
+    })
+  }
+
   const plan = (subscription?.status === "active" || subscription?.status === "trialing")
     ? subscription.plan
     : profile?.plan ?? "free"
@@ -97,6 +187,20 @@ export default async function DashboardPage({
     ? await fetchPortfolioMarketHistory(lastAnalysis.allocations ?? [], market.prices, 8)
     : []
   const marketDecision = buildMarketDecision(market.prices, market.global, lastAnalysis?.allocations ?? null)
+  const snapshotSummary = summarizePortfolioSnapshots(portfolioSnapshots as PortfolioHistoryRow[], market.fetchedAt)
+  const portfolioSource = hasPortfolioSnapshots ? "portfolio_history" : lastAnalysis ? "coingecko" : "none"
+
+  console.info("[dashboard] portfolioHistory received", {
+    userId: user.id,
+    source: portfolioSource,
+    rawCount: portfolioSnapshots.length,
+    normalizedCount: snapshotSummary.normalizedCount,
+    sample: portfolioSnapshots.slice(0, 3).map((snapshot) => ({
+      createdAt: snapshot.created_at,
+      portfolioValue: snapshot.portfolio_value,
+      investedAmount: snapshot.invested_amount,
+    })),
+  })
 
   console.info("[dashboard] portfolio history summary", {
     userId: user.id,
@@ -105,6 +209,14 @@ export default async function DashboardPage({
     allocationSymbols: (lastAnalysis?.allocations ?? []).map((allocation: { symbol: string }) => allocation.symbol),
     marketPriceCount: market.prices.length,
     portfolioSnapshotCount: portfolioSnapshots?.length ?? 0,
+    portfolioSnapshotNormalizedCount: snapshotSummary.normalizedCount,
+    portfolioSnapshotValueTypesSample: portfolioSnapshots.slice(0, 3).map((snapshot) => ({
+      createdAt: snapshot.created_at,
+      portfolioValueType: typeof snapshot.portfolio_value,
+      investedAmountType: typeof snapshot.invested_amount,
+    })),
+    sourceUsed: portfolioSource,
+    timeframeSummaries: snapshotSummary.byTimeframe,
     portfolioHistoryAssets: portfolioHistory.map((asset) => ({
       symbol: asset.symbol,
       points: asset.prices.length,
