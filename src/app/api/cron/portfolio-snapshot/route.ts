@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { fetchMarketSnapshot } from "@/lib/coingecko"
-import type { CryptoPrice } from "@/lib/coingecko"
+import { fetchKrakenTickers } from "@/lib/kraken"
+import { computePortfolioSnapshotValue, normalizePortfolioAllocations } from "@/lib/portfolio-history"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
 const SNAPSHOT_INTERVAL_MS = 30 * 60 * 1000
 
-type PortfolioAllocation = {
-  symbol: string
-  percentage: number
-}
-
 type PortfolioHistorySeed = {
   user_id: string
   analysis_id: string | null
   created_at: string
-  invested_amount: number | null
-  allocations: PortfolioAllocation[] | null
+  portfolio_value: number | string | null
+  invested_amount: number | string | null
+  allocations: Array<{ symbol: string; percentage: number }> | null
 }
 
 function getAdmin() {
@@ -35,56 +32,28 @@ function isAuthorized(request: NextRequest) {
   return request.headers.get("authorization") === `Bearer ${secret}`
 }
 
-function normalizeAllocations(value: unknown): PortfolioAllocation[] {
-  if (!Array.isArray(value)) return []
-
-  return value
-    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
-    .map((item) => ({
-      symbol: String(item.symbol ?? "").toUpperCase().trim(),
-      percentage: Number(item.percentage ?? 0),
-    }))
-    .filter((item) => item.symbol && Number.isFinite(item.percentage) && item.percentage > 0)
-}
-
-function computePortfolioSnapshot(
-  allocations: PortfolioAllocation[],
-  prices: CryptoPrice[],
-  investedAmount: number
-) {
-  if (!investedAmount || investedAmount <= 0) return null
-
-  const unresolved = allocations.filter((allocation) => !prices.some((price) => price.symbol === allocation.symbol))
-  if (unresolved.length > 0) return null
-
-  const weightedChange = allocations.reduce((sum, allocation) => {
-    const price = prices.find((item) => item.symbol === allocation.symbol)
-    if (!price) return sum
-    return sum + (allocation.percentage / 100) * price.change24h
-  }, 0)
-
-  return {
-    portfolioValue: Number((investedAmount * (1 + weightedChange / 100)).toFixed(2)),
-    performancePercent: Number(weightedChange.toFixed(4)),
-  }
-}
-
 export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   const admin = getAdmin()
-  const { prices } = await fetchMarketSnapshot()
+  const market = await fetchMarketSnapshot()
+  let krakenTickers = [] as Awaited<ReturnType<typeof fetchKrakenTickers>>
+  try {
+    krakenTickers = await fetchKrakenTickers()
+  } catch (error) {
+    console.warn("[cron] kraken live prices unavailable", error)
+  }
 
-  if (!prices.length) {
+  if (!market.prices.length) {
     console.error("[cron] portfolio snapshot aborted: CoinGecko unavailable")
     return NextResponse.json({ error: "Market data unavailable" }, { status: 503 })
   }
 
   const { data: rows, error: rowsError } = await admin
     .from("portfolio_history")
-    .select("user_id, analysis_id, created_at, invested_amount, allocations")
+    .select("user_id, analysis_id, created_at, portfolio_value, invested_amount, allocations")
     .order("created_at", { ascending: false })
     .limit(5000)
 
@@ -106,7 +75,7 @@ export async function GET(request: NextRequest) {
     portfolio_value: number
     invested_amount: number
     performance_percent: number
-    allocations: PortfolioAllocation[]
+    allocations: Array<{ symbol: string; percentage: number }>
   }> = []
 
   const skipped: Array<{ userId: string; reason: string }> = []
@@ -118,8 +87,12 @@ export async function GET(request: NextRequest) {
       continue
     }
 
-    const allocations = normalizeAllocations(snapshot.allocations)
-    const investedAmount = snapshot.invested_amount
+    const allocations = normalizePortfolioAllocations(snapshot.allocations)
+    const investedAmount = typeof snapshot.invested_amount === "number"
+      ? snapshot.invested_amount
+      : typeof snapshot.invested_amount === "string"
+      ? Number(snapshot.invested_amount)
+      : null
 
     if (!allocations.length) {
       skipped.push({ userId: snapshot.user_id, reason: "allocations absentes" })
@@ -131,9 +104,15 @@ export async function GET(request: NextRequest) {
       continue
     }
 
-    const computed = computePortfolioSnapshot(allocations, prices, investedAmount)
+    const computed = await computePortfolioSnapshotValue({
+      latestSnapshot: snapshot,
+      investedAmount,
+      marketPrices: market.prices,
+      marketFetchedAt: market.fetchedAt,
+      krakenTickers,
+    })
     if (!computed) {
-      skipped.push({ userId: snapshot.user_id, reason: "prix marché incomplets" })
+      skipped.push({ userId: snapshot.user_id, reason: "revalorisation impossible" })
       continue
     }
 
@@ -157,7 +136,7 @@ export async function GET(request: NextRequest) {
       inserted: 0,
       usersConsidered: latestByUser.size,
       skipped,
-      priceSource: "CoinGecko",
+      priceSource: krakenTickers.length > 0 ? "Kraken + CoinGecko" : "CoinGecko",
     })
   }
 
@@ -172,6 +151,7 @@ export async function GET(request: NextRequest) {
     inserted: inserts.length,
     usersConsidered: latestByUser.size,
     skipped,
+    priceSource: krakenTickers.length > 0 ? "Kraken + CoinGecko" : "CoinGecko",
   })
 
   return NextResponse.json({
@@ -179,6 +159,6 @@ export async function GET(request: NextRequest) {
     inserted: inserts.length,
     usersConsidered: latestByUser.size,
     skipped,
-    priceSource: "CoinGecko",
+    priceSource: krakenTickers.length > 0 ? "Kraken + CoinGecko" : "CoinGecko",
   })
 }

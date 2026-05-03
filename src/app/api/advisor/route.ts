@@ -6,6 +6,7 @@ import { fetchMarketSnapshot } from "@/lib/coingecko"
 import type { CryptoPrice, MarketGlobal } from "@/lib/coingecko"
 import { fetchKrakenTickers, type KrakenTicker } from "@/lib/kraken"
 import { buildMarketDecision } from "@/lib/market-agent"
+import { computePortfolioSnapshotValue } from "@/lib/portfolio-history"
 
 export const maxDuration = 60
 
@@ -79,27 +80,6 @@ function parseEuroAmount(value: string): number {
 
   const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : 0
-}
-
-function computePortfolioSnapshot(
-  allocations: AllocationItem[],
-  prices: CryptoPrice[],
-  investedAmount: number
-) {
-  if (!investedAmount || investedAmount <= 0) {
-    return { portfolioValue: 0, performancePercent: 0 }
-  }
-
-  const weightedChange = allocations.reduce((sum, allocation) => {
-    const price = prices.find((item) => item.symbol === allocation.asset)
-    if (!price) return sum
-    return sum + (allocation.percentage / 100) * price.change24h
-  }, 0)
-
-  return {
-    performancePercent: Number(weightedChange.toFixed(4)),
-    portfolioValue: Number((investedAmount * (1 + weightedChange / 100)).toFixed(2)),
-  }
 }
 
 function sanitize(s: unknown, maxLen = 300): string {
@@ -906,15 +886,26 @@ export async function POST(request: Request) {
     applyPlanFeatureGate(analysisData, plan)
 
     const investedAmount = parseEuroAmount(cleanCapital)
-    const { portfolioValue, performancePercent } = computePortfolioSnapshot(
-      analysisData.allocation,
-      prices,
-      investedAmount
-    )
     const portfolioHistoryAllocations = analysisData.allocation.map((allocation) => ({
       symbol: allocation.asset,
       percentage: allocation.percentage,
     }))
+    const admin = getAdmin()
+    const { data: latestPortfolioSnapshot } = await admin
+      .from("portfolio_history")
+      .select("created_at, portfolio_value, invested_amount, allocations")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const computedPortfolioSnapshot = await computePortfolioSnapshotValue({
+      latestSnapshot: latestPortfolioSnapshot,
+      investedAmount,
+      marketPrices: prices,
+      marketFetchedAt: Date.now(),
+      krakenTickers,
+    })
 
     // Save to DB (allocation without notes for compatibility)
     const { data: savedAnalysis, error: dbError } = await supabase
@@ -977,15 +968,20 @@ export async function POST(request: Request) {
         userId: user.id,
         savedAnalysis,
       })
+    } else if (!computedPortfolioSnapshot) {
+      console.error("[advisor] portfolio_history insert skipped: snapshot repricing failed", {
+        userId: user.id,
+        analysisId: savedAnalysis.id,
+      })
     } else {
-      const { error: historyError } = await getAdmin()
+      const { error: historyError } = await admin
         .from("portfolio_history")
         .insert({
           user_id: user.id,
           analysis_id: savedAnalysis.id,
-          portfolio_value: portfolioValue,
+          portfolio_value: computedPortfolioSnapshot.portfolioValue,
           invested_amount: investedAmount,
-          performance_percent: performancePercent,
+          performance_percent: computedPortfolioSnapshot.performancePercent,
           allocations: portfolioHistoryAllocations,
         })
 
@@ -995,6 +991,7 @@ export async function POST(request: Request) {
         console.log("[advisor] portfolio_history inserted", {
           userId: user.id,
           analysisId: savedAnalysis.id,
+          mode: computedPortfolioSnapshot.mode,
         })
       }
     }

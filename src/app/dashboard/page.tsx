@@ -2,16 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { createServerClient } from "@supabase/ssr"
 import { redirect } from "next/navigation"
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview"
-import {
-  fetchMarketSnapshot,
-  fetchPortfolioMarketHistory,
-  fetchMarketsData,
-  type CryptoPrice,
-  type MarketChartPoint,
-} from "@/lib/coingecko"
+import { fetchMarketSnapshot } from "@/lib/coingecko"
 import { buildMarketDecision } from "@/lib/market-agent"
 import { stripe } from "@/lib/stripe"
-import { fetchKrakenTickers } from "@/lib/kraken"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type StripeSub = Record<string, any>
@@ -26,20 +19,11 @@ interface PortfolioHistoryRow {
   allocations: Array<{ symbol: string; percentage: number }> | null
 }
 
-interface LivePortfolioPoint {
-  timestamp: number
-  created_at: string
-  portfolio_value: number
-  invested_amount: number | null
-  price_source: "kraken" | "coingecko"
-}
-
 const TIMEFRAME_WINDOWS_MS = {
   "1H": 60 * 60 * 1000,
   "1D": 24 * 60 * 60 * 1000,
   "7D": 7 * 24 * 60 * 60 * 1000,
 } as const
-const DAY_MS = 24 * 60 * 60 * 1000
 
 function parseFiniteNumber(value: number | string | null | undefined) {
   if (typeof value === "number" && Number.isFinite(value)) return value
@@ -59,23 +43,6 @@ function normalizeAllocations(value: Array<{ symbol: string; percentage: number 
       percentage: Number(allocation.percentage ?? 0),
     }))
     .filter((allocation) => allocation.symbol && Number.isFinite(allocation.percentage) && allocation.percentage > 0)
-}
-
-function getPriceAtOrBefore(points: MarketChartPoint[], timestamp: number) {
-  let price: number | null = null
-  for (const point of points) {
-    if (point.timestamp > timestamp) break
-    price = point.price
-  }
-  return price
-}
-
-function mergeMarketUniverse(primary: CryptoPrice[], secondary: CryptoPrice[]) {
-  const bySymbol = new Map<string, CryptoPrice>()
-  for (const coin of [...primary, ...secondary]) {
-    if (!bySymbol.has(coin.symbol)) bySymbol.set(coin.symbol, coin)
-  }
-  return Array.from(bySymbol.values())
 }
 
 function normalizePortfolioSnapshots(rows: PortfolioHistoryRow[]) {
@@ -144,121 +111,6 @@ function summarizePortfolioWindow(
     firstValue,
     lastValue,
     performancePercent,
-  }
-}
-
-async function buildLivePortfolioPoint(
-  rows: PortfolioHistoryRow[],
-  market: Awaited<ReturnType<typeof fetchMarketSnapshot>>
-): Promise<{ point: LivePortfolioPoint | null; debug: Record<string, unknown> }> {
-  const normalized = normalizePortfolioSnapshots(rows)
-  const latestSnapshot = normalized[normalized.length - 1]
-
-  if (!latestSnapshot) {
-    return { point: null, debug: { reason: "no_valid_snapshot" } }
-  }
-
-  if (!latestSnapshot.allocations.length) {
-    return { point: null, debug: { reason: "missing_allocations", snapshotAt: latestSnapshot.timestamp } }
-  }
-
-  let marketUniverse = market.prices
-  const missingSymbols = latestSnapshot.allocations
-    .map((allocation) => allocation.symbol)
-    .filter((symbol) => !marketUniverse.some((coin) => coin.symbol === symbol))
-
-  if (missingSymbols.length > 0) {
-    const extendedMarkets = await fetchMarketsData(100)
-    marketUniverse = mergeMarketUniverse(marketUniverse, extendedMarkets)
-  }
-
-  let krakenTickers: Awaited<ReturnType<typeof fetchKrakenTickers>> = []
-  try {
-    krakenTickers = await fetchKrakenTickers()
-  } catch (error) {
-    console.warn("[dashboard] kraken live prices unavailable", error)
-  }
-
-  const krakenPriceMap = new Map(krakenTickers.map((ticker) => [ticker.symbol, ticker.price]))
-  const daysNeeded = Math.max(1, Math.ceil((market.fetchedAt - latestSnapshot.timestamp) / DAY_MS) + 1)
-  const histories = await fetchPortfolioMarketHistory(latestSnapshot.allocations, marketUniverse, daysNeeded)
-
-  if (!histories.length) {
-    return {
-      point: null,
-      debug: {
-        reason: "historical_prices_unavailable",
-        snapshotAt: latestSnapshot.timestamp,
-        daysNeeded,
-      },
-    }
-  }
-
-  let livePortfolioValue = 0
-  let usedKraken = false
-  const assetDebug = latestSnapshot.allocations.map((allocation) => {
-    const history = histories.find((item) => item.symbol === allocation.symbol)
-    const baselinePrice = history ? getPriceAtOrBefore(history.prices, latestSnapshot.timestamp) : null
-    const krakenPrice = krakenPriceMap.get(allocation.symbol) ?? null
-    const coinGeckoPrice = marketUniverse.find((coin) => coin.symbol === allocation.symbol)?.price ?? history?.prices[history.prices.length - 1]?.price ?? null
-    const livePrice = krakenPrice ?? coinGeckoPrice
-
-    if (!baselinePrice || !livePrice || latestSnapshot.portfolioValue <= 0) {
-      return {
-        symbol: allocation.symbol,
-        percentage: allocation.percentage,
-        baselinePrice,
-        livePrice,
-        liveSource: krakenPrice ? "kraken" : coinGeckoPrice ? "coingecko" : null,
-        quantity: null,
-        currentValue: null,
-      }
-    }
-
-    const quantity = (latestSnapshot.portfolioValue * (allocation.percentage / 100)) / baselinePrice
-    const currentValue = quantity * livePrice
-    if (krakenPrice) usedKraken = true
-    livePortfolioValue += currentValue
-
-    return {
-      symbol: allocation.symbol,
-      percentage: allocation.percentage,
-      baselinePrice,
-      livePrice,
-      liveSource: krakenPrice ? "kraken" : "coingecko",
-      quantity: Number(quantity.toFixed(8)),
-      currentValue: Number(currentValue.toFixed(2)),
-    }
-  })
-
-  if (assetDebug.some((asset) => asset.currentValue === null)) {
-    return {
-      point: null,
-      debug: {
-        reason: "live_value_incomplete",
-        snapshotAt: latestSnapshot.timestamp,
-        daysNeeded,
-        assetDebug,
-      },
-    }
-  }
-
-  return {
-    point: {
-      timestamp: market.fetchedAt,
-      created_at: new Date(market.fetchedAt).toISOString(),
-      portfolio_value: Number(livePortfolioValue.toFixed(2)),
-      invested_amount: latestSnapshot.investedAmount,
-      price_source: usedKraken ? "kraken" : "coingecko",
-    },
-    debug: {
-      reason: "ok",
-      snapshotAt: latestSnapshot.timestamp,
-      daysNeeded,
-      livePriceSource: usedKraken ? "kraken" : "coingecko",
-      livePortfolioValue: Number(livePortfolioValue.toFixed(2)),
-      assetDebug,
-    },
   }
 }
 
@@ -344,15 +196,9 @@ export default async function DashboardPage({
     : profile?.plan ?? "free"
   const lastAnalysis = (analyses ?? []).slice(0, HISTORY_LIMIT[plan] ?? 3)[0] ?? null
   const hasPortfolioSnapshots = (portfolioSnapshots?.length ?? 0) > 0
-  const portfolioHistory = !hasPortfolioSnapshots && lastAnalysis
-    ? await fetchPortfolioMarketHistory(lastAnalysis.allocations ?? [], market.prices, 8)
-    : []
   const marketDecision = buildMarketDecision(market.prices, market.global, lastAnalysis?.allocations ?? null)
   const snapshotSummary = summarizePortfolioSnapshots(portfolioSnapshots as PortfolioHistoryRow[], market.fetchedAt)
-  const portfolioSource = hasPortfolioSnapshots ? "portfolio_history" : lastAnalysis ? "coingecko" : "none"
-  const { point: livePortfolioPoint, debug: livePortfolioDebug } = hasPortfolioSnapshots
-    ? await buildLivePortfolioPoint(portfolioSnapshots as PortfolioHistoryRow[], market)
-    : { point: null, debug: { reason: "no_portfolio_history" } }
+  const portfolioSource = hasPortfolioSnapshots ? "portfolio_history" : "none"
 
   console.info("[dashboard] portfolioHistory received", {
     userId: user.id,
@@ -380,14 +226,7 @@ export default async function DashboardPage({
       investedAmountType: typeof snapshot.invested_amount,
     })),
     sourceUsed: portfolioSource,
-    livePriceSource: livePortfolioPoint?.price_source ?? null,
-    livePortfolioValue: livePortfolioPoint?.portfolio_value ?? null,
-    livePortfolioDebug,
     timeframeSummaries: snapshotSummary.byTimeframe,
-    portfolioHistoryAssets: portfolioHistory.map((asset) => ({
-      symbol: asset.symbol,
-      points: asset.prices.length,
-    })),
     marketFetchedAt: market.fetchedAt,
   })
 
@@ -400,9 +239,7 @@ export default async function DashboardPage({
       justUpgraded={params.upgraded === "true" ? (params.plan ?? null) : null}
       monthlyCount={monthlyCount ?? 0}
       cryptoPrices={market.prices}
-      portfolioHistory={portfolioHistory}
       portfolioSnapshots={(portfolioSnapshots ?? []) as PortfolioHistoryRow[]}
-      livePortfolioPoint={livePortfolioPoint}
       marketGlobal={market.global}
       marketDecision={marketDecision}
       marketFetchedAt={market.fetchedAt}
