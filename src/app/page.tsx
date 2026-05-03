@@ -135,6 +135,9 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+          <p className="mx-auto mt-5 max-w-2xl text-center text-xs leading-6 text-muted-foreground">
+            Les cryptomonnaies comportent un risque de perte en capital. Ceci n’est pas un conseil financier.
+          </p>
         </div>
       </section>
 

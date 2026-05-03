@@ -428,6 +428,15 @@ function buildPortfolioSnapshotData(
   if (!snapshots.length) return []
 
   const periodMs = TIMEFRAME_WINDOWS_MS[timeframe]
+  const oldestTimestamp = snapshots[0]?.timestamp ?? null
+  if (
+    periodMs !== undefined &&
+    oldestTimestamp !== null &&
+    anchorMs - oldestTimestamp < periodMs
+  ) {
+    return []
+  }
+
   const series = periodMs === undefined
     ? snapshots.filter((snapshot) => snapshot.timestamp <= anchorMs)
     : snapshots.filter((snapshot) => snapshot.timestamp >= anchorMs - periodMs && snapshot.timestamp <= anchorMs)
@@ -522,6 +531,12 @@ function PortfolioLineChart({
     (selectedWindowMs !== undefined && selectedUsesFullHistory && totalHistorySpanMs < selectedWindowMs)
     || (tf === "ALL" && totalHistorySpanMs < 7 * DAY_MS)
   )
+
+  useEffect(() => {
+    if (timeframeAvailability[tf]?.available) return
+    const preferred = getPreferredTimeframe(timeframeAvailability)
+    if (preferred !== tf) setTf(preferred)
+  }, [tf, timeframeAvailability])
 
   useEffect(() => {
     const container = chartContainerRef.current
@@ -715,9 +730,13 @@ function PortfolioLineChart({
                 return (
                   <button
                     key={t}
-                    onClick={() => setTf(t)}
+                    onClick={() => {
+                      if (enabled) setTf(t)
+                    }}
                     title={enabled ? t : availability.reason}
                     aria-label={enabled ? t : `${t} indisponible: ${availability.reason}`}
+                    aria-disabled={!enabled}
+                    disabled={!enabled}
                     className={cn(
                       "rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-all",
                       enabled && t === tf
@@ -726,7 +745,7 @@ function PortfolioLineChart({
                         ? "bg-secondary text-muted-foreground border border-border"
                         : enabled
                         ? "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                        : "text-muted-foreground/50 hover:bg-secondary/40"
+                        : "cursor-not-allowed text-muted-foreground/40"
                     )}
                   >
                     {t}
@@ -1237,9 +1256,20 @@ export function DashboardOverview({
     if (useSnapshotHistory) {
       for (const timeframe of TIMEFRAMES) {
         const series = buildPortfolioSnapshotData(mergedPortfolioSnapshots, timeframe, timeframeAnchorMs)
+        const timeframeWindowMs = TIMEFRAME_WINDOWS_MS[timeframe]
+        const oldestTimestamp = mergedPortfolioSnapshots[0]?.timestamp ?? null
+        const hasFullWindow = timeframeWindowMs === undefined
+          ? mergedPortfolioSnapshots.length > 1
+          : oldestTimestamp !== null && timeframeAnchorMs - oldestTimestamp >= timeframeWindowMs
+
         availability[timeframe] = series.length > 1
           ? { available: true, reason: "" }
-          : { available: false, reason: "Pas encore assez d’historique pour cette période." }
+          : {
+              available: false,
+              reason: hasFullWindow
+                ? "Pas encore assez d’historique pour cette période."
+                : "Historique encore trop court pour cette période.",
+            }
       }
       return availability
     }
@@ -1324,6 +1354,7 @@ export function DashboardOverview({
                 ? <span className="ml-1">Données marché à <span className="font-medium text-foreground tabular-nums">{lastUpdated}</span>.</span>
                 : <span className="ml-1 text-muted-foreground/50">Chargement des données…</span>
               }
+              <span className="ml-1">Source : <span className="font-medium text-foreground">{livePortfolioPoint?.price_source === "kraken" ? "Kraken + CoinGecko" : "CoinGecko"}</span>.</span>
             </p>
           </div>
           <Link
@@ -1333,6 +1364,9 @@ export function DashboardOverview({
             <AxiomIcon className="h-3.5 w-3.5" />
             Nouvelle analyse
           </Link>
+        </div>
+        <div className="mt-3 rounded-xl border border-border bg-card px-4 py-3 text-[12px] leading-5 text-muted-foreground">
+          Les cryptomonnaies comportent un risque de perte en capital. Ceci n’est pas un conseil financier.
         </div>
       </div>
 

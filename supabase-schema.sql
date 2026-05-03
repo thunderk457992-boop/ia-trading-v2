@@ -1,5 +1,5 @@
 -- ============================================================
--- IA Trading Sens — Supabase Complete Schema
+-- Axiom AI — Supabase Complete Schema
 -- Run this in: Supabase Dashboard → SQL Editor → Run
 -- ============================================================
 
@@ -124,7 +124,25 @@ create index if not exists ai_analyses_user_id_idx    on public.ai_analyses(user
 create index if not exists ai_analyses_created_at_idx on public.ai_analyses(created_at desc);
 
 -- ============================================================
--- TABLE 6: chat_messages (chat usage + optional history)
+-- TABLE 6: portfolio_history (saved portfolio snapshots)
+-- ============================================================
+create table if not exists public.portfolio_history (
+  id                  uuid         primary key default gen_random_uuid(),
+  user_id             uuid         not null references public.profiles(id) on delete cascade,
+  analysis_id         uuid         references public.ai_analyses(id) on delete set null,
+  portfolio_value     numeric(15,2) not null,
+  invested_amount     numeric(15,2),
+  performance_percent numeric(8,4),
+  allocations         jsonb        not null default '[]',
+  created_at          timestamptz  not null default now()
+);
+
+comment on table public.portfolio_history is 'Saved portfolio valuation snapshots used by the dashboard performance chart';
+create index if not exists portfolio_history_user_id_idx on public.portfolio_history(user_id);
+create index if not exists portfolio_history_created_at_idx on public.portfolio_history(user_id, created_at desc);
+
+-- ============================================================
+-- TABLE 7: chat_messages (chat usage + optional history)
 -- ============================================================
 create table if not exists public.chat_messages (
   id               uuid        primary key default gen_random_uuid(),
@@ -146,6 +164,7 @@ alter table public.subscriptions enable row level security;
 alter table public.payments      enable row level security;
 alter table public.strategies    enable row level security;
 alter table public.ai_analyses   enable row level security;
+alter table public.portfolio_history enable row level security;
 alter table public.chat_messages enable row level security;
 
 -- profiles: users see and edit only their own row
@@ -181,6 +200,12 @@ create policy "ai_analyses: own rows read"
   on public.ai_analyses for select using (auth.uid() = user_id);
 create policy "ai_analyses: own rows insert"
   on public.ai_analyses for insert with check (auth.uid() = user_id);
+
+-- portfolio_history: read + insert by owner
+create policy "portfolio_history: own rows read"
+  on public.portfolio_history for select using (auth.uid() = user_id);
+create policy "portfolio_history: own rows insert"
+  on public.portfolio_history for insert with check (auth.uid() = user_id);
 
 -- chat_messages: read + insert by owner
 create policy "chat_messages: own rows read"

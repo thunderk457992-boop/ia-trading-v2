@@ -2,13 +2,13 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Axiom - Conseiller Crypto Intelligent",
+  title: "Axiom AI",
   description:
-    "Obtenez une allocation crypto personnalisee basee sur votre profil, vos objectifs et les conditions du marche.",
-  keywords: "axiom, crypto, trading, IA, intelligence artificielle, bitcoin, portfolio, allocation",
+    "Axiom AI vous aide à construire une allocation crypto cohérente selon votre profil, vos objectifs et les conditions de marché.",
+  keywords: "axiom ai, axiom, crypto, trading, IA, intelligence artificielle, bitcoin, portfolio, allocation",
   openGraph: {
-    title: "Axiom",
-    description: "Votre conseiller crypto IA avec allocation personnalisee en quelques secondes",
+    title: "Axiom AI",
+    description: "Votre copilote crypto IA pour analyser, suivre et ajuster votre portefeuille avec méthode.",
     type: "website",
   },
 }
