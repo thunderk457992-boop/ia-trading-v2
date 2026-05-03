@@ -891,13 +891,21 @@ export async function POST(request: Request) {
       percentage: allocation.percentage,
     }))
     const admin = getAdmin()
-    const { data: latestPortfolioSnapshot } = await admin
+    const { data: latestPortfolioSnapshot, error: latestSnapshotError } = await admin
       .from("portfolio_history")
       .select("created_at, portfolio_value, invested_amount, allocations")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    if (latestSnapshotError) {
+      console.error("[advisor] latest portfolio snapshot query failed", latestSnapshotError)
+      return NextResponse.json(
+        { error: "Impossible de charger l'historique portefeuille pour le moment." },
+        { status: 500 }
+      )
+    }
 
     const computedPortfolioSnapshot = await computePortfolioSnapshotValue({
       latestSnapshot: latestPortfolioSnapshot,
@@ -906,6 +914,23 @@ export async function POST(request: Request) {
       marketFetchedAt: Date.now(),
       krakenTickers,
     })
+
+    if (!computedPortfolioSnapshot) {
+      console.error("[advisor] portfolio snapshot computation failed", {
+        userId: user.id,
+        allocationCount: portfolioHistoryAllocations.length,
+        coinGeckoAvailable,
+        krakenAvailable,
+      })
+      return NextResponse.json(
+        {
+          error: "Impossible de valoriser votre portefeuille avec les prix de marché actuels.",
+          marketDataAvailable,
+          marketSources: { coinGecko: coinGeckoAvailable, kraken: krakenAvailable },
+        },
+        { status: 503 }
+      )
+    }
 
     // Save to DB (allocation without notes for compatibility)
     const { data: savedAnalysis, error: dbError } = await supabase
@@ -968,11 +993,10 @@ export async function POST(request: Request) {
         userId: user.id,
         savedAnalysis,
       })
-    } else if (!computedPortfolioSnapshot) {
-      console.error("[advisor] portfolio_history insert skipped: snapshot repricing failed", {
-        userId: user.id,
-        analysisId: savedAnalysis.id,
-      })
+      return NextResponse.json(
+        { error: "Impossible d'enregistrer l'analyse générée." },
+        { status: 500 }
+      )
     } else {
       const { error: historyError } = await admin
         .from("portfolio_history")
@@ -987,6 +1011,20 @@ export async function POST(request: Request) {
 
       if (historyError) {
         console.error("[advisor] portfolio_history insert failed", historyError)
+        const { error: rollbackError } = await admin
+          .from("ai_analyses")
+          .delete()
+          .eq("id", savedAnalysis.id)
+          .eq("user_id", user.id)
+
+        if (rollbackError) {
+          console.error("[advisor] ai_analyses rollback failed after portfolio_history error", rollbackError)
+        }
+
+        return NextResponse.json(
+          { error: "Impossible d'enregistrer l'historique portefeuille pour le moment." },
+          { status: 500 }
+        )
       } else {
         console.log("[advisor] portfolio_history inserted", {
           userId: user.id,

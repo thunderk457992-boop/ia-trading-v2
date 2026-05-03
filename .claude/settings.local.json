@@ -39,7 +39,8 @@
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const g=JSON.parse\\(d\\).data;console.log\\('Total cap:','\\\\$'+\\(g.total_market_cap.usd/1e12\\).toFixed\\(2\\)+'T','| BTC dom:',g.market_cap_percentage.btc.toFixed\\(1\\)+'%','| 24h chg:',g.market_cap_change_percentage_24h_usd.toFixed\\(2\\)+'%'\\)}\\)\")",
       "Bash(powershell *)",
       "Bash(unzip -o \"b_1gxDyfBkb4g \\(1\\).zip\" -d design_ref)",
-      "PowerShell($items = Get-ChildItem \"C:\\\\Users\\\\oller\\\\Desktop\\\\ia-trading-v2\"; foreach \\($i in $items\\) { Write-Output $i.Name })"
+      "PowerShell($items = Get-ChildItem \"C:\\\\Users\\\\oller\\\\Desktop\\\\ia-trading-v2\"; foreach \\($i in $items\\) { Write-Output $i.Name })",
+      "Bash(node *)"
     ]
   },
   "enableAllProjectMcpServers": true

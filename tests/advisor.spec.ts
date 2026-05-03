@@ -27,3 +27,13 @@ test('chat redirects to login when user is not authenticated', async ({ page }) 
   await page.goto('http://localhost:3000/chat');
   await expect(page).toHaveURL(/login/);
 });
+
+test('settings redirects to login when user is not authenticated', async ({ page }) => {
+  await page.goto('http://localhost:3000/settings');
+  await expect(page).toHaveURL(/login/);
+});
+
+test('guide redirects to login when user is not authenticated', async ({ page }) => {
+  await page.goto('http://localhost:3000/guide');
+  await expect(page).toHaveURL(/login/);
+});

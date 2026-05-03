@@ -480,16 +480,10 @@ function PortfolioLineChart({
       })),
     })
     console.info("[dashboard] portfolio timeframe debug", payload)
-
-    void fetch("/api/dashboard/portfolio-debug", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).catch(() => undefined)
   }, [mergedData, selectedChange, selectedSnapshotData, selectedTimeframeAvailable, selectedValueChange, tf, useSnapshotHistory])
 
   return (
-    <div className="rounded-xl border border-border bg-card">
+    <div className="rounded-xl border border-border bg-card" data-testid="portfolio-performance-card">
       <div className="p-5 border-b border-border">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -502,7 +496,10 @@ function PortfolioLineChart({
             {mergedData.length > 0 ? (
               <>
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className={cn("text-3xl font-bold tracking-tight tabular-nums", isUp ? "text-success" : "text-destructive")}>
+                  <h2
+                    className={cn("text-3xl font-bold tracking-tight tabular-nums", isUp ? "text-success" : "text-destructive")}
+                    data-testid="portfolio-performance-percent"
+                  >
                     {isUp ? "+" : ""}{lastValue.toFixed(2)}%
                   </h2>
                   <div className={cn(
@@ -515,14 +512,17 @@ function PortfolioLineChart({
                 </div>
                 {selectedValueChange !== null && (
                   <>
-                    <p className={cn("mt-1 text-lg font-semibold tabular-nums", isUp ? "text-success" : "text-destructive")}>
+                    <p
+                      className={cn("mt-1 text-lg font-semibold tabular-nums", isUp ? "text-success" : "text-destructive")}
+                      data-testid="portfolio-performance-euro"
+                    >
                       {fmtPortfolioEuroDelta(selectedValueChange)}
                     </p>
                     <p className="text-[12px] text-muted-foreground">
                       Variation {tf} sur <span className="font-medium text-foreground">{capital.toLocaleString("fr-FR")}€</span> investis
                     </p>
                     {shortHistoryNotice && (
-                      <p className="mt-1 text-[12px] text-muted-foreground">
+                      <p className="mt-1 text-[12px] text-muted-foreground" data-testid="portfolio-performance-short-history">
                         Historique encore trop court pour différencier cette période.
                       </p>
                     )}
@@ -530,7 +530,7 @@ function PortfolioLineChart({
                 )}
               </>
             ) : (
-              <p className="text-[15px] text-muted-foreground mt-1">
+              <p className="text-[15px] text-muted-foreground mt-1" data-testid="portfolio-performance-empty">
                 {emptyStateMessage}
               </p>
             )}
@@ -547,6 +547,7 @@ function PortfolioLineChart({
                     onClick={() => {
                       if (enabled) setTf(t)
                     }}
+                    data-testid={`portfolio-timeframe-${t}`}
                     title={enabled ? t : availability.reason}
                     aria-label={enabled ? t : `${t} indisponible: ${availability.reason}`}
                     aria-disabled={!enabled}
@@ -705,7 +706,7 @@ function PortfolioLineChart({
           <div className="h-12 w-12 rounded-xl bg-secondary flex items-center justify-center">
             <BarChart2 className="h-6 w-6 text-muted-foreground" />
           </div>
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground" data-testid="portfolio-performance-empty">
             {emptyStateMessage}
           </p>
           <Link href="/advisor" className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background text-xs font-bold rounded-lg transition-colors hover:opacity-90">
@@ -716,7 +717,7 @@ function PortfolioLineChart({
 
       {/* Data source footer */}
       <div className="px-5 py-2 border-t border-border/60 flex items-center flex-wrap gap-x-3 gap-y-1">
-        <span className="text-[10px] text-muted-foreground/60">Source&nbsp;: {useSnapshotHistory ? "portfolio_history uniquement" : "aucune donnée portefeuille"}</span>
+        <span className="text-[10px] text-muted-foreground/60" data-testid="portfolio-performance-source">Source&nbsp;: {useSnapshotHistory ? "portfolio_history uniquement" : "aucune donnée portefeuille"}</span>
         <span className="text-[10px] text-muted-foreground/40">·</span>
         <span className="text-[10px] text-muted-foreground/60">Actualisation auto 30s</span>
         {lastUpdated && (
