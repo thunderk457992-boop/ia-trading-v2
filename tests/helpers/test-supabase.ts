@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { expect, type Page } from "@playwright/test"
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js"
 
 type TestUser = {
   id: string
@@ -72,14 +72,48 @@ function requireEnv(name: string) {
 export function hasSupabaseAdminEnv() {
   return Boolean(
     getEnv("NEXT_PUBLIC_SUPABASE_URL")
-    && getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     && getEnv("SUPABASE_SERVICE_ROLE_KEY")
   )
 }
 
+function getSupabaseUrl() {
+  return requireEnv("NEXT_PUBLIC_SUPABASE_URL")
+}
+
+function getSupabaseStorageKey() {
+  return `sb-${new URL(getSupabaseUrl()).hostname.split(".")[0]}-auth-token`
+}
+
+function createCookieChunks(key: string, value: string, chunkSize = 3180) {
+  let encodedValue = encodeURIComponent(value)
+  if (encodedValue.length <= chunkSize) {
+    return [{ name: key, value }]
+  }
+
+  const chunks: string[] = []
+
+  while (encodedValue.length > 0) {
+    let encodedChunkHead = encodedValue.slice(0, chunkSize)
+    const lastEscapePos = encodedChunkHead.lastIndexOf("%")
+
+    if (lastEscapePos > chunkSize - 3) {
+      encodedChunkHead = encodedChunkHead.slice(0, lastEscapePos)
+    }
+
+    chunks.push(decodeURIComponent(encodedChunkHead))
+    encodedValue = encodedValue.slice(encodedChunkHead.length)
+  }
+
+  return chunks.map((chunk, index) => ({ name: `${key}.${index}`, value: chunk }))
+}
+
+function requirePublicSupabaseKey() {
+  return requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+}
+
 export function createAdminClient() {
   return createClient(
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    getSupabaseUrl(),
     requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
     {
       auth: {
@@ -151,6 +185,39 @@ export async function loginAsUser(page: Page, user: TestUser) {
     const errorText = await loginError.textContent().catch(() => null)
     throw new Error(`Login failed for temp user${errorText ? `: ${errorText}` : ""}`, { cause: error })
   }
+}
+
+export async function createBrowserSession(user: TestUser) {
+  const publicKey = requirePublicSupabaseKey()
+  const client = createClient(getSupabaseUrl(), publicKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email: user.email,
+    password: user.password,
+  })
+
+  if (error || !data.session) {
+    throw error ?? new Error("Unable to create a browser session for the temp user.")
+  }
+
+  return data.session as Session
+}
+
+export async function authenticatePage(page: Page, user: TestUser) {
+  const session = await createBrowserSession(user)
+  const encodedSession = `base64-${Buffer.from(JSON.stringify(session), "utf8").toString("base64url")}`
+  const cookies = createCookieChunks(getSupabaseStorageKey(), encodedSession).map((cookie) => ({
+    name: cookie.name,
+    value: cookie.value,
+    url: "http://localhost:3000",
+  }))
+
+  await page.context().addCookies(cookies)
 }
 
 export async function seedPortfolioSnapshots(

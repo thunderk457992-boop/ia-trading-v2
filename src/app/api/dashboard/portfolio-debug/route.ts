@@ -1,22 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-export async function POST(request: NextRequest) {
-  // ── Security gate ── must be the very first block, no exceptions ──────────
-  if (process.env.DEBUG_DASHBOARD_ENABLED !== "true") {
-    let authenticated = false
-    try {
-      const supabase = await createClient()
-      const { data } = await supabase.auth.getUser()
-      authenticated = data.user !== null
-    } catch {
-      authenticated = false
-    }
-    if (!authenticated) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 })
-    }
+async function canUseDebugRoute() {
+  if (process.env.DEBUG_DASHBOARD_ENABLED !== "true") return false
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
+
+    return !error && !!user
+  } catch {
+    return false
   }
-  // ─────────────────────────────────────────────────────────────────────────
+}
+
+export async function POST(request: NextRequest) {
+  if (!(await canUseDebugRoute())) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
 
   let payload: unknown
   try {

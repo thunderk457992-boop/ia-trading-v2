@@ -3,7 +3,7 @@
 import Link from "next/link"
 import {
   ArrowRight, Check, X, ChevronRight, TrendingUp, TrendingDown,
-  Wallet, Activity, Brain, Percent, Crown, BarChart2,
+  Wallet, Activity, Brain, Percent, Crown,
   Search, RefreshCw, Star, StarOff, ChevronUp, ChevronDown,
   Zap, Clock, AlertTriangle,
 } from "lucide-react"
@@ -331,23 +331,24 @@ function getPortfolioSnapshotChange(
 }
 
 function PortfolioLineChart({
-  portfolioSnapshots, capital, timeframeAvailability, timeframeAnchorMs, lastUpdated,
+  portfolioSnapshots, capital, timeframeAvailability, timeframeAnchorMs, lastSnapshotLabel,
 }: {
   portfolioSnapshots: PortfolioSnapshot[]
   capital: number
   timeframeAvailability: Record<TF, TimeframeAvailability>
   timeframeAnchorMs: number
-  lastUpdated: string | null
+  lastSnapshotLabel: string | null
 }) {
   const [tf, setTf] = useState<TF>(() => getPreferredTimeframe(timeframeAvailability))
   const chartContainerRef = useRef<HTMLDivElement | null>(null)
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
   const uid = useId().replace(/:/g, "")
-  const useSnapshotHistory = portfolioSnapshots.length > 0
   const normalizedSnapshots = useMemo(
     () => selectContinuousPortfolioSnapshots(normalizePortfolioSnapshots(portfolioSnapshots)),
     [portfolioSnapshots]
   )
+  const useSnapshotHistory = normalizedSnapshots.length > 0
+  const usableSnapshotCount = normalizedSnapshots.length
   const snapshotSeriesByTimeframe = useMemo(() => (
     Object.fromEntries(
       TIMEFRAMES.map((timeframe) => [
@@ -601,117 +602,171 @@ function PortfolioLineChart({
       {mergedData.length > 0 ? (
         <div className="h-[300px] w-full min-w-0 p-4 pt-2">
           <div ref={chartContainerRef} className="h-full w-full min-h-0 min-w-0">
-            {chartSize.width > 0 && chartSize.height > 0 && (
-              <AreaChart width={chartSize.width} height={chartSize.height} data={mergedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity={0.15} />
-                  <stop offset="100%" stopColor={color} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id={`${gradId}-btc`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#f97316" stopOpacity={0.08} />
-                  <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id={`${gradId}-eth`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#a855f7" stopOpacity={0.08} />
-                  <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: "#94a3b8", fontSize: 10 }}
-                dy={8}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: "#94a3b8", fontSize: 10 }}
-                tickFormatter={(v) => useSnapshotHistory ? formatPortfolioValue(v) : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`}
-                dx={-4}
-                width={useSnapshotHistory ? 72 : 52}
-                domain={["auto", "auto"]}
-              />
-              <RechartsTooltip
-                content={({ active, payload, label }) => {
-                  if (!active || !payload?.length) return null
-                  const KEY_LABEL: Record<string, string> = { portfolio: "Portfolio", btc: "BTC", eth: "ETH" }
-                  return (
-                    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg">
-                      <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">{label}</p>
-                      {payload.map((entry, i) => {
-                        const val = entry.value as number | null
-                        if (val === null || val === undefined) return null
-                        const point = entry.payload as PortfolioChartDataPoint
-                        return (
-                          <div key={i} className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-1.5">
-                              <div className="h-2 w-2 rounded-full" style={{ background: entry.stroke as string }} />
-                              <span className="text-[11px] text-muted-foreground">
-                                {KEY_LABEL[entry.dataKey as string] ?? entry.dataKey}
+            {chartSize.width > 0 && chartSize.height > 0 ? (
+              <AreaChart
+                width={chartSize.width}
+                height={chartSize.height}
+                data={mergedData}
+                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity={0.15} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id={`${gradId}-btc`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.08} />
+                    <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id={`${gradId}-eth`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity={0.08} />
+                    <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#94a3b8", fontSize: 10 }}
+                  dy={8}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#94a3b8", fontSize: 10 }}
+                  tickFormatter={(v) => useSnapshotHistory ? formatPortfolioValue(v) : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`}
+                  dx={-4}
+                  width={useSnapshotHistory ? 72 : 52}
+                  domain={["auto", "auto"]}
+                />
+                <RechartsTooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null
+                    const KEY_LABEL: Record<string, string> = { portfolio: "Portfolio", btc: "BTC", eth: "ETH" }
+                    return (
+                      <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg">
+                        <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">{label}</p>
+                        {payload.map((entry, i) => {
+                          const val = entry.value as number | null
+                          if (val === null || val === undefined) return null
+                          const point = entry.payload as PortfolioChartDataPoint
+                          return (
+                            <div key={i} className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-1.5">
+                                <div className="h-2 w-2 rounded-full" style={{ background: entry.stroke as string }} />
+                                <span className="text-[11px] text-muted-foreground">
+                                  {KEY_LABEL[entry.dataKey as string] ?? entry.dataKey}
+                                </span>
+                              </div>
+                              <span
+                                className={cn(
+                                  "text-[12px] font-medium tabular-nums",
+                                  useSnapshotHistory
+                                    ? point.performance >= 0 ? "text-success" : "text-destructive"
+                                    : val >= 0
+                                    ? "text-success"
+                                    : "text-destructive"
+                                )}
+                              >
+                                {useSnapshotHistory
+                                  ? entry.dataKey === "portfolio"
+                                    ? formatPortfolioValue(val)
+                                    : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`
+                                  : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`}
                               </span>
                             </div>
-                            <span className={cn(
-                              "text-[12px] font-medium tabular-nums",
-                              useSnapshotHistory
-                                ? (point.performance >= 0 ? "text-success" : "text-destructive")
-                                : val >= 0
-                                ? "text-success"
-                                : "text-destructive"
-                            )}>
-                              {useSnapshotHistory
-                                ? entry.dataKey === "portfolio"
-                                  ? formatPortfolioValue(val)
-                                  : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`
-                                : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`}
+                          )
+                        })}
+                        {useSnapshotHistory && payload[0]?.payload?.performance !== undefined && (
+                          <div className="mt-2 flex items-center justify-between gap-4 border-t border-border pt-2">
+                            <span className="text-[11px] text-muted-foreground">Performance</span>
+                            <span
+                              className={cn(
+                                "text-[12px] font-medium tabular-nums",
+                                (payload[0].payload as PortfolioChartDataPoint).performance >= 0 ? "text-success" : "text-destructive"
+                              )}
+                            >
+                              {(payload[0].payload as PortfolioChartDataPoint).performance >= 0 ? "+" : ""}
+                              {(payload[0].payload as PortfolioChartDataPoint).performance.toFixed(2)}%
                             </span>
                           </div>
-                        )
-                      })}
-                      {useSnapshotHistory && payload[0]?.payload?.performance !== undefined && (
-                        <div className="mt-2 flex items-center justify-between gap-4 border-t border-border pt-2">
-                          <span className="text-[11px] text-muted-foreground">Performance</span>
-                          <span className={cn(
-                            "text-[12px] font-medium tabular-nums",
-                            (payload[0].payload as PortfolioChartDataPoint).performance >= 0 ? "text-success" : "text-destructive"
-                          )}>
-                            {(payload[0].payload as PortfolioChartDataPoint).performance >= 0 ? "+" : ""}
-                            {(payload[0].payload as PortfolioChartDataPoint).performance.toFixed(2)}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )
-                }}
-                cursor={{ stroke: "#e2e8f0", strokeWidth: 1 }}
-              />
-              <Area
-                type="monotone"
-                dataKey="portfolio"
-                stroke={color}
-                strokeWidth={2}
-                fill={`url(#${gradId})`}
-                dot={false}
-                activeDot={{ r: 4, fill: color, strokeWidth: 0 }}
-              />
+                        )}
+                      </div>
+                    )
+                  }}
+                  cursor={{ stroke: "#e2e8f0", strokeWidth: 1 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="portfolio"
+                  stroke={color}
+                  strokeWidth={2}
+                  fill={`url(#${gradId})`}
+                  dot={false}
+                  activeDot={{ r: 4, fill: color, strokeWidth: 0 }}
+                />
               </AreaChart>
+            ) : (
+              <div className="h-full w-full animate-pulse rounded-lg bg-secondary/40" />
             )}
           </div>
         </div>
       ) : (
-        <div className="h-60 flex flex-col items-center justify-center gap-3">
-          <div className="h-12 w-12 rounded-xl bg-secondary flex items-center justify-center">
-            <BarChart2 className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="text-[13px] text-muted-foreground" data-testid="portfolio-performance-empty">
-            {emptyStateMessage}
-          </p>
-          <Link href="/advisor" className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background text-xs font-bold rounded-lg transition-colors hover:opacity-90">
-            Lancer l&apos;analyse <ArrowRight className="h-3 w-3" />
-          </Link>
+        <div className="h-60 flex flex-col items-center justify-center gap-4 px-8">
+          {!useSnapshotHistory ? (
+            <>
+              <div className="flex items-center">
+                {(["Analyse", "Historique", "Graphique"] as const).map((label, i) => (
+                  <div key={label} className="flex items-center">
+                    {i > 0 && <div className="w-8 h-px bg-border mx-1" />}
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className="h-8 w-8 rounded-full border-2 border-border bg-secondary flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                        {i + 1}
+                      </div>
+                      <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[13px] text-muted-foreground text-center" data-testid="portfolio-performance-empty">
+                Lancez votre première analyse pour démarrer le suivi de performance.
+              </p>
+              <Link href="/advisor" className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background text-xs font-bold rounded-lg transition-colors hover:opacity-90">
+                Première analyse <ArrowRight className="h-3 w-3" />
+              </Link>
+            </>
+          ) : (
+            <div className="w-full max-w-xs flex flex-col items-center gap-3">
+              <div className="w-full">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-medium text-muted-foreground">Historique en construction</span>
+                  <span className="text-[11px] tabular-nums font-semibold text-foreground">
+                    {usableSnapshotCount}&nbsp;snapshot{usableSnapshotCount > 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="h-1 w-full rounded-full bg-secondary overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-blue-500 transition-[width] duration-500"
+                    style={{ width: `${Math.min(100, Math.round((usableSnapshotCount / 3) * 100))}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-[10px] text-muted-foreground/70 text-right">
+                  3 snapshots recommandés pour le graphique 1D
+                </p>
+              </div>
+              <p className="text-[12px] text-muted-foreground text-center" data-testid="portfolio-performance-empty">
+                {emptyStateMessage}
+              </p>
+              <p className="text-[10px] text-muted-foreground/60 text-center">
+                Un snapshot est généré à chaque analyse, puis enrichi par la mise à jour quotidienne.
+              </p>
+              <Link href="/advisor" className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-foreground text-background text-xs font-bold rounded-lg transition-colors hover:opacity-90">
+                Générer une analyse <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
@@ -719,11 +774,11 @@ function PortfolioLineChart({
       <div className="px-5 py-2 border-t border-border/60 flex items-center flex-wrap gap-x-3 gap-y-1">
         <span className="text-[10px] text-muted-foreground/60" data-testid="portfolio-performance-source">Source&nbsp;: {useSnapshotHistory ? "portfolio_history uniquement" : "aucune donnée portefeuille"}</span>
         <span className="text-[10px] text-muted-foreground/40">·</span>
-        <span className="text-[10px] text-muted-foreground/60">Actualisation auto 30s</span>
-        {lastUpdated && (
+        <span className="text-[10px] text-muted-foreground/60">Snapshots calculés côté serveur avec Kraken si disponible, sinon CoinGecko</span>
+        {lastSnapshotLabel && (
           <>
             <span className="text-[10px] text-muted-foreground/40">·</span>
-            <span className="text-[10px] text-muted-foreground/60">Dernière mise à jour&nbsp;: {lastUpdated}</span>
+            <span className="text-[10px] text-muted-foreground/60">Dernier snapshot&nbsp;: {lastSnapshotLabel}</span>
           </>
         )}
       </div>
@@ -948,7 +1003,6 @@ export function DashboardOverview({
 }: Props) {
   const router = useRouter()
   const [showUpgradeToast, setShowUpgradeToast] = useState(!!justUpgraded)
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null)
 
   useEffect(() => {
@@ -958,12 +1012,7 @@ export function DashboardOverview({
     }
   }, [justUpgraded])
 
-  useEffect(() => {
-    const ts = marketFetchedAt ?? Date.now()
-    setLastUpdated(new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }))
-  }, [marketFetchedAt])
-
-  // Refresh market data every 30s so the "Live" label is honest
+  // Refresh market cards every 30s; portfolio performance still comes from real snapshots only.
   useEffect(() => {
     const id = setInterval(() => router.refresh(), 30_000)
     return () => clearInterval(id)
@@ -991,6 +1040,19 @@ export function DashboardOverview({
   const useSnapshotHistory = normalizedPortfolioSnapshots.length > 0
   const latestSnapshot = normalizedPortfolioSnapshots[normalizedPortfolioSnapshots.length - 1] ?? null
   const timeframeAnchorMs = latestSnapshot?.timestamp ?? marketFetchedAt ?? 0
+  const marketUpdatedLabel = useMemo(() => {
+    if (!marketFetchedAt) return null
+    return new Date(marketFetchedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+  }, [marketFetchedAt])
+  const lastSnapshotLabel = useMemo(() => {
+    if (!latestSnapshot) return null
+    return new Date(latestSnapshot.timestamp).toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }, [latestSnapshot])
 
   const portfolioChange24h = useMemo(() => {
     return useSnapshotHistory ? getPortfolioSnapshotChange(normalizedPortfolioSnapshots, "1D", timeframeAnchorMs) : null
@@ -1073,11 +1135,12 @@ export function DashboardOverview({
             <h1 className="text-xl font-semibold tracking-tight text-foreground">Dashboard</h1>
             <p className="text-[13px] text-muted-foreground">
               Bienvenue, {firstName}.
-              {lastUpdated
-                ? <span className="ml-1">Données marché à <span className="font-medium text-foreground tabular-nums">{lastUpdated}</span>.</span>
+              {marketUpdatedLabel
+                ? <span className="ml-1">Données marché à <span className="font-medium text-foreground tabular-nums">{marketUpdatedLabel}</span>.</span>
                 : <span className="ml-1 text-muted-foreground/50">Chargement des données…</span>
               }
               <span className="ml-1">Source portefeuille : <span className="font-medium text-foreground">{useSnapshotHistory ? "portfolio_history uniquement" : "aucune donnée"}</span>.</span>
+              <span className="ml-1">Prix marché : <span className="font-medium text-foreground">CoinGecko, avec Kraken si disponible pour le calcul des snapshots.</span></span>
             </p>
           </div>
           <Link
@@ -1312,7 +1375,7 @@ export function DashboardOverview({
             capital={capital}
             timeframeAvailability={timeframeAvailability}
             timeframeAnchorMs={timeframeAnchorMs}
-            lastUpdated={lastUpdated}
+            lastSnapshotLabel={lastSnapshotLabel}
           />
         </div>
         <div>

@@ -7,7 +7,7 @@ import { computePortfolioSnapshotValue, normalizePortfolioAllocations } from "@/
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
-const SNAPSHOT_INTERVAL_MS = 30 * 60 * 1000
+const SNAPSHOT_INTERVAL_MS = 24 * 60 * 60 * 1000
 
 type PortfolioHistorySeed = {
   user_id: string
@@ -28,7 +28,7 @@ function getAdmin() {
 
 function isAuthorized(request: NextRequest) {
   const secret = process.env.CRON_SECRET
-  if (!secret) return process.env.NODE_ENV !== "production"
+  if (!secret) return false
   return request.headers.get("authorization") === `Bearer ${secret}`
 }
 
