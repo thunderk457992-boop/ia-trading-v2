@@ -28,7 +28,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: session.url })
   } catch (error) {
-    console.error("Portal error:", error)
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Erreur serveur"
+    console.error("[portal] error:", error)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
