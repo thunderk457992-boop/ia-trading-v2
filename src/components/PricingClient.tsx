@@ -289,6 +289,10 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
 
       const data = await response.json()
       if (!response.ok) {
+        if (response.status === 401) {
+          window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`)
+          return
+        }
         if (data.manageBilling) {
           // Active subscription exists — redirect to portal instead
           setLoadingPlan("manage")

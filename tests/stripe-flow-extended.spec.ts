@@ -130,3 +130,86 @@ test.describe("stripe sync with no subscription", () => {
     }
   })
 })
+
+// ── Checkout opens for authenticated user ─────────────────────────────────────
+
+test.describe("stripe checkout for authenticated user", () => {
+  test.skip(!hasSupabaseAdminEnv(), "requires Supabase admin env")
+
+  test("authenticated user without subscription gets non-401 from checkout API", async ({ page }) => {
+    test.setTimeout(30_000)
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "stripe-checkout-auth")
+
+    try {
+      await authenticatePage(page, user)
+
+      // Use a known-invalid priceId — the server should return 400 (bad price), not 401 (unauthenticated)
+      const res = await page.request.post("http://localhost:3000/api/stripe/checkout", {
+        data: { priceId: "price_playwright_fake", plan: "pro" },
+      })
+      // Must NOT be 401 — the user is authenticated
+      expect(res.status()).not.toBe(401)
+      // With a fake priceId not in PRICE_CATALOG → 400
+      expect(res.status()).toBe(400)
+    } finally {
+      await cleanupTempUser(admin, user.id)
+    }
+  })
+
+  test("checkout API returns checkout URL for authenticated user when price IDs are configured", async ({ page }) => {
+    test.setTimeout(30_000)
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "stripe-checkout-url")
+
+    try {
+      await authenticatePage(page, user)
+
+      // Fetch actual price IDs from the plans endpoint
+      const plansRes = await page.request.get("http://localhost:3000/api/stripe/plans")
+      const plans = await plansRes.json()
+      const priceId = plans?.pro?.monthly
+
+      if (!priceId) {
+        test.skip()
+        return
+      }
+
+      const res = await page.request.post("http://localhost:3000/api/stripe/checkout", {
+        data: { priceId, plan: "pro" },
+      })
+      expect(res.status()).toBe(200)
+      const body = await res.json()
+      expect(typeof body.url).toBe("string")
+      expect(body.url).toMatch(/stripe\.com/)
+    } finally {
+      await cleanupTempUser(admin, user.id)
+    }
+  })
+
+  test("unauthenticated user visiting /pricing is redirected to login with next=/pricing", async ({ page }) => {
+    await page.goto("http://localhost:3000/pricing")
+    await expect(page).toHaveURL(/\/login/)
+    const url = new URL(page.url())
+    expect(url.searchParams.get("next")).toBe("/pricing")
+  })
+
+  test("authenticated user can access pricing page and Pro button is not disabled", async ({ page }) => {
+    test.setTimeout(30_000)
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "stripe-pricing-ui")
+
+    try {
+      await authenticatePage(page, user)
+      await page.goto("http://localhost:3000/pricing")
+
+      await expect(page.locator("h1")).toContainText("Choisissez votre plan")
+
+      const proButton = page.locator("button").filter({ hasText: "Choisir Pro" })
+      await expect(proButton).toBeVisible()
+      await expect(proButton).not.toBeDisabled()
+    } finally {
+      await cleanupTempUser(admin, user.id)
+    }
+  })
+})

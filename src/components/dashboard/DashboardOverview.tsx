@@ -1081,32 +1081,17 @@ export function DashboardOverview({
     if (useSnapshotHistory) {
       for (const timeframe of TIMEFRAMES) {
         const series = buildPortfolioSnapshotData(normalizedPortfolioSnapshots, timeframe, timeframeAnchorMs)
-        const timeframeWindowMs = TIMEFRAME_WINDOWS_MS[timeframe]
-        const oldestTimestamp = normalizedPortfolioSnapshots[0]?.timestamp ?? null
-        const hasFullWindow = timeframeWindowMs === undefined
-          ? normalizedPortfolioSnapshots.length > 1
-          : oldestTimestamp !== null && timeframeAnchorMs - oldestTimestamp >= timeframeWindowMs
         const hasEnoughPoints = series.length > 1
-        const requiresFullWindow = timeframe === "7D" || timeframe === "1M" || timeframe === "3M" || timeframe === "1Y"
-        const isAvailable = timeframe === "ALL"
-          ? hasEnoughPoints
-          : requiresFullWindow
-            ? hasEnoughPoints && hasFullWindow
-            : hasEnoughPoints
 
-        availability[timeframe] = isAvailable
+        availability[timeframe] = hasEnoughPoints
           ? { available: true, reason: "" }
           : {
               available: false,
-              reason: !hasEnoughPoints
-                ? timeframe === "1H"
-                  ? "Disponible avec plus de snapshots intrajournaliers."
-                  : timeframe === "1D"
-                    ? "Pas encore assez d’historique sur 24h."
-                    : hasFullWindow
-                      ? "Pas encore assez de snapshots pour cette période."
-                      : "Historique encore trop court pour cette période."
-                : "Historique encore trop court pour cette période.",
+              reason: timeframe === "1H"
+                ? "Disponible avec plus de snapshots intrajournaliers."
+                : timeframe === "1D"
+                  ? "Pas encore assez d’historique sur 24h."
+                  : "Pas encore assez de snapshots pour cette période.",
             }
       }
       return availability

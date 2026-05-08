@@ -5,7 +5,7 @@ import { PricingClient } from "@/components/PricingClient"
 export default async function PricingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  if (!user) redirect("/login?next=/pricing")
 
   const [{ data: profile }, { data: subscription }] = await Promise.all([
     supabase

@@ -69,11 +69,11 @@ test.describe("timeframe availability logic", () => {
     }
   })
 
-  // ── 7D remains disabled when the account history is still shorter than 7 full days ──
-  test("7D stays disabled when snapshots are only 3–7 days old", async ({ page }) => {
+  // ── 7D active when 2+ snapshots exist within the 7-day window ───────────────
+  test("7D enabled when 2+ snapshots exist in 7D window", async ({ page }) => {
     test.setTimeout(30_000)
     const admin = createAdminClient()
-    const user = await createTempUser(admin, "tf-7d-active-1d-disabled")
+    const user = await createTempUser(admin, "tf-7d-active")
 
     try {
       await seedPortfolioSnapshots(admin, user.id, [
@@ -87,27 +87,77 @@ test.describe("timeframe availability logic", () => {
 
       await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
 
-      // 7D still stays disabled because the history does not yet cover a full 7-day window.
-      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeDisabled()
+      // anchor = 3d ago; 7D window = [10d ago, 3d ago] → all 3 snapshots included → 7D enabled
+      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
 
-      // 1D has 0–1 snapshots in its 24h window → disabled
+      // 1D has only the anchor snapshot (3d ago) in its 24h window → disabled
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeDisabled()
-
-      // 1H disabled
       await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
 
       // Disabled buttons carry the correct reason text in their title attribute
-      const btn1D = page.getByTestId("portfolio-timeframe-1D")
-      const title1D = await btn1D.getAttribute("title")
+      const title1D = await page.getByTestId("portfolio-timeframe-1D").getAttribute("title")
       expect(title1D).toMatch(/24h/)
 
-      const btn1H = page.getByTestId("portfolio-timeframe-1H")
-      const title1H = await btn1H.getAttribute("title")
+      const title1H = await page.getByTestId("portfolio-timeframe-1H").getAttribute("title")
       expect(title1H).toMatch(/intrajournaliers/)
+    } finally {
+      await cleanupTempUser(admin, user.id)
+    }
+  })
 
-      const btn7D = page.getByTestId("portfolio-timeframe-7D")
-      const title7D = await btn7D.getAttribute("title")
-      expect(title7D).toMatch(/Historique encore trop court/)
+  // ── 7D disabled when fewer than 2 snapshots exist in 7D window ───────────
+  test("7D disabled when only 1 snapshot exists in 7D window", async ({ page }) => {
+    test.setTimeout(30_000)
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "tf-7d-disabled")
+
+    try {
+      await seedPortfolioSnapshots(admin, user.id, [
+        { createdAt: isoOffset(15 * DAY_MS), portfolioValue: 1000, investedAmount: 1000, performancePercent: 0 },
+        { createdAt: isoOffset(1 * DAY_MS),  portfolioValue: 1050, investedAmount: 1000, performancePercent: 5 },
+      ])
+
+      await authenticatePage(page, user)
+      await page.goto("http://localhost:3000/dashboard")
+
+      await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
+
+      // anchor = 1d ago; 7D window = [8d ago, 1d ago] → only 1d ago in window → 7D disabled
+      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeDisabled()
+
+      // 1M window = [31d ago, 1d ago] → both snapshots included → 1M enabled
+      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeEnabled()
+
+      const title7D = await page.getByTestId("portfolio-timeframe-7D").getAttribute("title")
+      expect(title7D).toContain("Pas encore assez de snapshots pour cette période")
+    } finally {
+      await cleanupTempUser(admin, user.id)
+    }
+  })
+
+  // ── 1M active when 2+ snapshots exist within the 30-day window ───────────
+  test("1M enabled with 2 snapshots in last 30 days", async ({ page }) => {
+    test.setTimeout(30_000)
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "tf-1m-active")
+
+    try {
+      await seedPortfolioSnapshots(admin, user.id, [
+        { createdAt: isoOffset(25 * DAY_MS), portfolioValue: 1000, investedAmount: 1000, performancePercent: 0 },
+        { createdAt: isoOffset(5 * DAY_MS),  portfolioValue: 1100, investedAmount: 1000, performancePercent: 10 },
+      ])
+
+      await authenticatePage(page, user)
+      await page.goto("http://localhost:3000/dashboard")
+
+      await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
+
+      // anchor = 5d ago; 1M window = [35d ago, 5d ago] → both in window → 1M enabled
+      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeEnabled()
+      // 7D window = [12d ago, 5d ago] → only 5d ago in window → disabled
+      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeDisabled()
+      // 1D: only 5d ago in window → disabled
+      await expect(page.getByTestId("portfolio-timeframe-1D")).toBeDisabled()
     } finally {
       await cleanupTempUser(admin, user.id)
     }

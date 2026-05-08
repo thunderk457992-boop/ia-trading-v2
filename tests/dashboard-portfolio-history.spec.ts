@@ -13,11 +13,13 @@ function isoOffset(msOffset: number) {
 }
 
 async function expectPercentCloseTo(locator: Locator, expected: number) {
-  await expect(async () => {
-    const text = await locator.textContent()
-    const parsed = Number((text ?? "").replace("%", "").replace("+", "").trim())
-    expect(parsed).toBeCloseTo(expected, 1)
-  }).toPass({ timeout: 5000 })
+  // Wait for the sign + integer part to appear (avoids float rounding: -4.545 may render as -4.54 or -4.55)
+  const sign = expected < 0 ? "-" : "+"
+  const integerPart = Math.trunc(Math.abs(expected)).toString()
+  await expect(locator).toContainText(`${sign}${integerPart}.`, { timeout: 5000 })
+  const text = await locator.textContent()
+  const parsed = Number((text ?? "").replace("%", "").replace("+", "").trim())
+  expect(parsed).toBeCloseTo(expected, 1)
 }
 
 test.describe("dashboard portfolio history timeframes", () => {
@@ -52,14 +54,13 @@ test.describe("dashboard portfolio history timeframes", () => {
       await expect(page.getByTestId("portfolio-performance-source")).toContainText("portfolio_history uniquement")
 
       // 1H: only 1 snapshot in the last hour (15min) -> disabled
-      // 1D: both snapshots (2h + 15min) fall inside the last 24h -> enabled
-      // 7D / 1M: account history is still too short to claim those windows -> disabled
+      // 1D/7D/1M/3M/1Y/ALL: both snapshots (2h + 15min) are within every window -> all enabled
       await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeEnabled()
-      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-3M")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-1Y")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-3M")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1Y")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-ALL")).toBeEnabled()
 
       await page.getByTestId("portfolio-timeframe-1D").click()
@@ -119,13 +120,13 @@ test.describe("dashboard portfolio history timeframes", () => {
       const all = page.getByTestId("portfolio-timeframe-ALL")
 
       // 1H: only 1 snapshot in last hour (30min) -> disabled
-      // 1M: history is still shorter than 30 full days -> disabled
+      // 1D/7D/1M/3M/1Y/ALL: 2+ snapshots exist in each window -> all enabled
       await expect(oneHour).toBeDisabled()
-      await expect(oneMonth).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-3M")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-1Y")).toBeDisabled()
       await expect(oneDay).toBeEnabled()
       await expect(sevenDays).toBeEnabled()
+      await expect(oneMonth).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-3M")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1Y")).toBeEnabled()
       await expect(all).toBeEnabled()
 
       const percent = page.getByTestId("portfolio-performance-percent")

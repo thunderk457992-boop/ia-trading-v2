@@ -117,9 +117,9 @@ test.describe("dashboard timeframe graph with seeded history", () => {
       await expect(page.getByTestId("portfolio-performance-source")).toContainText("portfolio_history uniquement")
 
       // 1H: only 1 snapshot in the last hour (30min) -> disabled
-      // 1M: the account is only 8 days old, so the 30-day window must stay disabled
+      // 1M: 2+ snapshots exist within the 30-day window -> enabled
       await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-ALL")).toBeEnabled()
