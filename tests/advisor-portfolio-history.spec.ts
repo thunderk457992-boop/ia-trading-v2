@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test"
 import {
+  authenticatePage,
   createAdminClient,
   createTempUser,
   cleanupTempUser,
   hasSupabaseAdminEnv,
-  loginAsUser,
 } from "./helpers/test-supabase"
 
 const advisorPayload = {
@@ -33,7 +33,9 @@ test.describe("advisor -> portfolio_history pipeline", () => {
     const user = await createTempUser(admin, "advisor-history")
 
     try {
-      await loginAsUser(page, user)
+      await authenticatePage(page, user)
+      await page.goto("http://localhost:3000/dashboard")
+      await expect(page).toHaveURL(/dashboard/)
 
       const response = await page.context().request.post("http://localhost:3000/api/advisor", {
         data: advisorPayload,
