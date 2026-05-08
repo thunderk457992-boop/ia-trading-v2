@@ -296,14 +296,6 @@ function buildPortfolioSnapshotData(
   if (!snapshots.length) return []
 
   const periodMs = TIMEFRAME_WINDOWS_MS[timeframe]
-  const oldestTimestamp = snapshots[0]?.timestamp ?? null
-  if (
-    periodMs !== undefined &&
-    oldestTimestamp !== null &&
-    anchorMs - oldestTimestamp < periodMs
-  ) {
-    return []
-  }
 
   const series = periodMs === undefined
     ? snapshots.filter((snapshot) => snapshot.timestamp <= anchorMs)
@@ -1077,8 +1069,12 @@ export function DashboardOverview({
           ? { available: true, reason: "" }
           : {
               available: false,
-              reason: hasFullWindow
-                ? "Pas encore assez d’historique pour cette période."
+              reason: timeframe === "1H"
+                ? "Disponible avec plus de snapshots intrajournaliers."
+                : timeframe === "1D"
+                ? "Pas encore assez d’historique sur 24h."
+                : hasFullWindow
+                ? "Pas encore assez de snapshots pour cette période."
                 : "Historique encore trop court pour cette période.",
             }
       }

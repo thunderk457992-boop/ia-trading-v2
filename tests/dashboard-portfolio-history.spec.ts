@@ -49,10 +49,12 @@ test.describe("dashboard portfolio history timeframes", () => {
       await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
       await expect(page.getByTestId("portfolio-performance-source")).toContainText("portfolio_history uniquement")
 
+      // 1H: only 1 snapshot in the last hour (15min) → disabled
+      // 1D, 7D, 1M, ALL: both snapshots (2h + 15min) fall inside each window → enabled
       await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-1D")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-1D")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-ALL")).toBeEnabled()
 
       await page.getByTestId("portfolio-timeframe-ALL").click()
@@ -111,8 +113,10 @@ test.describe("dashboard portfolio history timeframes", () => {
       const oneMonth = page.getByTestId("portfolio-timeframe-1M")
       const all = page.getByTestId("portfolio-timeframe-ALL")
 
+      // 1H: only 1 snapshot in last hour (30min) → disabled
+      // 1M: all 4 snapshots fall within the 30-day window → enabled
       await expect(oneHour).toBeDisabled()
-      await expect(oneMonth).toBeDisabled()
+      await expect(oneMonth).toBeEnabled()
       await expect(oneDay).toBeEnabled()
       await expect(sevenDays).toBeEnabled()
       await expect(all).toBeEnabled()
