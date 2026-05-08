@@ -81,6 +81,8 @@ const ASSET_TEXT: Record<string, string> = {
   NEAR: "text-green-600", MATIC: "text-violet-600",
 }
 const HISTORY_LIMIT: Record<string, number> = { free: 3, pro: 10, premium: 20 }
+const DISPLAY_LOCALE = "fr-FR"
+const DISPLAY_TIME_ZONE = "Europe/Paris"
 const PLAN_CAPABILITIES: Record<"free" | "pro" | "premium", { included: string[]; locked: string[]; upsell: string }> = {
   free: {
     included: ["1 analyse/mois", "Historique 3", "Analyse de base"],
@@ -198,18 +200,32 @@ function formatTimeframeLabel(timeframe: TF, timestamp: number) {
   const date = new Date(timestamp)
 
   if (timeframe === "1H") {
-    return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    return date.toLocaleTimeString(DISPLAY_LOCALE, {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: DISPLAY_TIME_ZONE,
+    })
   }
 
   if (timeframe === "1D") {
-    return date.toLocaleTimeString("fr-FR", { hour: "2-digit" })
+    return date.toLocaleTimeString(DISPLAY_LOCALE, {
+      hour: "2-digit",
+      timeZone: DISPLAY_TIME_ZONE,
+    })
   }
 
   if (timeframe === "7D") {
-    return date.toLocaleDateString("fr-FR", { weekday: "short" })
+    return date.toLocaleDateString(DISPLAY_LOCALE, {
+      weekday: "short",
+      timeZone: DISPLAY_TIME_ZONE,
+    })
   }
 
-  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })
+  return date.toLocaleDateString(DISPLAY_LOCALE, {
+    day: "2-digit",
+    month: "short",
+    timeZone: DISPLAY_TIME_ZONE,
+  })
 }
 
 interface PortfolioSnapshotChartPoint {
@@ -1034,15 +1050,21 @@ export function DashboardOverview({
   const timeframeAnchorMs = latestSnapshot?.timestamp ?? marketFetchedAt ?? 0
   const marketUpdatedLabel = useMemo(() => {
     if (!marketFetchedAt) return null
-    return new Date(marketFetchedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    return new Date(marketFetchedAt).toLocaleTimeString(DISPLAY_LOCALE, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: DISPLAY_TIME_ZONE,
+    })
   }, [marketFetchedAt])
   const lastSnapshotLabel = useMemo(() => {
     if (!latestSnapshot) return null
-    return new Date(latestSnapshot.timestamp).toLocaleString("fr-FR", {
+    return new Date(latestSnapshot.timestamp).toLocaleString(DISPLAY_LOCALE, {
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: DISPLAY_TIME_ZONE,
     })
   }, [latestSnapshot])
 
@@ -1064,17 +1086,26 @@ export function DashboardOverview({
         const hasFullWindow = timeframeWindowMs === undefined
           ? normalizedPortfolioSnapshots.length > 1
           : oldestTimestamp !== null && timeframeAnchorMs - oldestTimestamp >= timeframeWindowMs
+        const hasEnoughPoints = series.length > 1
+        const requiresFullWindow = timeframe === "7D" || timeframe === "1M" || timeframe === "3M" || timeframe === "1Y"
+        const isAvailable = timeframe === "ALL"
+          ? hasEnoughPoints
+          : requiresFullWindow
+            ? hasEnoughPoints && hasFullWindow
+            : hasEnoughPoints
 
-        availability[timeframe] = series.length > 1
+        availability[timeframe] = isAvailable
           ? { available: true, reason: "" }
           : {
               available: false,
-              reason: timeframe === "1H"
-                ? "Disponible avec plus de snapshots intrajournaliers."
-                : timeframe === "1D"
-                ? "Pas encore assez d’historique sur 24h."
-                : hasFullWindow
-                ? "Pas encore assez de snapshots pour cette période."
+              reason: !hasEnoughPoints
+                ? timeframe === "1H"
+                  ? "Disponible avec plus de snapshots intrajournaliers."
+                  : timeframe === "1D"
+                    ? "Pas encore assez d’historique sur 24h."
+                    : hasFullWindow
+                      ? "Pas encore assez de snapshots pour cette période."
+                      : "Historique encore trop court pour cette période."
                 : "Historique encore trop court pour cette période.",
             }
       }
@@ -1329,7 +1360,12 @@ export function DashboardOverview({
               {
                 label: "Renouvellement",
                 value: subscription?.current_period_end
-                  ? new Date(subscription.current_period_end).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })
+                  ? new Date(subscription.current_period_end).toLocaleDateString(DISPLAY_LOCALE, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      timeZone: DISPLAY_TIME_ZONE,
+                    })
                   : plan === "free" ? "Gratuit" : "—",
               },
             ].map(item => (
@@ -1587,7 +1623,12 @@ export function DashboardOverview({
                   </div>
                   <div className="min-w-0">
                     <p className="text-[13px] font-medium text-foreground">
-                      {new Date(a.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                      {new Date(a.created_at).toLocaleDateString(DISPLAY_LOCALE, {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                        timeZone: DISPLAY_TIME_ZONE,
+                      })}
                     </p>
                     <div className="flex flex-wrap gap-2 mt-0.5">
                       {(a.allocations ?? []).slice(0, 4).map(al => (
@@ -1660,7 +1701,12 @@ function AnalysisDetailModal({ analysis, onClose }: { analysis: Analysis; onClos
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <div>
             <h2 className="font-semibold text-foreground">
-              {new Date(analysis.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+              {new Date(analysis.created_at).toLocaleDateString(DISPLAY_LOCALE, {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+                timeZone: DISPLAY_TIME_ZONE,
+              })}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">{modelLabel} · {goals.slice(0, 2).join(", ")}</p>
           </div>

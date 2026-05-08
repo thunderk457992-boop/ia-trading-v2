@@ -35,41 +35,47 @@ export default function RegisterPage() {
     if (password.length < 8) { setError("Le mot de passe doit contenir au moins 8 caractères"); return }
     setLoading(true)
     setError("")
+    try {
+      const nextPath = typeof window === "undefined"
+        ? "/dashboard"
+        : new URLSearchParams(window.location.search).get("next") || "/dashboard"
+      const supabase = createClient()
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
 
-    const supabase = createClient()
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
+      if (signUpError) {
+        const msg =
+          signUpError.message.includes("already registered") ||
+          signUpError.message.includes("already been registered") ||
+          signUpError.message.includes("User already registered")
+            ? "Un compte existe déjà avec cet email."
+            : signUpError.message.includes("Password should be")
+            ? "Le mot de passe doit contenir au moins 6 caractères."
+            : signUpError.message.includes("Unable to validate")
+            ? "Email invalide."
+            : signUpError.message
+        setError(msg)
+        return
+      }
 
-    if (signUpError) {
-      const msg =
-        signUpError.message.includes("already registered") ||
-        signUpError.message.includes("already been registered") ||
-        signUpError.message.includes("User already registered")
-          ? "Un compte existe déjà avec cet email."
-          : signUpError.message.includes("Password should be")
-          ? "Le mot de passe doit contenir au moins 6 caractères."
-          : signUpError.message.includes("Unable to validate")
-          ? "Email invalide."
-          : signUpError.message
-      setError(msg)
+      if (data.session) {
+        router.push(nextPath)
+        router.refresh()
+        return
+      }
+
+      setSuccess(true)
+    } catch {
+      setError("L’inscription est temporairement indisponible. Vérifiez la configuration Supabase ou réessayez.")
+    } finally {
       setLoading(false)
-      return
     }
-
-    if (data.session) {
-      router.push("/dashboard")
-      router.refresh()
-      return
-    }
-
-    setSuccess(true)
-    setLoading(false)
   }
 
   if (success) {
@@ -107,8 +113,9 @@ export default function RegisterPage() {
         <div className="bg-card rounded-2xl border border-border p-5 sm:p-6">
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">Nom complet</label>
+              <label htmlFor="register-full-name" className="block text-sm font-medium text-muted-foreground mb-1.5">Nom complet</label>
               <input
+                id="register-full-name"
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -120,8 +127,9 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">Email</label>
+              <label htmlFor="register-email" className="block text-sm font-medium text-muted-foreground mb-1.5">Email</label>
               <input
+                id="register-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -133,9 +141,10 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">Mot de passe</label>
+              <label htmlFor="register-password" className="block text-sm font-medium text-muted-foreground mb-1.5">Mot de passe</label>
               <div className="relative">
                 <input
+                  id="register-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -147,6 +156,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Masquer le contenu saisi" : "Afficher le contenu saisi"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

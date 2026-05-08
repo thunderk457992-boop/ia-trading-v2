@@ -69,8 +69,8 @@ test.describe("timeframe availability logic", () => {
     }
   })
 
-  // ── 7D active, 1D disabled when all snapshots are > 24h old ─────────────
-  test("7D active but 1D disabled when snapshots are only 3–7 days old", async ({ page }) => {
+  // ── 7D remains disabled when the account history is still shorter than 7 full days ──
+  test("7D stays disabled when snapshots are only 3–7 days old", async ({ page }) => {
     test.setTimeout(30_000)
     const admin = createAdminClient()
     const user = await createTempUser(admin, "tf-7d-active-1d-disabled")
@@ -87,8 +87,8 @@ test.describe("timeframe availability logic", () => {
 
       await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
 
-      // 7D has 2+ snapshots in its window → enabled
-      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
+      // 7D still stays disabled because the history does not yet cover a full 7-day window.
+      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeDisabled()
 
       // 1D has 0–1 snapshots in its 24h window → disabled
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeDisabled()
@@ -104,6 +104,10 @@ test.describe("timeframe availability logic", () => {
       const btn1H = page.getByTestId("portfolio-timeframe-1H")
       const title1H = await btn1H.getAttribute("title")
       expect(title1H).toMatch(/intrajournaliers/)
+
+      const btn7D = page.getByTestId("portfolio-timeframe-7D")
+      const title7D = await btn7D.getAttribute("title")
+      expect(title7D).toMatch(/Historique encore trop court/)
     } finally {
       await cleanupTempUser(admin, user.id)
     }

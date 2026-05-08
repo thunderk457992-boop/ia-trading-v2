@@ -18,6 +18,7 @@ function LoginForm() {
   const [info, setInfo] = useState("")
   const [resetLoading, setResetLoading] = useState(false)
   const [resetSent, setResetSent] = useState(false)
+  const nextPath = searchParams.get("next") || "/dashboard"
 
   useEffect(() => {
     if (searchParams.get("error") === "auth_error") {
@@ -26,47 +27,62 @@ function LoginForm() {
     if (searchParams.get("deleted") === "true") {
       setInfo("Votre compte a été déconnecté. Vos données seront supprimées sous 30 jours.")
     }
+    if (searchParams.get("reason") === "auth_required") {
+      setInfo("Connectez-vous pour accéder à cette page.")
+    }
   }, [searchParams])
 
   const handleForgotPassword = async () => {
     if (!email) { setError("Entrez votre email pour réinitialiser le mot de passe"); return }
     setResetLoading(true)
     setError("")
-    const supabase = createClient()
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
-    })
-    setResetLoading(false)
-    setResetSent(true)
+    try {
+      const supabase = createClient()
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+      })
+      setResetSent(true)
+    } catch {
+      setError("La réinitialisation est indisponible pour le moment. Réessayez un peu plus tard.")
+    } finally {
+      setResetLoading(false)
+    }
   }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      const msg = error.message.includes("Invalid login credentials")
-        ? "Email ou mot de passe incorrect."
-        : error.message.includes("Email not confirmed")
-        ? "Confirmez votre email avant de vous connecter."
-        : error.message.includes("Too many requests")
-        ? "Trop de tentatives. Réessayez dans quelques minutes."
-        : error.message
-      setError(msg)
-      setLoading(false)
-    } else {
-      router.push("/dashboard")
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        const msg = error.message.includes("Invalid login credentials")
+          ? "Email ou mot de passe incorrect."
+          : error.message.includes("Email not confirmed")
+          ? "Confirmez votre email avant de vous connecter."
+          : error.message.includes("Too many requests")
+          ? "Trop de tentatives. Réessayez dans quelques minutes."
+          : error.message
+        setError(msg)
+        return
+      }
+
+      router.push(nextPath)
       router.refresh()
+    } catch {
+      setError("La connexion est temporairement indisponible. Vérifiez la configuration Supabase ou réessayez.")
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <form onSubmit={handleLogin} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Email</label>
+        <label htmlFor="login-email" className="block text-sm font-medium text-muted-foreground mb-1.5">Email</label>
         <input
+          id="login-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -78,9 +94,10 @@ function LoginForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Mot de passe</label>
+        <label htmlFor="login-password" className="block text-sm font-medium text-muted-foreground mb-1.5">Mot de passe</label>
         <div className="relative">
           <input
+            id="login-password"
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -92,6 +109,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
+            aria-label={showPassword ? "Masquer le contenu saisi" : "Afficher le contenu saisi"}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
           >
             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

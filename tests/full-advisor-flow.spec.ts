@@ -96,7 +96,7 @@ test.describe("advisor generates portfolio_history and dashboard reflects it", (
 test.describe("dashboard timeframe graph with seeded history", () => {
   test.skip(!hasSupabaseAdminEnv(), "requires Supabase admin env")
 
-  test("1D / 7D / ALL show different values, only 1H disabled with 8-day history", async ({ page }) => {
+  test("1D / 7D / ALL show different values, while 1M stays disabled with only 8 days of history", async ({ page }) => {
     test.setTimeout(60_000)
 
     const admin = createAdminClient()
@@ -116,10 +116,10 @@ test.describe("dashboard timeframe graph with seeded history", () => {
       await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
       await expect(page.getByTestId("portfolio-performance-source")).toContainText("portfolio_history uniquement")
 
-      // 1H: only 1 snapshot in the last hour (30min) → disabled
-      // 1M: all 4 snapshots are within the 30-day window → enabled
+      // 1H: only 1 snapshot in the last hour (30min) -> disabled
+      // 1M: the account is only 8 days old, so the 30-day window must stay disabled
       await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-ALL")).toBeEnabled()
