@@ -116,17 +116,35 @@ test.describe("stripe sync with no subscription", () => {
     const admin = createAdminClient()
     const user = await createTempUser(admin, "stripe-sync-empty")
 
+    await admin.from("subscriptions").upsert({
+      id: "sub_playwright_sync_empty_stale",
+      user_id: user.id,
+      plan: "pro",
+      status: "active",
+      current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      cancel_at_period_end: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
     try {
       await authenticatePage(page, user)
 
       const res = await page.context().request.post("http://localhost:3000/api/stripe/sync")
-      // 200 = synced (no sub found); 500 = Stripe not configured in test env
-      expect([200, 500]).toContain(res.status())
-      if (res.status() === 200) {
-        const body = await res.json()
-        expect(body.plan).toBe("free")
-      }
+      expect(res.status()).toBe(200)
+      const body = await res.json()
+      expect(body.plan).toBe("free")
+      expect(body.reason).toBe("no_customer")
+
+      const { data: subscription } = await admin
+        .from("subscriptions")
+        .select("status")
+        .eq("id", "sub_playwright_sync_empty_stale")
+        .single()
+
+      expect(subscription?.status).toBe("canceled")
     } finally {
+      await admin.from("subscriptions").delete().eq("user_id", user.id)
       await cleanupTempUser(admin, user.id)
     }
   })
@@ -310,7 +328,7 @@ test.describe("stripe checkout for authenticated user", () => {
       await authenticatePage(page, user)
       await page.goto("http://localhost:3000/pricing")
 
-      await expect(page.getByText("Plan actif - synchronisation requise")).toBeVisible()
+      await expect(page.getByText("Plan actuel").first()).toBeVisible()
       await expect(page.getByRole("button", { name: /gérer mon abonnement/i })).toHaveCount(0)
       await expect(page.getByRole("button", { name: /modifier mon abonnement/i })).toHaveCount(0)
       await expect(page.getByRole("button", { name: /choisir premium/i })).toBeVisible()

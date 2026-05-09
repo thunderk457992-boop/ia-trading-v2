@@ -25,15 +25,16 @@ export default async function PricingPage() {
 
   const hasActiveSubscription = subscription?.status === "active" || subscription?.status === "trialing"
   const hasStripeCustomer = Boolean(profile?.stripe_customer_id)
-  const currentPlan = hasActiveSubscription
+  const canManageBilling = hasActiveSubscription && hasStripeCustomer
+  const currentPlan = canManageBilling
     ? (subscription.plan ?? profile?.plan ?? "free")
     : (profile?.plan ?? "free")
 
   return (
     <PricingClient
       currentPlan={currentPlan}
-      hasSubscription={hasActiveSubscription}
-      canManageBilling={hasActiveSubscription && hasStripeCustomer}
+      hasSubscription={canManageBilling}
+      canManageBilling={canManageBilling}
     />
   )
 }

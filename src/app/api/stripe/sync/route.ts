@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe"
 import { createClient } from "@/lib/supabase/server"
+import { createServerClient } from "@supabase/ssr"
 
 const PRICE_TO_PLAN: Record<string, string> = {
   [process.env.STRIPE_PRICE_PRO_MONTHLY ?? ""]: "pro",
@@ -11,6 +12,14 @@ const PRICE_TO_PLAN: Record<string, string> = {
 
 function isMissingStripeCustomerError(error: unknown) {
   return error instanceof Error && /No such customer/i.test(error.message)
+}
+
+function getAdmin() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } }
+  )
 }
 
 async function clearStoredStripeCustomer(
@@ -28,8 +37,27 @@ async function clearStoredStripeCustomer(
     .eq("id", userId)
 }
 
+async function clearLocalSubscriptionState(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  userId: string
+) {
+  const now = new Date().toISOString()
+
+  await supabase
+    .from("subscriptions")
+    .update({
+      status: "canceled",
+      canceled_at: now,
+      updated_at: now,
+    })
+    .eq("user_id", userId)
+    .in("status", ["active", "trialing", "incomplete"])
+}
+
 export async function POST() {
   const supabase = await createClient()
+  const admin = getAdmin()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: "Non authentifie" }, { status: 401 })
@@ -42,6 +70,17 @@ export async function POST() {
     .maybeSingle()
 
   if (!profile?.stripe_customer_id) {
+    await admin
+      .from("profiles")
+      .update({
+        plan: "free",
+        stripe_subscription_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id)
+
+    await clearLocalSubscriptionState(admin, user.id)
+
     return NextResponse.json({ synced: false, plan: "free", reason: "no_customer" })
   }
 
@@ -64,7 +103,7 @@ export async function POST() {
       const trialSub = trialSubs.data[0] ?? null
 
       if (!trialSub) {
-        await supabase
+        await admin
           .from("profiles")
           .update({
             plan: "free",
@@ -72,6 +111,7 @@ export async function POST() {
             updated_at: new Date().toISOString(),
           })
           .eq("id", user.id)
+        await clearLocalSubscriptionState(admin, user.id)
         return NextResponse.json({ synced: true, plan: "free" })
       }
 
@@ -79,7 +119,7 @@ export async function POST() {
         ?? PRICE_TO_PLAN[trialSub.items.data[0]?.price.id ?? ""]
         ?? "pro"
 
-      await syncSubscription(supabase, user.id, trialSub, plan)
+      await syncSubscription(admin, user.id, trialSub, plan)
       return NextResponse.json({ synced: true, plan })
     }
 
@@ -87,14 +127,16 @@ export async function POST() {
       ?? PRICE_TO_PLAN[activeSub.items.data[0]?.price.id ?? ""]
       ?? "pro"
 
-    await syncSubscription(supabase, user.id, activeSub, plan)
+    await syncSubscription(admin, user.id, activeSub, plan)
     return NextResponse.json({ synced: true, plan })
   } catch (error) {
     if (isMissingStripeCustomerError(error)) {
-      const { error: clearError } = await clearStoredStripeCustomer(supabase, user.id)
+      const { error: clearError } = await clearStoredStripeCustomer(admin, user.id)
       if (clearError) {
         console.error("[sync] failed to clear stale stripe customer:", clearError)
       }
+
+      await clearLocalSubscriptionState(admin, user.id)
 
       console.warn("[sync] stale stripe customer cleared", {
         userId: user.id,
