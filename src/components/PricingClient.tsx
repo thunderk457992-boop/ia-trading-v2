@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils"
 interface PricingClientProps {
   currentPlan: string
   hasSubscription: boolean
+  canManageBilling: boolean
 }
 
 interface Plan {
@@ -155,7 +156,7 @@ const MAX_YEARLY_DISCOUNT = Math.max(
   ...PLANS.map((plan) => getYearlyDiscount(plan))
 )
 
-export function PricingClient({ currentPlan, hasSubscription }: PricingClientProps) {
+export function PricingClient({ currentPlan, hasSubscription, canManageBilling }: PricingClientProps) {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly")
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
   const [priceIds, setPriceIds] = useState<Record<string, Record<string, string | null>>>({})
@@ -279,15 +280,42 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
     }
 
     setLoadingPlan(planId)
+    const startCheckout = () => fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ priceId, plan: planId }),
+    })
 
     try {
-      const response = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId, plan: planId }),
-      })
+      let response = await startCheckout()
 
-      const data = await response.json()
+      let data = await response.json()
+
+      if (!response.ok && response.status === 409 && data.manageBilling && !canManageBilling) {
+        const syncRes = await fetch("/api/stripe/sync", { method: "POST" })
+        const syncData = await syncRes.json().catch(() => ({})) as {
+          synced?: boolean
+          plan?: string
+          reason?: string
+          error?: string
+        }
+
+        const customerCleared = syncRes.ok && (
+          syncData.reason === "invalid_customer"
+          || syncData.reason === "no_customer"
+          || syncData.plan === "free"
+        )
+
+        if (!customerCleared) {
+          throw new Error(
+            syncData.error
+              ?? "Votre abonnement doit etre resynchronise avant de pouvoir modifier ce plan."
+          )
+        }
+
+        response = await startCheckout()
+        data = await response.json()
+      }
       if (!response.ok) {
         if (response.status === 401) {
           window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`)
@@ -295,6 +323,9 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
         }
         if (data.manageBilling) {
           // Active subscription exists — redirect to portal instead
+          if (!canManageBilling) {
+            throw new Error("Aucun customer Stripe live valide n'est relie a ce compte pour le moment.")
+          }
           setLoadingPlan("manage")
           const portalRes = await fetch("/api/stripe/portal", { method: "POST" })
           const portalData = await portalRes.json()
@@ -566,7 +597,7 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
                 )}
               </ul>
 
-              {isCurrent && hasSubscription ? (
+              {isCurrent && canManageBilling ? (
                 <button
                   onClick={handleManageSubscription}
                   disabled={loadingPlan === "manage"}
@@ -577,13 +608,13 @@ export function PricingClient({ currentPlan, hasSubscription }: PricingClientPro
                 </button>
               ) : isCurrent ? (
                 <div className="w-full rounded-2xl border border-border bg-secondary py-3.5 text-center text-sm font-medium text-muted-foreground">
-                  Plan actuel
+                  {hasSubscription && !canManageBilling ? "Plan actif - synchronisation requise" : "Plan actuel"}
                 </div>
               ) : plan.id === "free" ? (
                 <div className="w-full rounded-2xl border border-border bg-transparent py-3.5 text-center text-xs text-muted-foreground">
                   Toujours gratuit, sans carte bancaire
                 </div>
-              ) : hasSubscription ? (
+              ) : canManageBilling ? (
                 <button
                   onClick={handleManageSubscription}
                   disabled={loadingPlan === "manage"}

@@ -289,4 +289,121 @@ test.describe("stripe checkout for authenticated user", () => {
       await cleanupTempUser(admin, user.id)
     }
   })
+
+  test("paid user without Stripe customer does not see portal actions on pricing", async ({ page }) => {
+    test.setTimeout(30_000)
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "stripe-pricing-stale", "pro")
+
+    await admin.from("subscriptions").upsert({
+      id: "sub_playwright_stale_pricing",
+      user_id: user.id,
+      plan: "pro",
+      status: "active",
+      current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      cancel_at_period_end: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    try {
+      await authenticatePage(page, user)
+      await page.goto("http://localhost:3000/pricing")
+
+      await expect(page.getByText("Plan actif - synchronisation requise")).toBeVisible()
+      await expect(page.getByRole("button", { name: /gérer mon abonnement/i })).toHaveCount(0)
+      await expect(page.getByRole("button", { name: /modifier mon abonnement/i })).toHaveCount(0)
+      await expect(page.getByRole("button", { name: /choisir premium/i })).toBeVisible()
+    } finally {
+      await admin.from("subscriptions").delete().eq("user_id", user.id)
+      await cleanupTempUser(admin, user.id)
+    }
+  })
+
+  test("pricing retries checkout via sync and never opens portal when no live customer is available", async ({ page }) => {
+    test.setTimeout(30_000)
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "stripe-pricing-retry", "pro")
+    let checkoutCalls = 0
+    let syncCalls = 0
+    let portalCalls = 0
+
+    await admin.from("subscriptions").upsert({
+      id: "sub_playwright_retry_without_customer",
+      user_id: user.id,
+      plan: "pro",
+      status: "active",
+      current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      cancel_at_period_end: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    await page.route("**/api/stripe/plans", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          pro: { monthly: "price_pro_monthly_mock", yearly: "price_pro_yearly_mock" },
+          premium: { monthly: "price_premium_monthly_mock", yearly: "price_premium_yearly_mock" },
+        }),
+      })
+    })
+
+    await page.route("**/api/stripe/checkout", async (route) => {
+      checkoutCalls += 1
+      if (checkoutCalls === 1) {
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: "Vous avez deja un abonnement actif.",
+            manageBilling: true,
+          }),
+        })
+        return
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ url: "http://localhost:3000/dashboard" }),
+      })
+    })
+
+    await page.route("**/api/stripe/sync", async (route) => {
+      syncCalls += 1
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          synced: false,
+          plan: "free",
+          reason: "invalid_customer",
+        }),
+      })
+    })
+
+    await page.route("**/api/stripe/portal", async (route) => {
+      portalCalls += 1
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "portal should not be called" }),
+      })
+    })
+
+    try {
+      await authenticatePage(page, user)
+      await page.goto("http://localhost:3000/pricing")
+
+      await page.getByRole("button", { name: /choisir premium/i }).click()
+      await expect.poll(() => checkoutCalls).toBe(2)
+      await expect.poll(() => syncCalls).toBe(1)
+      expect(portalCalls).toBe(0)
+    } finally {
+      await admin.from("subscriptions").delete().eq("user_id", user.id)
+      await cleanupTempUser(admin, user.id)
+    }
+  })
 })
