@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { fetchMarketSnapshot } from "@/lib/coingecko"
 import { fetchKrakenTickers } from "@/lib/kraken"
-import { computePortfolioSnapshotValue, normalizePortfolioAllocations } from "@/lib/portfolio-history"
+import {
+  computePortfolioSnapshotValue,
+  normalizePortfolioAllocations,
+  type PortfolioSnapshotAllocation,
+} from "@/lib/portfolio-history"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -15,7 +19,7 @@ type PortfolioHistorySeed = {
   created_at: string
   portfolio_value: number | string | null
   invested_amount: number | string | null
-  allocations: Array<{ symbol: string; percentage: number }> | null
+  allocations: PortfolioSnapshotAllocation[] | null
 }
 
 function getAdmin() {
@@ -75,7 +79,7 @@ export async function GET(request: NextRequest) {
     portfolio_value: number
     invested_amount: number
     performance_percent: number
-    allocations: Array<{ symbol: string; percentage: number }>
+    allocations: PortfolioSnapshotAllocation[]
   }> = []
 
   const skipped: Array<{ userId: string; reason: string }> = []
@@ -120,9 +124,9 @@ export async function GET(request: NextRequest) {
       user_id: snapshot.user_id,
       analysis_id: snapshot.analysis_id,
       portfolio_value: computed.portfolioValue,
-      invested_amount: investedAmount,
+      invested_amount: computed.investedAmount,
       performance_percent: computed.performancePercent,
-      allocations,
+      allocations: computed.allocations.length ? computed.allocations : allocations,
     })
   }
 

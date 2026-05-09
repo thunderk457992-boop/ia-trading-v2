@@ -298,26 +298,6 @@ function normalizePortfolioSnapshots(snapshots: PortfolioSnapshot[]): Normalized
     .sort((left, right) => left.timestamp - right.timestamp)
 }
 
-function selectContinuousPortfolioSnapshots(snapshots: NormalizedPortfolioSnapshot[]) {
-  if (snapshots.length <= 1) return snapshots
-
-  const latest = snapshots[snapshots.length - 1]
-  if (latest?.investedAmount === null || latest.investedAmount <= 0) return snapshots
-
-  const tolerance = Math.max(0.01, latest.investedAmount * 0.01)
-  const continuous: NormalizedPortfolioSnapshot[] = []
-
-  for (let index = snapshots.length - 1; index >= 0; index -= 1) {
-    const snapshot = snapshots[index]
-    if (snapshot.investedAmount === null || Math.abs(snapshot.investedAmount - latest.investedAmount) > tolerance) {
-      break
-    }
-    continuous.push(snapshot)
-  }
-
-  return continuous.reverse()
-}
-
 function getPortfolioSnapshotsForTimeframe(
   snapshots: NormalizedPortfolioSnapshot[],
   timeframe: TF,
@@ -361,12 +341,23 @@ function buildPortfolioSnapshotData(
 
   const baseline = series[0]
   if (baseline.portfolioValue <= 0) return []
+  const baselineInvestedAmount = baseline.investedAmount ?? 0
 
   return series.map((snapshot) => ({
     timestamp: snapshot.timestamp,
     portfolioValue: snapshot.portfolioValue,
-    valueChange: Number((snapshot.portfolioValue - baseline.portfolioValue).toFixed(2)),
-    performance: Number((((snapshot.portfolioValue / baseline.portfolioValue) - 1) * 100).toFixed(3)),
+    valueChange: Number((
+      snapshot.portfolioValue
+      - baseline.portfolioValue
+      - ((snapshot.investedAmount ?? baselineInvestedAmount) - baselineInvestedAmount)
+    ).toFixed(2)),
+    performance: Number(((
+      (
+        snapshot.portfolioValue
+        - baseline.portfolioValue
+        - ((snapshot.investedAmount ?? baselineInvestedAmount) - baselineInvestedAmount)
+      ) / baseline.portfolioValue
+    ) * 100).toFixed(3)),
   }))
 }
 
@@ -377,6 +368,15 @@ function getPortfolioSnapshotChange(
 ) {
   const data = buildPortfolioSnapshotData(snapshots, timeframe, anchorMs)
   return data.length ? data[data.length - 1].performance : null
+}
+
+function getPortfolioSnapshotValueChange(
+  snapshots: NormalizedPortfolioSnapshot[],
+  timeframe: TF,
+  anchorMs: number
+) {
+  const data = buildPortfolioSnapshotData(snapshots, timeframe, anchorMs)
+  return data.length ? data[data.length - 1].valueChange : null
 }
 
 function getTimeframeAvailability(
@@ -437,7 +437,7 @@ function PortfolioLineChart({
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
   const uid = useId().replace(/:/g, "")
   const normalizedSnapshots = useMemo(
-    () => selectContinuousPortfolioSnapshots(normalizePortfolioSnapshots(portfolioSnapshots)),
+    () => normalizePortfolioSnapshots(portfolioSnapshots),
     [portfolioSnapshots]
   )
   const useSnapshotHistory = normalizedSnapshots.length > 0
@@ -1149,7 +1149,7 @@ export function DashboardOverview({
   const planLimit = plan === "premium" ? null : plan === "pro" ? 20 : 1
   const analysesRemaining = planLimit === null ? null : Math.max(0, planLimit - monthlyCount)
   const normalizedPortfolioSnapshots = useMemo(
-    () => selectContinuousPortfolioSnapshots(normalizePortfolioSnapshots(portfolioSnapshots)),
+    () => normalizePortfolioSnapshots(portfolioSnapshots),
     [portfolioSnapshots]
   )
   const useSnapshotHistory = normalizedPortfolioSnapshots.length > 0
@@ -1182,6 +1182,9 @@ export function DashboardOverview({
   const portfolioChange24h = useMemo(() => {
     return useSnapshotHistory ? getPortfolioSnapshotChange(normalizedPortfolioSnapshots, "1D", timeframeAnchorMs) : null
   }, [normalizedPortfolioSnapshots, timeframeAnchorMs, useSnapshotHistory])
+  const portfolioValueChange = useMemo(() => {
+    return useSnapshotHistory ? getPortfolioSnapshotValueChange(normalizedPortfolioSnapshots, "1D", timeframeAnchorMs) : null
+  }, [normalizedPortfolioSnapshots, timeframeAnchorMs, useSnapshotHistory])
 
   const timeframeAvailability = useMemo(() => {
     const availability = {} as Record<TF, TimeframeAvailability>
@@ -1192,9 +1195,6 @@ export function DashboardOverview({
   }, [normalizedPortfolioSnapshots, timeframeAnchorMs])
 
   const capital = Number(latestSnapshot?.investedAmount ?? (lastAnalysis?.investor_profile as Record<string, unknown> | undefined)?.capital ?? 0)
-  const portfolioValueChange = timeframeAvailability["1D"].available && portfolioChange24h !== null && capital > 0
-    ? capital * portfolioChange24h / 100
-    : null
 
   const sentiment = useMemo(() => {
     if (!cryptoPrices.length) return null

@@ -6,7 +6,7 @@ import { fetchMarketSnapshot } from "@/lib/coingecko"
 import type { CryptoPrice, MarketGlobal } from "@/lib/coingecko"
 import { fetchKrakenTickers, type KrakenTicker } from "@/lib/kraken"
 import { buildMarketDecision } from "@/lib/market-agent"
-import { computePortfolioSnapshotValue } from "@/lib/portfolio-history"
+import { computeAggregatedPortfolioSnapshotFromAnalyses } from "@/lib/portfolio-history"
 
 export const maxDuration = 60
 
@@ -891,25 +891,38 @@ export async function POST(request: Request) {
       percentage: allocation.percentage,
     }))
     const admin = getAdmin()
-    const { data: latestPortfolioSnapshot, error: latestSnapshotError } = await admin
-      .from("portfolio_history")
-      .select("created_at, portfolio_value, invested_amount, allocations")
+    const analysisCreatedAt = new Date().toISOString()
+    const { data: historicalAnalyses, error: historicalAnalysesError } = await admin
+      .from("ai_analyses")
+      .select("created_at, allocations, investor_profile")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .order("created_at", { ascending: true })
 
-    if (latestSnapshotError) {
-      console.error("[advisor] latest portfolio snapshot query failed", latestSnapshotError)
+    if (historicalAnalysesError) {
+      console.error("[advisor] historical analyses query failed", historicalAnalysesError)
       return NextResponse.json(
-        { error: "Impossible de charger l'historique portefeuille pour le moment." },
+        { error: "Impossible de charger l'historique des analyses pour le moment." },
         { status: 500 }
       )
     }
 
-    const computedPortfolioSnapshot = await computePortfolioSnapshotValue({
-      latestSnapshot: latestPortfolioSnapshot,
-      investedAmount,
+    const computedPortfolioSnapshot = await computeAggregatedPortfolioSnapshotFromAnalyses({
+      analyses: [
+        ...(historicalAnalyses ?? []).map((analysis) => ({
+          created_at: analysis.created_at,
+          invested_amount: parseEuroAmount(
+            String(
+              (analysis.investor_profile as Record<string, unknown> | null)?.capital ?? ""
+            )
+          ),
+          allocations: Array.isArray(analysis.allocations) ? analysis.allocations : [],
+        })),
+        {
+          created_at: analysisCreatedAt,
+          invested_amount: investedAmount,
+          allocations: portfolioHistoryAllocations,
+        },
+      ],
       marketPrices: prices,
       marketFetchedAt: Date.now(),
       krakenTickers,
@@ -957,6 +970,7 @@ export async function POST(request: Request) {
             errorsToAvoid: analysisData.errorsToAvoid ?? [],
           },
         },
+        created_at:       analysisCreatedAt,
         allocations:      portfolioHistoryAllocations,
         total_score:      analysisData.score,
         market_context:   analysisData.explanation,
@@ -1004,9 +1018,9 @@ export async function POST(request: Request) {
           user_id: user.id,
           analysis_id: savedAnalysis.id,
           portfolio_value: computedPortfolioSnapshot.portfolioValue,
-          invested_amount: investedAmount,
+          invested_amount: computedPortfolioSnapshot.investedAmount,
           performance_percent: computedPortfolioSnapshot.performancePercent,
-          allocations: portfolioHistoryAllocations,
+          allocations: computedPortfolioSnapshot.allocations,
         })
 
       if (historyError) {
