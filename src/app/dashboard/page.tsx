@@ -19,100 +19,6 @@ interface PortfolioHistoryRow {
   allocations: Array<{ symbol: string; percentage: number }> | null
 }
 
-const TIMEFRAME_WINDOWS_MS = {
-  "1H": 60 * 60 * 1000,
-  "1D": 24 * 60 * 60 * 1000,
-  "7D": 7 * 24 * 60 * 60 * 1000,
-} as const
-
-function parseFiniteNumber(value: number | string | null | undefined) {
-  if (typeof value === "number" && Number.isFinite(value)) return value
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-  return null
-}
-
-function normalizeAllocations(value: Array<{ symbol: string; percentage: number }> | null | undefined) {
-  if (!Array.isArray(value)) return []
-
-  return value
-    .map((allocation) => ({
-      symbol: String(allocation.symbol ?? "").toUpperCase().trim(),
-      percentage: Number(allocation.percentage ?? 0),
-    }))
-    .filter((allocation) => allocation.symbol && Number.isFinite(allocation.percentage) && allocation.percentage > 0)
-}
-
-function normalizePortfolioSnapshots(rows: PortfolioHistoryRow[]) {
-  return rows
-    .map((row) => {
-      const timestamp = Date.parse(row.created_at)
-      const portfolioValue = parseFiniteNumber(row.portfolio_value)
-      const investedAmount = parseFiniteNumber(row.invested_amount)
-      const allocations = normalizeAllocations(row.allocations)
-
-      if (!Number.isFinite(timestamp) || portfolioValue === null || portfolioValue <= 0) {
-        return null
-      }
-
-      return {
-        timestamp,
-        portfolioValue,
-        investedAmount,
-        allocations,
-      }
-    })
-    .filter((row): row is { timestamp: number; portfolioValue: number; investedAmount: number | null; allocations: Array<{ symbol: string; percentage: number }> } => row !== null)
-    .sort((left, right) => left.timestamp - right.timestamp)
-}
-
-function summarizePortfolioSnapshots(rows: PortfolioHistoryRow[], anchorMs: number) {
-  const normalized = normalizePortfolioSnapshots(rows)
-
-  return {
-    normalizedCount: normalized.length,
-    byTimeframe: {
-      "1H": summarizePortfolioWindow(normalized, TIMEFRAME_WINDOWS_MS["1H"], anchorMs),
-      "1D": summarizePortfolioWindow(normalized, TIMEFRAME_WINDOWS_MS["1D"], anchorMs),
-      "7D": summarizePortfolioWindow(normalized, TIMEFRAME_WINDOWS_MS["7D"], anchorMs),
-      "ALL": summarizePortfolioWindow(normalized, null, anchorMs),
-    },
-  }
-}
-
-function summarizePortfolioWindow(
-  rows: Array<{ timestamp: number; portfolioValue: number }>,
-  windowMs: number | null,
-  anchorMs: number
-) {
-  const filtered = windowMs === null
-    ? rows.filter((row) => row.timestamp <= anchorMs)
-    : rows.filter((row) => row.timestamp >= anchorMs - windowMs && row.timestamp <= anchorMs)
-
-  if (filtered.length < 2) {
-    return {
-      pointCount: filtered.length,
-      firstValue: filtered[0]?.portfolioValue ?? null,
-      lastValue: filtered[filtered.length - 1]?.portfolioValue ?? null,
-      performancePercent: null,
-    }
-  }
-
-  const firstValue = filtered[0].portfolioValue
-  const lastValue = filtered[filtered.length - 1].portfolioValue
-  const performancePercent = firstValue > 0
-    ? Number((((lastValue - firstValue) / firstValue) * 100).toFixed(3))
-    : null
-
-  return {
-    pointCount: filtered.length,
-    firstValue,
-    lastValue,
-    performancePercent,
-  }
-}
 
 const PRICE_TO_PLAN: Record<string, string> = Object.fromEntries(
   [
@@ -218,40 +124,8 @@ export default async function DashboardPage({
     ? subscription.plan
     : profile?.plan ?? "free"
   const lastAnalysis = (analyses ?? []).slice(0, HISTORY_LIMIT[plan] ?? 3)[0] ?? null
-  const hasPortfolioSnapshots = (portfolioSnapshots?.length ?? 0) > 0
   const marketDecision = buildMarketDecision(market.prices, market.global, lastAnalysis?.allocations ?? null)
-  const snapshotSummary = summarizePortfolioSnapshots(portfolioSnapshots as PortfolioHistoryRow[], market.fetchedAt)
-  const portfolioSource = hasPortfolioSnapshots ? "portfolio_history" : "none"
 
-  console.info("[dashboard] portfolioHistory received", {
-    userId: user.id,
-    source: portfolioSource,
-    rawCount: portfolioSnapshots.length,
-    normalizedCount: snapshotSummary.normalizedCount,
-    sample: portfolioSnapshots.slice(0, 3).map((snapshot) => ({
-      createdAt: snapshot.created_at,
-      portfolioValue: snapshot.portfolio_value,
-      investedAmount: snapshot.invested_amount,
-    })),
-  })
-
-  console.info("[dashboard] portfolio history summary", {
-    userId: user.id,
-    lastAnalysisCreatedAt: lastAnalysis?.created_at ?? null,
-    allocationCount: lastAnalysis?.allocations?.length ?? 0,
-    allocationSymbols: (lastAnalysis?.allocations ?? []).map((allocation: { symbol: string }) => allocation.symbol),
-    marketPriceCount: market.prices.length,
-    portfolioSnapshotCount: portfolioSnapshots?.length ?? 0,
-    portfolioSnapshotNormalizedCount: snapshotSummary.normalizedCount,
-    portfolioSnapshotValueTypesSample: portfolioSnapshots.slice(0, 3).map((snapshot) => ({
-      createdAt: snapshot.created_at,
-      portfolioValueType: typeof snapshot.portfolio_value,
-      investedAmountType: typeof snapshot.invested_amount,
-    })),
-    sourceUsed: portfolioSource,
-    timeframeSummaries: snapshotSummary.byTimeframe,
-    marketFetchedAt: market.fetchedAt,
-  })
 
   return (
     <DashboardOverview
@@ -320,7 +194,7 @@ async function syncStripeSubscription(userId: string, fallbackPlan?: string): Pr
       ?? fallbackPlan
       ?? "pro"
 
-    console.log(`[sync] userId=${userId} plan=${plan} sub=${sub.id} status=${sub.status}`)
+    console.info("[sync] stripe subscription resolved", { userId, plan, status: sub.status })
 
     // 1. UPSERT profile (creates row if missing, updates if exists)
     const { error: profileErr } = await db

@@ -124,14 +124,14 @@ const ASSET_BAR: Record<string, string> = {
   BTC: "bg-amber-500", ETH: "bg-blue-500", SOL: "bg-purple-500",
   BNB: "bg-yellow-500", XRP: "bg-sky-500", ADA: "bg-blue-600",
   AVAX: "bg-red-500", DOT: "bg-pink-500", LINK: "bg-blue-700",
-  NEAR: "bg-green-500", MATIC: "bg-violet-500",
+  NEAR: "bg-green-500", MATIC: "bg-violet-500", POL: "bg-violet-500",
 }
 
 const ASSET_TEXT: Record<string, string> = {
   BTC: "text-amber-600", ETH: "text-blue-600", SOL: "text-purple-600",
   BNB: "text-yellow-600", XRP: "text-sky-600", ADA: "text-blue-600",
   AVAX: "text-red-600", DOT: "text-pink-600", LINK: "text-blue-700",
-  NEAR: "text-green-600", MATIC: "text-violet-600",
+  NEAR: "text-green-600", MATIC: "text-violet-600", POL: "text-violet-600",
 }
 
 const LOADING_STEPS = [
@@ -495,7 +495,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           <h1 className="text-3xl font-black text-foreground tracking-tight mb-1">Conseiller IA</h1>
           <p className="text-muted-foreground text-sm">
             {plan === "premium" ? "Claude Opus · stratégie institutionnelle" : plan === "pro" ? "Claude Sonnet · analyse détaillée" : "Claude Haiku · analyse de base"}
-            {" · "}analyse complete en environ 1 minute
+            {" · "}analyse complete en 60 a 90 secondes selon la charge
           </p>
         </div>
 

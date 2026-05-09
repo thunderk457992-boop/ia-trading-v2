@@ -7,7 +7,7 @@ const ASSET_COLORS: Record<string, string> = {
   BTC: "#f59e0b", ETH: "#3b82f6", SOL: "#a855f7",
   BNB: "#eab308", XRP: "#0ea5e9", ADA: "#2563eb",
   AVAX: "#ef4444", DOT: "#ec4899", LINK: "#1d4ed8",
-  NEAR: "#22c55e", MATIC: "#7c3aed", ATOM: "#6366f1",
+  NEAR: "#22c55e", MATIC: "#7c3aed", POL: "#7c3aed", ATOM: "#6366f1",
   ALGO: "#14b8a6", FTM: "#8b5cf6", ONE: "#06b6d4",
 }
 

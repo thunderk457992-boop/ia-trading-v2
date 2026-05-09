@@ -72,13 +72,13 @@ const ASSET_BAR: Record<string, string> = {
   BTC: "bg-amber-500", ETH: "bg-blue-500", SOL: "bg-purple-500",
   BNB: "bg-yellow-500", XRP: "bg-sky-500", ADA: "bg-blue-600",
   AVAX: "bg-red-500", DOT: "bg-pink-500", LINK: "bg-blue-700",
-  NEAR: "bg-green-500", MATIC: "bg-violet-500",
+  NEAR: "bg-green-500", MATIC: "bg-violet-500", POL: "bg-violet-500",
 }
 const ASSET_TEXT: Record<string, string> = {
   BTC: "text-amber-600", ETH: "text-blue-600", SOL: "text-purple-600",
   BNB: "text-yellow-600", XRP: "text-sky-600", ADA: "text-blue-700",
   AVAX: "text-red-600", DOT: "text-pink-600", LINK: "text-blue-700",
-  NEAR: "text-green-600", MATIC: "text-violet-600",
+  NEAR: "text-green-600", MATIC: "text-violet-600", POL: "text-violet-600",
 }
 const HISTORY_LIMIT: Record<string, number> = { free: 3, pro: 10, premium: 20 }
 const DISPLAY_LOCALE = "fr-FR"
@@ -1227,7 +1227,7 @@ export function DashboardOverview({
           <div className="flex items-start justify-between">
             <div className="space-y-0.5 flex-1">
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Capital investi</p>
-              <p className="text-xl font-bold tracking-tight text-foreground">
+              <p data-testid="capital-value" className="text-xl font-bold tracking-tight text-foreground">
                 {capital > 0 ? `${capital.toLocaleString("fr-FR")}€` : "—"}
               </p>
               {portfolioChange24h !== null && portfolioValueChange !== null ? (

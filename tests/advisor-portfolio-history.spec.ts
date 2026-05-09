@@ -135,7 +135,7 @@ test.describe("advisor -> portfolio_history pipeline", () => {
       await page.goto("http://localhost:3000/dashboard")
       await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
       await expect(page.getByText("Capital investi")).toBeVisible()
-      await expect(page.getByText(/2.?000/)).toBeVisible()
+      await expect(page.getByTestId("capital-value").getByText(/2[\s ]?000/)).toBeVisible()
     } finally {
       await cleanupTempUser(admin, user.id)
     }
