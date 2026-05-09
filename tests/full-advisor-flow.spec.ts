@@ -105,7 +105,7 @@ test.describe("dashboard timeframe graph with seeded history", () => {
     try {
       await seedPortfolioSnapshots(admin, user.id, [
         { createdAt: isoOffset(8 * DAY_MS),         portfolioValue: 1000, investedAmount: 1000, performancePercent: 0 },
-        { createdAt: isoOffset(2 * DAY_MS),         portfolioValue: 1100, investedAmount: 1000, performancePercent: 10 },
+        { createdAt: isoOffset(3 * DAY_MS),         portfolioValue: 1100, investedAmount: 1000, performancePercent: 10 },
         { createdAt: isoOffset(12 * 60 * 60_000),  portfolioValue: 1080, investedAmount: 1000, performancePercent: 8 },
         { createdAt: isoOffset(30 * 60_000),        portfolioValue: 1050, investedAmount: 1000, performancePercent: 5 },
       ])
@@ -117,9 +117,9 @@ test.describe("dashboard timeframe graph with seeded history", () => {
       await expect(page.getByTestId("portfolio-performance-source")).toContainText("portfolio_history uniquement")
 
       // 1H: only 1 snapshot in the last hour (30min) -> disabled
-      // 1M: 2+ snapshots exist within the 30-day window -> enabled
+      // 1M: history span is still too short -> disabled
       await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-ALL")).toBeEnabled()

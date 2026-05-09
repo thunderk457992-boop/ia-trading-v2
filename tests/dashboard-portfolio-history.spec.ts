@@ -13,19 +13,53 @@ function isoOffset(msOffset: number) {
 }
 
 async function expectPercentCloseTo(locator: Locator, expected: number) {
-  // Wait for the sign + integer part to appear (avoids float rounding: -4.545 may render as -4.54 or -4.55)
   const sign = expected < 0 ? "-" : "+"
   const integerPart = Math.trunc(Math.abs(expected)).toString()
-  await expect(locator).toContainText(`${sign}${integerPart}.`, { timeout: 5000 })
+  await expect(locator).toContainText(`${sign}${integerPart}.`, { timeout: 5_000 })
   const text = await locator.textContent()
   const parsed = Number((text ?? "").replace("%", "").replace("+", "").trim())
   expect(parsed).toBeCloseTo(expected, 1)
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
 test.describe("dashboard portfolio history timeframes", () => {
   test.skip(!hasSupabaseAdminEnv(), "Supabase admin env is required for seeded portfolio history tests.")
 
-  test("two snapshots show a simple ALL variation and keep unsupported periods disabled", async ({ page }) => {
+  test("one snapshot keeps the chart honest and avoids fake performance", async ({ page }) => {
+    test.setTimeout(60_000)
+
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "dashboard-one-snapshot")
+
+    try {
+      await seedPortfolioSnapshots(admin, user.id, [
+        {
+          createdAt: isoOffset(6 * 60 * 60 * 1000),
+          portfolioValue: 1000,
+          investedAmount: 1000,
+          performancePercent: 0,
+        },
+      ])
+
+      await authenticatePage(page, user)
+      await page.goto("http://localhost:3000/dashboard")
+
+      await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
+      await expect(page.getByTestId("portfolio-performance-source")).toContainText("portfolio_history uniquement")
+      await expect(page.getByTestId("portfolio-performance-empty").first()).toContainText("deuxième snapshot")
+      await expect(page.getByTestId("portfolio-performance-build-note")).toContainText("snapshots quotidiens")
+
+      for (const timeframe of ["1H", "1D", "7D", "1M", "3M", "1Y", "ALL"]) {
+        await expect(page.getByTestId(`portfolio-timeframe-${timeframe}`)).toBeDisabled()
+      }
+      await expect(page.getByTestId("portfolio-performance-percent")).toHaveCount(0)
+    } finally {
+      await cleanupTempUser(admin, user.id)
+    }
+  })
+
+  test("two snapshots show a simple 1D/ALL segment while longer periods stay disabled", async ({ page }) => {
     test.setTimeout(60_000)
 
     const admin = createAdminClient()
@@ -53,14 +87,12 @@ test.describe("dashboard portfolio history timeframes", () => {
       await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
       await expect(page.getByTestId("portfolio-performance-source")).toContainText("portfolio_history uniquement")
 
-      // 1H: only 1 snapshot in the last hour (15min) -> disabled
-      // 1D/7D/1M/3M/1Y/ALL: both snapshots (2h + 15min) are within every window -> all enabled
       await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeEnabled()
-      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
-      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeEnabled()
-      await expect(page.getByTestId("portfolio-timeframe-3M")).toBeEnabled()
-      await expect(page.getByTestId("portfolio-timeframe-1Y")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-3M")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-1Y")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-ALL")).toBeEnabled()
 
       await page.getByTestId("portfolio-timeframe-1D").click()
@@ -72,7 +104,7 @@ test.describe("dashboard portfolio history timeframes", () => {
     }
   })
 
-  test("seeded snapshots drive timeframe-specific portfolio values", async ({ page }) => {
+  test("3+ snapshots produce timeframe-specific values without enabling 1M too early", async ({ page }) => {
     test.setTimeout(60_000)
 
     const admin = createAdminClient()
@@ -81,13 +113,13 @@ test.describe("dashboard portfolio history timeframes", () => {
     try {
       await seedPortfolioSnapshots(admin, user.id, [
         {
-          createdAt: isoOffset(8 * 24 * 60 * 60 * 1000),
+          createdAt: isoOffset(8 * DAY_MS),
           portfolioValue: 1000,
           investedAmount: 1000,
           performancePercent: 0,
         },
         {
-          createdAt: isoOffset(2 * 24 * 60 * 60 * 1000),
+          createdAt: isoOffset(3 * DAY_MS),
           portfolioValue: 1100,
           investedAmount: 1000,
           performancePercent: 10,
@@ -109,38 +141,29 @@ test.describe("dashboard portfolio history timeframes", () => {
       await authenticatePage(page, user)
       await page.goto("http://localhost:3000/dashboard")
 
-      const card = page.getByTestId("portfolio-performance-card")
-      await expect(card).toBeVisible()
+      await expect(page.getByTestId("portfolio-performance-card")).toBeVisible()
       await expect(page.getByTestId("portfolio-performance-source")).toContainText("portfolio_history uniquement")
 
-      const oneHour = page.getByTestId("portfolio-timeframe-1H")
-      const oneDay = page.getByTestId("portfolio-timeframe-1D")
-      const sevenDays = page.getByTestId("portfolio-timeframe-7D")
-      const oneMonth = page.getByTestId("portfolio-timeframe-1M")
-      const all = page.getByTestId("portfolio-timeframe-ALL")
-
-      // 1H: only 1 snapshot in last hour (30min) -> disabled
-      // 1D/7D/1M/3M/1Y/ALL: 2+ snapshots exist in each window -> all enabled
-      await expect(oneHour).toBeDisabled()
-      await expect(oneDay).toBeEnabled()
-      await expect(sevenDays).toBeEnabled()
-      await expect(oneMonth).toBeEnabled()
-      await expect(page.getByTestId("portfolio-timeframe-3M")).toBeEnabled()
-      await expect(page.getByTestId("portfolio-timeframe-1Y")).toBeEnabled()
-      await expect(all).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-1D")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1M")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-3M")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-1Y")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-ALL")).toBeEnabled()
 
       const percent = page.getByTestId("portfolio-performance-percent")
       const euro = page.getByTestId("portfolio-performance-euro")
 
-      await oneDay.click()
+      await page.getByTestId("portfolio-timeframe-1D").click()
       await expectPercentCloseTo(percent, -2.78)
       await expect(euro).toHaveText("-30€")
 
-      await sevenDays.click()
+      await page.getByTestId("portfolio-timeframe-7D").click()
       await expectPercentCloseTo(percent, -4.55)
       await expect(euro).toHaveText("-50€")
 
-      await all.click()
+      await page.getByTestId("portfolio-timeframe-ALL").click()
       await expectPercentCloseTo(percent, 5)
       await expect(euro).toHaveText("+50€")
     } finally {

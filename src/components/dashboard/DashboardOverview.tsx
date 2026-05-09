@@ -190,6 +190,14 @@ const TIMEFRAME_WINDOWS_MS: Partial<Record<TF, number>> = {
   "3M": 90 * DAY_MS,
   "1Y": 365 * DAY_MS,
 }
+const TIMEFRAME_MIN_COVERAGE_MS: Partial<Record<TF, number>> = {
+  "7D": 2 * DAY_MS,
+  "1M": 21 * DAY_MS,
+  "3M": 60 * DAY_MS,
+  "1Y": 180 * DAY_MS,
+}
+const TIMEFRAME_SHORT_HISTORY_MESSAGE = "Historique encore trop court pour cette période."
+const SNAPSHOT_BUILD_MESSAGE = "La courbe se construit avec vos analyses et les snapshots quotidiens."
 
 function getPreferredTimeframe(availability: Record<TF, TimeframeAvailability>): TF {
   if (availability["1H"]?.available) return "1H"
@@ -232,6 +240,7 @@ interface PortfolioSnapshotChartPoint {
   timestamp: number
   performance: number
   portfolioValue: number
+  valueChange: number
 }
 
 interface NormalizedPortfolioSnapshot {
@@ -241,10 +250,11 @@ interface NormalizedPortfolioSnapshot {
 }
 
 interface PortfolioChartDataPoint {
-  name: string
+  timestamp: number
   portfolio: number
   performance: number
-  portfolioValue: number | null
+  portfolioValue: number
+  valueChange: number
 }
 
 function formatPortfolioValue(value: number) {
@@ -304,6 +314,24 @@ function selectContinuousPortfolioSnapshots(snapshots: NormalizedPortfolioSnapsh
   return continuous.reverse()
 }
 
+function getPortfolioSnapshotsForTimeframe(
+  snapshots: NormalizedPortfolioSnapshot[],
+  timeframe: TF,
+  anchorMs: number
+) {
+  const periodMs = TIMEFRAME_WINDOWS_MS[timeframe]
+
+  return (periodMs === undefined
+    ? snapshots
+    : snapshots.filter((snapshot) => snapshot.timestamp >= anchorMs - periodMs)
+  ).filter((snapshot) => snapshot.timestamp <= anchorMs)
+}
+
+function getSnapshotCoverageMs(snapshots: NormalizedPortfolioSnapshot[]) {
+  if (snapshots.length < 2) return 0
+  return Math.max(0, snapshots[snapshots.length - 1].timestamp - snapshots[0].timestamp)
+}
+
 function buildPortfolioSnapshotData(
   snapshots: NormalizedPortfolioSnapshot[],
   timeframe: TF,
@@ -311,11 +339,7 @@ function buildPortfolioSnapshotData(
 ): PortfolioSnapshotChartPoint[] {
   if (!snapshots.length) return []
 
-  const periodMs = TIMEFRAME_WINDOWS_MS[timeframe]
-
-  const series = periodMs === undefined
-    ? snapshots.filter((snapshot) => snapshot.timestamp <= anchorMs)
-    : snapshots.filter((snapshot) => snapshot.timestamp >= anchorMs - periodMs && snapshot.timestamp <= anchorMs)
+  const series = getPortfolioSnapshotsForTimeframe(snapshots, timeframe, anchorMs)
 
   if (series.length < 2) return []
 
@@ -325,6 +349,7 @@ function buildPortfolioSnapshotData(
   return series.map((snapshot) => ({
     timestamp: snapshot.timestamp,
     portfolioValue: snapshot.portfolioValue,
+    valueChange: Number((snapshot.portfolioValue - baseline.portfolioValue).toFixed(2)),
     performance: Number((((snapshot.portfolioValue / baseline.portfolioValue) - 1) * 100).toFixed(3)),
   }))
 }
@@ -336,6 +361,34 @@ function getPortfolioSnapshotChange(
 ) {
   const data = buildPortfolioSnapshotData(snapshots, timeframe, anchorMs)
   return data.length ? data[data.length - 1].performance : null
+}
+
+function getTimeframeAvailability(
+  snapshots: NormalizedPortfolioSnapshot[],
+  timeframe: TF,
+  anchorMs: number
+): TimeframeAvailability {
+  if (!snapshots.length) {
+    return { available: false, reason: "Aucune donnée portefeuille" }
+  }
+
+  if (timeframe === "ALL") {
+    return snapshots.length >= 2
+      ? { available: true, reason: "" }
+      : { available: false, reason: TIMEFRAME_SHORT_HISTORY_MESSAGE }
+  }
+
+  const filteredSnapshots = getPortfolioSnapshotsForTimeframe(snapshots, timeframe, anchorMs)
+  if (filteredSnapshots.length < 2) {
+    return { available: false, reason: TIMEFRAME_SHORT_HISTORY_MESSAGE }
+  }
+
+  const minCoverageMs = TIMEFRAME_MIN_COVERAGE_MS[timeframe] ?? 0
+  if (minCoverageMs > 0 && getSnapshotCoverageMs(filteredSnapshots) < minCoverageMs) {
+    return { available: false, reason: TIMEFRAME_SHORT_HISTORY_MESSAGE }
+  }
+
+  return { available: true, reason: "" }
 }
 
 function PortfolioLineChart({
@@ -370,7 +423,7 @@ function PortfolioLineChart({
     ? selectedSnapshotData[selectedSnapshotData.length - 1].performance
     : null
   const selectedValueChange = selectedSnapshotData.length > 1
-    ? selectedSnapshotData[selectedSnapshotData.length - 1].portfolioValue - selectedSnapshotData[0].portfolioValue
+    ? selectedSnapshotData[selectedSnapshotData.length - 1].valueChange
     : null
   const selectedTimeframeAvailable = timeframeAvailability[tf].available
   const fullSnapshotSeries = useMemo(
@@ -381,11 +434,15 @@ function PortfolioLineChart({
     ? fullSnapshotSeries[fullSnapshotSeries.length - 1].timestamp - fullSnapshotSeries[0].timestamp
     : 0
   const selectedWindowMs = TIMEFRAME_WINDOWS_MS[tf]
+  const selectedHistoryCoverageMs = selectedSnapshotData.length > 1
+    ? selectedSnapshotData[selectedSnapshotData.length - 1].timestamp - selectedSnapshotData[0].timestamp
+    : 0
   const selectedUsesFullHistory = selectedSnapshotData.length > 0 && selectedSnapshotData.length === fullSnapshotSeries.length
   const shortHistoryNotice = useSnapshotHistory && selectedSnapshotData.length > 1 && (
     (selectedWindowMs !== undefined && selectedUsesFullHistory && totalHistorySpanMs < selectedWindowMs)
     || (tf === "ALL" && totalHistorySpanMs < 7 * DAY_MS)
   )
+  const hasUnavailableTimeframes = TIMEFRAMES.some((timeframe) => !timeframeAvailability[timeframe].available)
 
   useEffect(() => {
     if (timeframeAvailability[tf]?.available) return
@@ -425,12 +482,13 @@ function PortfolioLineChart({
     if (selectedSnapshotData.length < 2) return []
 
     return selectedSnapshotData.map((point) => ({
-      name: formatTimeframeLabel(tf, point.timestamp),
+      timestamp: point.timestamp,
       portfolio: point.portfolioValue,
       performance: point.performance,
       portfolioValue: point.portfolioValue,
+      valueChange: point.valueChange,
     }))
-  }, [selectedSnapshotData, selectedTimeframeAvailable, tf])
+  }, [selectedSnapshotData, selectedTimeframeAvailable])
 
   const lastValue = mergedData[mergedData.length - 1]?.performance ?? selectedChange ?? 0
   const isUp = lastValue >= 0
@@ -438,15 +496,24 @@ function PortfolioLineChart({
   const minVal = mergedData.length ? Math.min(...mergedData.map(d => d.performance)) : 0
   const color = isUp ? "#3b82f6" : "#ef4444"
   const gradId = `grad-${uid}`
+  const curveType = mergedData.length >= 5 ? "monotone" : "linear"
+  const dotStyle = mergedData.length <= 2
+    ? { r: 3, fill: color, stroke: "#ffffff", strokeWidth: 1.5 }
+    : mergedData.length <= 4
+    ? { r: 2, fill: color, stroke: "#ffffff", strokeWidth: 1 }
+    : false
   const missingHistoryData = useSnapshotHistory && mergedData.length === 0
   const unavailableReason = timeframeAvailability[tf].reason
-  const insufficientSnapshotHistory = useSnapshotHistory && missingHistoryData && selectedSnapshotData.length < 2
+  const insufficientSnapshotHistory = useSnapshotHistory && missingHistoryData && !selectedTimeframeAvailable
+  const singleSnapshotHistory = useSnapshotHistory && usableSnapshotCount === 1
   const emptyStateMessage = !useSnapshotHistory
     ? "Aucune donnée de performance portefeuille pour le moment."
+    : singleSnapshotHistory
+    ? "Un deuxième snapshot est nécessaire pour afficher la première variation."
     : insufficientSnapshotHistory
-    ? "Pas encore assez d’historique pour cette période."
+    ? TIMEFRAME_SHORT_HISTORY_MESSAGE
     : missingHistoryData
-    ? unavailableReason || "Données historiques indisponibles"
+    ? unavailableReason || TIMEFRAME_SHORT_HISTORY_MESSAGE
     : unavailableReason || "Période indisponible"
 
   useEffect(() => {
@@ -460,6 +527,7 @@ function PortfolioLineChart({
       lastValue: lastPoint?.portfolioValue ?? null,
       performancePercent: selectedChange,
       valueChange: selectedValueChange,
+      coverageMs: selectedHistoryCoverageMs,
       available: selectedTimeframeAvailable,
     }
 
@@ -476,20 +544,21 @@ function PortfolioLineChart({
       lastValue: lastPoint?.portfolioValue ?? null,
       performancePercent: selectedChange,
       valueChange: selectedValueChange,
+      coverageMs: selectedHistoryCoverageMs,
     })
     console.info("[dashboard] chartSeries", {
       timeframe: tf,
       source: useSnapshotHistory ? "portfolio_history" : "none",
       pointCount: mergedData.length,
       sample: mergedData.slice(0, 3).map((point) => ({
-        name: point.name,
+        name: formatTimeframeLabel(tf, point.timestamp),
         portfolio: point.portfolio,
         performance: point.performance,
         portfolioValue: point.portfolioValue,
       })),
     })
     console.info("[dashboard] portfolio timeframe debug", payload)
-  }, [mergedData, selectedChange, selectedSnapshotData, selectedTimeframeAvailable, selectedValueChange, tf, useSnapshotHistory])
+  }, [mergedData, selectedChange, selectedHistoryCoverageMs, selectedSnapshotData, selectedTimeframeAvailable, selectedValueChange, tf, useSnapshotHistory])
 
   return (
     <div className="rounded-xl border border-border bg-card" data-testid="portfolio-performance-card">
@@ -579,6 +648,15 @@ function PortfolioLineChart({
             </div>
           </div>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <span>{SNAPSHOT_BUILD_MESSAGE}</span>
+          {hasUnavailableTimeframes && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span>{TIMEFRAME_SHORT_HISTORY_MESSAGE}</span>
+            </>
+          )}
+        </div>
 
         {mergedData.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -615,105 +693,92 @@ function PortfolioLineChart({
                 width={chartSize.width}
                 height={chartSize.height}
                 data={mergedData}
-                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                margin={{ top: 10, right: 10, left: 0, bottom: 6 }}
               >
                 <defs>
                   <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity={0.15} />
+                    <stop offset="0%" stopColor={color} stopOpacity={0.14} />
                     <stop offset="100%" stopColor={color} stopOpacity={0} />
                   </linearGradient>
-                  <linearGradient id={`${gradId}-btc`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.08} />
-                    <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id={`${gradId}-eth`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#a855f7" stopOpacity={0.08} />
-                    <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
-                  </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <CartesianGrid strokeDasharray="4 6" stroke="rgba(100,116,139,0.16)" vertical={false} />
                 <XAxis
-                  dataKey="name"
+                  dataKey="timestamp"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "#94a3b8", fontSize: 10 }}
+                  tick={{ fill: "#64748b", fontSize: 10 }}
+                  tickFormatter={(value) => formatTimeframeLabel(tf, Number(value))}
                   dy={8}
                   interval="preserveStartEnd"
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "#94a3b8", fontSize: 10 }}
-                  tickFormatter={(v) => useSnapshotHistory ? formatPortfolioValue(v) : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`}
+                  tick={{ fill: "#64748b", fontSize: 10 }}
+                  tickFormatter={(value) => formatPortfolioValue(Number(value))}
                   dx={-4}
-                  width={useSnapshotHistory ? 72 : 52}
+                  width={74}
                   domain={["auto", "auto"]}
                 />
                 <RechartsTooltip
-                  content={({ active, payload, label }) => {
+                  content={({ active, payload }) => {
                     if (!active || !payload?.length) return null
-                    const KEY_LABEL: Record<string, string> = { portfolio: "Portfolio", btc: "BTC", eth: "ETH" }
+                    const point = payload[0]?.payload as PortfolioChartDataPoint | undefined
+                    if (!point) return null
+                    const tooltipLabel = new Date(point.timestamp).toLocaleString(DISPLAY_LOCALE, {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: DISPLAY_TIME_ZONE,
+                    })
                     return (
-                      <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg">
-                        <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">{label}</p>
-                        {payload.map((entry, i) => {
-                          const val = entry.value as number | null
-                          if (val === null || val === undefined) return null
-                          const point = entry.payload as PortfolioChartDataPoint
-                          return (
-                            <div key={i} className="flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-1.5">
-                                <div className="h-2 w-2 rounded-full" style={{ background: entry.stroke as string }} />
-                                <span className="text-[11px] text-muted-foreground">
-                                  {KEY_LABEL[entry.dataKey as string] ?? entry.dataKey}
-                                </span>
-                              </div>
-                              <span
-                                className={cn(
-                                  "text-[12px] font-medium tabular-nums",
-                                  useSnapshotHistory
-                                    ? point.performance >= 0 ? "text-success" : "text-destructive"
-                                    : val >= 0
-                                    ? "text-success"
-                                    : "text-destructive"
-                                )}
-                              >
-                                {useSnapshotHistory
-                                  ? entry.dataKey === "portfolio"
-                                    ? formatPortfolioValue(val)
-                                    : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`
-                                  : `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`}
-                              </span>
-                            </div>
-                          )
-                        })}
-                        {useSnapshotHistory && payload[0]?.payload?.performance !== undefined && (
-                          <div className="mt-2 flex items-center justify-between gap-4 border-t border-border pt-2">
-                            <span className="text-[11px] text-muted-foreground">Performance</span>
-                            <span
-                              className={cn(
-                                "text-[12px] font-medium tabular-nums",
-                                (payload[0].payload as PortfolioChartDataPoint).performance >= 0 ? "text-success" : "text-destructive"
-                              )}
-                            >
-                              {(payload[0].payload as PortfolioChartDataPoint).performance >= 0 ? "+" : ""}
-                              {(payload[0].payload as PortfolioChartDataPoint).performance.toFixed(2)}%
+                      <div className="min-w-[220px] rounded-xl border border-border bg-card/95 px-3 py-2.5 shadow-xl backdrop-blur">
+                        <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{tooltipLabel}</p>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-[11px] text-muted-foreground">Valeur portefeuille</span>
+                            <span className="text-[13px] font-semibold tabular-nums text-foreground">
+                              {formatPortfolioValue(point.portfolioValue)}
                             </span>
                           </div>
-                        )}
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-[11px] text-muted-foreground">Variation période</span>
+                            <span
+                              className={cn(
+                                "text-[12px] font-semibold tabular-nums",
+                                point.performance >= 0 ? "text-success" : "text-destructive"
+                              )}
+                            >
+                              {point.performance >= 0 ? "+" : ""}
+                              {point.performance.toFixed(2)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-[11px] text-muted-foreground">Variation €</span>
+                            <span
+                              className={cn(
+                                "text-[12px] font-semibold tabular-nums",
+                                point.valueChange >= 0 ? "text-success" : "text-destructive"
+                              )}
+                            >
+                              {fmtPortfolioEuroDelta(point.valueChange)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     )
                   }}
                   cursor={{ stroke: "#e2e8f0", strokeWidth: 1 }}
                 />
                 <Area
-                  type="monotone"
+                  type={curveType}
                   dataKey="portfolio"
                   stroke={color}
                   strokeWidth={2}
                   fill={`url(#${gradId})`}
-                  dot={false}
-                  activeDot={{ r: 4, fill: color, strokeWidth: 0 }}
+                  dot={dotStyle}
+                  activeDot={{ r: 4, fill: color, stroke: "#ffffff", strokeWidth: 2 }}
                 />
               </AreaChart>
             ) : (
@@ -757,18 +822,18 @@ function PortfolioLineChart({
                 <div className="h-1 w-full rounded-full bg-secondary overflow-hidden">
                   <div
                     className="h-full rounded-full bg-blue-500 transition-[width] duration-500"
-                    style={{ width: `${Math.min(100, Math.round((usableSnapshotCount / 3) * 100))}%` }}
+                    style={{ width: `${Math.min(100, Math.round((usableSnapshotCount / 2) * 100))}%` }}
                   />
                 </div>
                 <p className="mt-1.5 text-[10px] text-muted-foreground/70 text-right">
-                  3 snapshots recommandés pour le graphique 1D
+                  2 snapshots pour une première variation, 3+ pour une courbe plus lisible
                 </p>
               </div>
               <p className="text-[12px] text-muted-foreground text-center" data-testid="portfolio-performance-empty">
                 {emptyStateMessage}
               </p>
-              <p className="text-[10px] text-muted-foreground/60 text-center">
-                Un snapshot est généré à chaque analyse, puis enrichi par la mise à jour quotidienne.
+              <p className="text-[10px] text-muted-foreground/60 text-center" data-testid="portfolio-performance-build-note">
+                {SNAPSHOT_BUILD_MESSAGE}
               </p>
               <Link href="/advisor" className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-foreground text-background text-xs font-bold rounded-lg transition-colors hover:opacity-90">
                 Générer une analyse <ArrowRight className="h-3 w-3" />
@@ -1075,30 +1140,10 @@ export function DashboardOverview({
   const timeframeAvailability = useMemo(() => {
     const availability = {} as Record<TF, TimeframeAvailability>
     for (const timeframe of TIMEFRAMES) {
-      availability[timeframe] = { available: false, reason: "Aucune donnée portefeuille" }
+      availability[timeframe] = getTimeframeAvailability(normalizedPortfolioSnapshots, timeframe, timeframeAnchorMs)
     }
-
-    if (useSnapshotHistory) {
-      for (const timeframe of TIMEFRAMES) {
-        const series = buildPortfolioSnapshotData(normalizedPortfolioSnapshots, timeframe, timeframeAnchorMs)
-        const hasEnoughPoints = series.length > 1
-
-        availability[timeframe] = hasEnoughPoints
-          ? { available: true, reason: "" }
-          : {
-              available: false,
-              reason: timeframe === "1H"
-                ? "Disponible avec plus de snapshots intrajournaliers."
-                : timeframe === "1D"
-                  ? "Pas encore assez d’historique sur 24h."
-                  : "Pas encore assez de snapshots pour cette période.",
-            }
-      }
-      return availability
-    }
-
     return availability
-  }, [normalizedPortfolioSnapshots, timeframeAnchorMs, useSnapshotHistory])
+  }, [normalizedPortfolioSnapshots, timeframeAnchorMs])
 
   const capital = Number(latestSnapshot?.investedAmount ?? (lastAnalysis?.investor_profile as Record<string, unknown> | undefined)?.capital ?? 0)
   const portfolioValueChange = timeframeAvailability["1D"].available && portfolioChange24h !== null && capital > 0
