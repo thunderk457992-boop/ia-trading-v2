@@ -190,6 +190,7 @@ const TIMEFRAME_WINDOWS_MS: Partial<Record<TF, number>> = {
   "3M": 90 * DAY_MS,
   "1Y": 365 * DAY_MS,
 }
+const ONE_DAY_RECENT_WINDOW_MS = 2 * DAY_MS
 const TIMEFRAME_MIN_COVERAGE_MS: Partial<Record<TF, number>> = {
   "7D": 2 * DAY_MS,
   "1M": 21 * DAY_MS,
@@ -197,6 +198,8 @@ const TIMEFRAME_MIN_COVERAGE_MS: Partial<Record<TF, number>> = {
   "1Y": 180 * DAY_MS,
 }
 const TIMEFRAME_SHORT_HISTORY_MESSAGE = "Historique encore trop court pour cette période."
+const INTRAHOUR_MESSAGE = "Disponible quand plusieurs snapshots sont créés dans la même heure."
+const RECENT_DATA_MESSAGE = "Disponible dès que deux snapshots existent sur les dernières 48h."
 const SNAPSHOT_BUILD_MESSAGE = "La courbe se construit avec vos analyses et les snapshots quotidiens."
 
 function getPreferredTimeframe(availability: Record<TF, TimeframeAvailability>): TF {
@@ -216,7 +219,8 @@ function formatTimeframeLabel(timeframe: TF, timestamp: number) {
   }
 
   if (timeframe === "1D") {
-    return date.toLocaleTimeString(DISPLAY_LOCALE, {
+    return date.toLocaleDateString(DISPLAY_LOCALE, {
+      day: "2-digit",
       hour: "2-digit",
       timeZone: DISPLAY_TIME_ZONE,
     })
@@ -319,12 +323,24 @@ function getPortfolioSnapshotsForTimeframe(
   timeframe: TF,
   anchorMs: number
 ) {
-  const periodMs = TIMEFRAME_WINDOWS_MS[timeframe]
+  const periodMs = timeframe === "1D"
+    ? ONE_DAY_RECENT_WINDOW_MS
+    : TIMEFRAME_WINDOWS_MS[timeframe]
 
   return (periodMs === undefined
     ? snapshots
     : snapshots.filter((snapshot) => snapshot.timestamp >= anchorMs - periodMs)
   ).filter((snapshot) => snapshot.timestamp <= anchorMs)
+}
+
+function getSnapshotsWithinWindow(
+  snapshots: NormalizedPortfolioSnapshot[],
+  anchorMs: number,
+  windowMs: number
+) {
+  return snapshots.filter((snapshot) => (
+    snapshot.timestamp >= anchorMs - windowMs && snapshot.timestamp <= anchorMs
+  ))
 }
 
 function getSnapshotCoverageMs(snapshots: NormalizedPortfolioSnapshot[]) {
@@ -380,7 +396,14 @@ function getTimeframeAvailability(
 
   const filteredSnapshots = getPortfolioSnapshotsForTimeframe(snapshots, timeframe, anchorMs)
   if (filteredSnapshots.length < 2) {
-    return { available: false, reason: TIMEFRAME_SHORT_HISTORY_MESSAGE }
+    return {
+      available: false,
+      reason: timeframe === "1H"
+        ? INTRAHOUR_MESSAGE
+        : timeframe === "1D"
+        ? RECENT_DATA_MESSAGE
+        : TIMEFRAME_SHORT_HISTORY_MESSAGE,
+    }
   }
 
   const minCoverageMs = TIMEFRAME_MIN_COVERAGE_MS[timeframe] ?? 0
@@ -391,14 +414,23 @@ function getTimeframeAvailability(
   return { available: true, reason: "" }
 }
 
+function usesRecentOneDayFallback(
+  snapshots: NormalizedPortfolioSnapshot[],
+  anchorMs: number
+) {
+  const exactOneDaySnapshots = getSnapshotsWithinWindow(snapshots, anchorMs, DAY_MS)
+  return exactOneDaySnapshots.length < 2 && getPortfolioSnapshotsForTimeframe(snapshots, "1D", anchorMs).length >= 2
+}
+
 function PortfolioLineChart({
-  portfolioSnapshots, capital, timeframeAvailability, timeframeAnchorMs, lastSnapshotLabel,
+  portfolioSnapshots, capital, timeframeAvailability, timeframeAnchorMs, lastSnapshotLabel, oneDayUsesRecentFallback,
 }: {
   portfolioSnapshots: PortfolioSnapshot[]
   capital: number
   timeframeAvailability: Record<TF, TimeframeAvailability>
   timeframeAnchorMs: number
   lastSnapshotLabel: string | null
+  oneDayUsesRecentFallback: boolean
 }) {
   const [tf, setTf] = useState<TF>(() => getPreferredTimeframe(timeframeAvailability))
   const chartContainerRef = useRef<HTMLDivElement | null>(null)
@@ -433,7 +465,7 @@ function PortfolioLineChart({
   const totalHistorySpanMs = fullSnapshotSeries.length > 1
     ? fullSnapshotSeries[fullSnapshotSeries.length - 1].timestamp - fullSnapshotSeries[0].timestamp
     : 0
-  const selectedWindowMs = TIMEFRAME_WINDOWS_MS[tf]
+  const selectedWindowMs = tf === "1D" ? ONE_DAY_RECENT_WINDOW_MS : TIMEFRAME_WINDOWS_MS[tf]
   const selectedHistoryCoverageMs = selectedSnapshotData.length > 1
     ? selectedSnapshotData[selectedSnapshotData.length - 1].timestamp - selectedSnapshotData[0].timestamp
     : 0
@@ -496,6 +528,11 @@ function PortfolioLineChart({
   const minVal = mergedData.length ? Math.min(...mergedData.map(d => d.performance)) : 0
   const color = isUp ? "#3b82f6" : "#ef4444"
   const gradId = `grad-${uid}`
+  const timeframeButtonLabel = (timeframe: TF) => (
+    timeframe === "1D" && oneDayUsesRecentFallback ? "Récent" : timeframe
+  )
+  const selectedTimeframeLabel = tf === "1D" && oneDayUsesRecentFallback ? "RÉCENT" : tf
+  const selectedVariationLabel = tf === "1D" && oneDayUsesRecentFallback ? "Variation récente" : `Variation ${tf}`
   const curveType = mergedData.length >= 5 ? "monotone" : "linear"
   const dotStyle = mergedData.length <= 2
     ? { r: 3, fill: color, stroke: "#ffffff", strokeWidth: 1.5 }
@@ -585,7 +622,7 @@ function PortfolioLineChart({
                     isUp ? "border-success/20 bg-success/10 text-success" : "border-destructive/20 bg-destructive/10 text-destructive"
                   )}>
                     {isUp ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    {tf}
+                    {selectedTimeframeLabel}
                   </div>
                 </div>
                 {selectedValueChange !== null && (
@@ -597,8 +634,13 @@ function PortfolioLineChart({
                       {fmtPortfolioEuroDelta(selectedValueChange)}
                     </p>
                     <p className="text-[12px] text-muted-foreground">
-                      Variation {tf} sur <span className="font-medium text-foreground">{capital.toLocaleString("fr-FR")}€</span> investis
+                      {selectedVariationLabel} sur <span className="font-medium text-foreground">{capital.toLocaleString("fr-FR")}€</span> investis
                     </p>
+                    {tf === "1D" && oneDayUsesRecentFallback && (
+                      <p className="mt-1 text-[12px] text-muted-foreground" data-testid="portfolio-performance-recent-label">
+                        Dernières données disponibles
+                      </p>
+                    )}
                     {shortHistoryNotice && (
                       <p className="mt-1 text-[12px] text-muted-foreground" data-testid="portfolio-performance-short-history">
                         Historique encore trop court pour différencier cette période.
@@ -626,8 +668,8 @@ function PortfolioLineChart({
                       if (enabled) setTf(t)
                     }}
                     data-testid={`portfolio-timeframe-${t}`}
-                    title={enabled ? t : availability.reason}
-                    aria-label={enabled ? t : `${t} indisponible: ${availability.reason}`}
+                    title={enabled ? timeframeButtonLabel(t) : availability.reason}
+                    aria-label={enabled ? timeframeButtonLabel(t) : `${timeframeButtonLabel(t)} indisponible: ${availability.reason}`}
                     aria-disabled={!enabled}
                     disabled={!enabled}
                     className={cn(
@@ -641,7 +683,7 @@ function PortfolioLineChart({
                         : "cursor-not-allowed text-muted-foreground/40"
                     )}
                   >
-                    {t}
+                    {timeframeButtonLabel(t)}
                   </button>
                 )
               })}
@@ -1132,6 +1174,10 @@ export function DashboardOverview({
       timeZone: DISPLAY_TIME_ZONE,
     })
   }, [latestSnapshot])
+  const oneDayUsesRecentFallback = useMemo(() => (
+    usesRecentOneDayFallback(normalizedPortfolioSnapshots, timeframeAnchorMs)
+  ), [normalizedPortfolioSnapshots, timeframeAnchorMs])
+  const oneDayBadgeLabel = oneDayUsesRecentFallback ? "RÉCENT" : "1D"
 
   const portfolioChange24h = useMemo(() => {
     return useSnapshotHistory ? getPortfolioSnapshotChange(normalizedPortfolioSnapshots, "1D", timeframeAnchorMs) : null
@@ -1224,15 +1270,20 @@ export function DashboardOverview({
                 {capital > 0 ? `${capital.toLocaleString("fr-FR")}€` : "—"}
               </p>
               {portfolioChange24h !== null && portfolioValueChange !== null ? (
-                <div className={cn("flex flex-wrap items-center gap-1.5 text-[12px] font-medium mt-1", portfolioChange24h >= 0 ? "text-success" : "text-destructive")}>
-                  {portfolioChange24h >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                  <span className="font-semibold tabular-nums">{portfolioChange24h >= 0 ? "+" : ""}{portfolioChange24h.toFixed(2)}%</span>
-                  <span className="text-muted-foreground font-normal">·</span>
-                  <span className="font-semibold tabular-nums">{fmtPortfolioEuroDelta(portfolioValueChange)}</span>
-                  <span className="inline-flex items-center rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    1D
-                  </span>
-                </div>
+                <>
+                  <div className={cn("flex flex-wrap items-center gap-1.5 text-[12px] font-medium mt-1", portfolioChange24h >= 0 ? "text-success" : "text-destructive")}>
+                    {portfolioChange24h >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    <span className="font-semibold tabular-nums">{portfolioChange24h >= 0 ? "+" : ""}{portfolioChange24h.toFixed(2)}%</span>
+                    <span className="text-muted-foreground font-normal">·</span>
+                    <span className="font-semibold tabular-nums">{fmtPortfolioEuroDelta(portfolioValueChange)}</span>
+                    <span className="inline-flex items-center rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {oneDayBadgeLabel}
+                    </span>
+                  </div>
+                  {oneDayUsesRecentFallback && (
+                    <p className="text-[11px] text-muted-foreground">Dernières données disponibles</p>
+                  )}
+                </>
               ) : capital === 0 ? (
                 <p className="text-[11px] text-muted-foreground">Configurez votre profil</p>
               ) : (
@@ -1438,6 +1489,7 @@ export function DashboardOverview({
             timeframeAvailability={timeframeAvailability}
             timeframeAnchorMs={timeframeAnchorMs}
             lastSnapshotLabel={lastSnapshotLabel}
+            oneDayUsesRecentFallback={oneDayUsesRecentFallback}
           />
         </div>
         <div>

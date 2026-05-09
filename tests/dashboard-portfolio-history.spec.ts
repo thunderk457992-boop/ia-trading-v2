@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from "@playwright/test"
+import { test, expect, type Locator, type Page } from "@playwright/test"
 import {
   authenticatePage,
   createAdminClient,
@@ -10,6 +10,12 @@ import {
 
 function isoOffset(msOffset: number) {
   return new Date(Date.now() - msOffset).toISOString()
+}
+
+async function selectTimeframe(page: Page, timeframe: string) {
+  const button = page.getByTestId(`portfolio-timeframe-${timeframe}`)
+  await button.click()
+  await expect(button).toHaveClass(/bg-foreground/)
 }
 
 async function expectPercentCloseTo(locator: Locator, expected: number) {
@@ -59,7 +65,7 @@ test.describe("dashboard portfolio history timeframes", () => {
     }
   })
 
-  test("two snapshots show a simple 1D/ALL segment while longer periods stay disabled", async ({ page }) => {
+  test("two snapshots within 48h activate Récent without faking a strict 24h label", async ({ page }) => {
     test.setTimeout(60_000)
 
     const admin = createAdminClient()
@@ -68,7 +74,7 @@ test.describe("dashboard portfolio history timeframes", () => {
     try {
       await seedPortfolioSnapshots(admin, user.id, [
         {
-          createdAt: isoOffset(2 * 60 * 60 * 1000),
+          createdAt: isoOffset(30 * 60 * 60 * 1000),
           portfolioValue: 1000,
           investedAmount: 1000,
           performancePercent: 0,
@@ -89,13 +95,15 @@ test.describe("dashboard portfolio history timeframes", () => {
 
       await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1D")).toContainText("Récent")
       await expect(page.getByTestId("portfolio-timeframe-7D")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-1M")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-3M")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-1Y")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-ALL")).toBeEnabled()
 
-      await page.getByTestId("portfolio-timeframe-1D").click()
+      await selectTimeframe(page, "1D")
+      await expect(page.getByTestId("portfolio-performance-recent-label")).toContainText("Dernières données disponibles")
       await expectPercentCloseTo(page.getByTestId("portfolio-performance-percent"), 3.5)
       await expect(page.getByTestId("portfolio-performance-euro")).toHaveText("+35€")
       await expect(page.getByTestId("portfolio-performance-short-history")).toContainText("Historique encore trop court")
@@ -155,15 +163,15 @@ test.describe("dashboard portfolio history timeframes", () => {
       const percent = page.getByTestId("portfolio-performance-percent")
       const euro = page.getByTestId("portfolio-performance-euro")
 
-      await page.getByTestId("portfolio-timeframe-1D").click()
+      await selectTimeframe(page, "1D")
       await expectPercentCloseTo(percent, -2.78)
       await expect(euro).toHaveText("-30€")
 
-      await page.getByTestId("portfolio-timeframe-7D").click()
+      await selectTimeframe(page, "7D")
       await expectPercentCloseTo(percent, -4.55)
       await expect(euro).toHaveText("-50€")
 
-      await page.getByTestId("portfolio-timeframe-ALL").click()
+      await selectTimeframe(page, "ALL")
       await expectPercentCloseTo(percent, 5)
       await expect(euro).toHaveText("+50€")
     } finally {

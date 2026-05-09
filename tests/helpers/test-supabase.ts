@@ -76,6 +76,13 @@ export function hasSupabaseAdminEnv() {
   )
 }
 
+export function hasSupabasePublicEnv() {
+  return Boolean(
+    getEnv("NEXT_PUBLIC_SUPABASE_URL")
+    && getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+  )
+}
+
 export function hasStripeServerEnv() {
   return Boolean(getEnv("STRIPE_SECRET_KEY"))
 }
@@ -113,6 +120,15 @@ function createCookieChunks(key: string, value: string, chunkSize = 3180) {
 
 function requirePublicSupabaseKey() {
   return requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+}
+
+export function createPublicClient() {
+  return createClient(getSupabaseUrl(), requirePublicSupabaseKey(), {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 }
 
 export function createAdminClient() {

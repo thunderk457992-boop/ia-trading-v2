@@ -342,6 +342,7 @@ test.describe("stripe checkout for authenticated user", () => {
     test.setTimeout(30_000)
     const admin = createAdminClient()
     const user = await createTempUser(admin, "stripe-pricing-retry", "pro")
+    let plansCalls = 0
     let checkoutCalls = 0
     let syncCalls = 0
     let portalCalls = 0
@@ -358,6 +359,7 @@ test.describe("stripe checkout for authenticated user", () => {
     })
 
     await page.route("**/api/stripe/plans", async (route) => {
+      plansCalls += 1
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -414,6 +416,7 @@ test.describe("stripe checkout for authenticated user", () => {
     try {
       await authenticatePage(page, user)
       await page.goto("http://localhost:3000/pricing")
+      await expect.poll(() => plansCalls).toBe(1)
 
       await page.getByRole("button", { name: /choisir premium/i }).click()
       await expect.poll(() => checkoutCalls).toBe(2)

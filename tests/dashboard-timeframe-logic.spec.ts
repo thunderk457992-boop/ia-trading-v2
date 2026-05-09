@@ -15,7 +15,7 @@ function isoOffset(msOffset: number) {
 const MIN_MS = 60 * 1000
 const HOUR_MS = 60 * MIN_MS
 const DAY_MS = 24 * HOUR_MS
-const SHORT_HISTORY_MESSAGE = "Historique encore trop court pour cette période."
+const INTRAHOUR_MESSAGE = "Disponible quand plusieurs snapshots sont créés dans la même heure."
 
 test.describe("timeframe availability logic", () => {
   test.skip(!hasSupabaseAdminEnv(), "requires Supabase admin env")
@@ -41,14 +41,14 @@ test.describe("timeframe availability logic", () => {
     }
   })
 
-  test("1D enabled only when 2 snapshots exist within the last 24h", async ({ page }) => {
+  test("1D uses recent 48h data when 2 snapshots exist in 48h but not 24h", async ({ page }) => {
     test.setTimeout(30_000)
     const admin = createAdminClient()
-    const user = await createTempUser(admin, "tf-1d-active")
+    const user = await createTempUser(admin, "tf-1d-recent")
 
     try {
       await seedPortfolioSnapshots(admin, user.id, [
-        { createdAt: isoOffset(18 * HOUR_MS), portfolioValue: 1000, investedAmount: 1000, performancePercent: 0 },
+        { createdAt: isoOffset(31 * HOUR_MS), portfolioValue: 1000, investedAmount: 1000, performancePercent: 0 },
         { createdAt: isoOffset(6 * HOUR_MS), portfolioValue: 1050, investedAmount: 1000, performancePercent: 5 },
       ])
 
@@ -56,8 +56,9 @@ test.describe("timeframe availability logic", () => {
       await page.goto("http://localhost:3000/dashboard")
 
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeEnabled()
+      await expect(page.getByTestId("portfolio-timeframe-1D")).toContainText("Récent")
       await expect(page.getByTestId("portfolio-timeframe-1H")).toBeDisabled()
-      await expect(page.getByTestId("portfolio-timeframe-1H")).toHaveAttribute("title", SHORT_HISTORY_MESSAGE)
+      await expect(page.getByTestId("portfolio-timeframe-1H")).toHaveAttribute("title", INTRAHOUR_MESSAGE)
     } finally {
       await cleanupTempUser(admin, user.id)
     }
@@ -71,7 +72,7 @@ test.describe("timeframe availability logic", () => {
     try {
       await seedPortfolioSnapshots(admin, user.id, [
         { createdAt: isoOffset(3 * DAY_MS), portfolioValue: 1000, investedAmount: 1000, performancePercent: 0 },
-        { createdAt: isoOffset(36 * HOUR_MS), portfolioValue: 1015, investedAmount: 1000, performancePercent: 1.5 },
+        { createdAt: isoOffset(60 * HOUR_MS), portfolioValue: 1015, investedAmount: 1000, performancePercent: 1.5 },
         { createdAt: isoOffset(6 * HOUR_MS), portfolioValue: 1040, investedAmount: 1000, performancePercent: 4 },
       ])
 
@@ -79,6 +80,7 @@ test.describe("timeframe availability logic", () => {
       await page.goto("http://localhost:3000/dashboard")
 
       await expect(page.getByTestId("portfolio-timeframe-1D")).toBeDisabled()
+      await expect(page.getByTestId("portfolio-timeframe-1D")).toHaveAttribute("title", /48h/)
       await expect(page.getByTestId("portfolio-timeframe-7D")).toBeEnabled()
       await expect(page.getByTestId("portfolio-timeframe-1M")).toBeDisabled()
       await expect(page.getByTestId("portfolio-timeframe-3M")).toBeDisabled()

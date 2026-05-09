@@ -4,8 +4,30 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Loader2, Check, AlertCircle, Mail } from "lucide-react"
+import { ResendConfirmationButton } from "@/components/auth/ResendConfirmationButton"
 import { AxiomLogo } from "@/components/branding/AxiomLogo"
+import { buildAuthCallbackUrl } from "@/lib/auth-redirect"
 import { createClient } from "@/lib/supabase/client"
+
+function getSignUpErrorMessage(message: string) {
+  if (
+    message.includes("already registered") ||
+    message.includes("already been registered") ||
+    message.includes("User already registered")
+  ) {
+    return "Un compte existe deja avec cet email."
+  }
+
+  if (message.includes("Password should be")) {
+    return "Le mot de passe doit contenir au moins 6 caracteres."
+  }
+
+  if (message.includes("Unable to validate")) {
+    return "Email invalide."
+  }
+
+  return message
+}
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -16,6 +38,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
+  const [confirmationNextPath, setConfirmationNextPath] = useState("/dashboard")
 
   const passwordStrength = (() => {
     if (password.length === 0) return 0
@@ -32,35 +55,42 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (password.length < 8) { setError("Le mot de passe doit contenir au moins 8 caractères"); return }
+
+    if (password.length < 8) {
+      setError("Le mot de passe doit contenir au moins 8 caracteres")
+      return
+    }
+
     setLoading(true)
     setError("")
+
     try {
       const nextPath = typeof window === "undefined"
         ? "/dashboard"
         : new URLSearchParams(window.location.search).get("next") || "/dashboard"
+
       const supabase = createClient()
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { full_name: fullName },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: buildAuthCallbackUrl(window.location.origin, nextPath),
         },
       })
 
       if (signUpError) {
-        const msg =
-          signUpError.message.includes("already registered") ||
-          signUpError.message.includes("already been registered") ||
-          signUpError.message.includes("User already registered")
-            ? "Un compte existe déjà avec cet email."
-            : signUpError.message.includes("Password should be")
-            ? "Le mot de passe doit contenir au moins 6 caractères."
-            : signUpError.message.includes("Unable to validate")
-            ? "Email invalide."
-            : signUpError.message
-        setError(msg)
+        setError(getSignUpErrorMessage(signUpError.message))
+        return
+      }
+
+      const isObfuscatedExistingUser =
+        !data.session &&
+        Array.isArray(data.user?.identities) &&
+        data.user.identities.length === 0
+
+      if (isObfuscatedExistingUser) {
+        setError("Cet email semble deja utilise ou en attente de confirmation. Connectez-vous ou renvoyez l'email de confirmation.")
         return
       }
 
@@ -70,9 +100,10 @@ export default function RegisterPage() {
         return
       }
 
+      setConfirmationNextPath(nextPath)
       setSuccess(true)
     } catch {
-      setError("L’inscription est temporairement indisponible. Vérifiez la configuration Supabase ou réessayez.")
+      setError("L'inscription est temporairement indisponible. Verifiez la configuration Supabase ou reessayez.")
     } finally {
       setLoading(false)
     }
@@ -85,14 +116,26 @@ export default function RegisterPage() {
           <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-6">
             <Mail className="w-7 h-7 text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-bold text-foreground mb-3">Vérifiez votre email</h2>
-          <p className="text-muted-foreground text-sm mb-6 leading-relaxed">
-            Un lien de confirmation a été envoyé à{" "}
+          <h2 className="text-2xl font-bold text-foreground mb-3">Verifiez votre email</h2>
+          <p className="text-muted-foreground text-sm mb-4 leading-relaxed">
+            Un lien de confirmation a ete envoye a{" "}
             <strong className="text-foreground">{email}</strong>.
             <br />Cliquez sur le lien pour activer votre compte.
           </p>
-          <Link href="/login" className="text-foreground text-sm font-semibold underline underline-offset-4 hover:opacity-75 transition-opacity">
-            ← Retour à la connexion
+          <div className="rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Vous ne voyez rien ?</p>
+            <p className="mt-1">Verifiez vos spams et l&apos;onglet Promotions.</p>
+          </div>
+          <ResendConfirmationButton
+            email={email}
+            nextPath={confirmationNextPath}
+            className="mt-4"
+          />
+          <Link
+            href="/login"
+            className="mt-5 inline-block text-foreground text-sm font-semibold underline underline-offset-4 hover:opacity-75 transition-opacity"
+          >
+            Retour a la connexion
           </Link>
         </div>
       </div>
@@ -106,14 +149,16 @@ export default function RegisterPage() {
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
             <AxiomLogo />
           </Link>
-          <h1 className="text-2xl font-bold text-foreground mb-1.5">Créer votre compte</h1>
-          <p className="text-muted-foreground text-sm">Commencez gratuitement, sans carte de crédit</p>
+          <h1 className="text-2xl font-bold text-foreground mb-1.5">Creer votre compte</h1>
+          <p className="text-muted-foreground text-sm">Commencez gratuitement, sans carte de credit</p>
         </div>
 
         <div className="bg-card rounded-2xl border border-border p-5 sm:p-6">
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label htmlFor="register-full-name" className="block text-sm font-medium text-muted-foreground mb-1.5">Nom complet</label>
+              <label htmlFor="register-full-name" className="block text-sm font-medium text-muted-foreground mb-1.5">
+                Nom complet
+              </label>
               <input
                 id="register-full-name"
                 type="text"
@@ -127,7 +172,9 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label htmlFor="register-email" className="block text-sm font-medium text-muted-foreground mb-1.5">Email</label>
+              <label htmlFor="register-email" className="block text-sm font-medium text-muted-foreground mb-1.5">
+                Email
+              </label>
               <input
                 id="register-email"
                 type="email"
@@ -141,14 +188,16 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label htmlFor="register-password" className="block text-sm font-medium text-muted-foreground mb-1.5">Mot de passe</label>
+              <label htmlFor="register-password" className="block text-sm font-medium text-muted-foreground mb-1.5">
+                Mot de passe
+              </label>
               <div className="relative">
                 <input
                   id="register-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="8 caractères minimum"
+                  placeholder="8 caracteres minimum"
                   required
                   autoComplete="new-password"
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all text-sm pr-10"
@@ -162,44 +211,61 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {password.length > 0 && (
+              {password.length > 0 ? (
                 <div className="mt-2">
                   <div className="flex gap-1 mb-1">
                     {[1, 2, 3, 4].map((level) => (
-                      <div key={level} className={`h-1 flex-1 rounded-full transition-all ${level <= passwordStrength ? strengthColor : "bg-secondary"}`} />
+                      <div
+                        key={level}
+                        className={`h-1 flex-1 rounded-full transition-all ${level <= passwordStrength ? strengthColor : "bg-secondary"}`}
+                      />
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground">{strengthLabel}</p>
                 </div>
-              )}
+              ) : null}
             </div>
 
-            {error && (
+            {error ? (
               <div className="flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 {error}
               </div>
-            )}
+            ) : null}
 
             <button
               type="submit"
               disabled={loading}
               className="w-full py-3 bg-foreground hover:bg-foreground/90 disabled:opacity-60 disabled:cursor-not-allowed text-background font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-2"
             >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? "Création du compte..." : "Créer mon compte gratuit"}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {loading ? "Creation du compte..." : "Creer mon compte gratuit"}
             </button>
 
+            <ResendConfirmationButton
+              email={email}
+              nextPath={confirmationNextPath}
+              className="mt-3"
+            />
+
             <p className="text-xs text-muted-foreground text-center">
-              En créant un compte, vous acceptez nos{" "}
-              <Link href="/legal/cgu" className="text-muted-foreground hover:text-foreground underline">CGU</Link>{" "}
+              Si l&apos;email tarde a arriver, verifiez aussi vos spams et l&apos;onglet Promotions.
+            </p>
+
+            <p className="text-xs text-muted-foreground text-center">
+              En creant un compte, vous acceptez nos{" "}
+              <Link href="/legal/cgu" className="text-muted-foreground hover:text-foreground underline">
+                CGU
+              </Link>{" "}
               et notre{" "}
-              <Link href="/legal/privacy" className="text-muted-foreground hover:text-foreground underline">politique de confidentialité</Link>.
+              <Link href="/legal/privacy" className="text-muted-foreground hover:text-foreground underline">
+                politique de confidentialite
+              </Link>.
             </p>
           </form>
 
           <div className="mt-5 pt-5 border-t border-border text-center text-sm text-muted-foreground">
-            Déjà un compte ?{" "}
+            Deja un compte ?{" "}
             <Link href="/login" className="text-foreground font-semibold underline underline-offset-4 hover:opacity-75 transition-opacity">
               Se connecter
             </Link>
@@ -207,7 +273,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="mt-6 flex items-center justify-center gap-6">
-          {["Gratuit pour commencer", "Sans carte de crédit"].map((text) => (
+          {["Gratuit pour commencer", "Sans carte de credit"].map((text) => (
             <div key={text} className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Check className="w-3.5 h-3.5 text-emerald-500" />
               {text}

@@ -4,7 +4,9 @@ import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Loader2, AlertCircle, Check } from "lucide-react"
+import { ResendConfirmationButton } from "@/components/auth/ResendConfirmationButton"
 import { AxiomLogo } from "@/components/branding/AxiomLogo"
+import { buildAuthCallbackUrl } from "@/lib/auth-redirect"
 import { createClient } from "@/lib/supabase/client"
 
 function LoginForm() {
@@ -22,28 +24,32 @@ function LoginForm() {
 
   useEffect(() => {
     if (searchParams.get("error") === "auth_error") {
-      setError("Le lien de confirmation est invalide ou a expiré. Réessayez.")
+      setError("Le lien de confirmation est invalide ou a expire. Reessayez.")
     }
     if (searchParams.get("deleted") === "true") {
-      setInfo("Votre compte a été déconnecté. Vos données seront supprimées sous 30 jours.")
+      setInfo("Votre compte a ete supprime definitivement.")
     }
     if (searchParams.get("reason") === "auth_required") {
-      setInfo("Connectez-vous pour accéder à cette page.")
+      setInfo("Connectez-vous pour acceder a cette page.")
     }
   }, [searchParams])
 
   const handleForgotPassword = async () => {
-    if (!email) { setError("Entrez votre email pour réinitialiser le mot de passe"); return }
+    if (!email) {
+      setError("Entrez votre email pour reinitialiser le mot de passe")
+      return
+    }
+
     setResetLoading(true)
     setError("")
     try {
       const supabase = createClient()
       await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+        redirectTo: buildAuthCallbackUrl(window.location.origin, "/settings"),
       })
       setResetSent(true)
     } catch {
-      setError("La réinitialisation est indisponible pour le moment. Réessayez un peu plus tard.")
+      setError("La reinitialisation est indisponible pour le moment. Reessayez un peu plus tard.")
     } finally {
       setResetLoading(false)
     }
@@ -53,25 +59,26 @@ function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError("")
+
     try {
       const supabase = createClient()
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        const msg = error.message.includes("Invalid login credentials")
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) {
+        const message = signInError.message.includes("Invalid login credentials")
           ? "Email ou mot de passe incorrect."
-          : error.message.includes("Email not confirmed")
+          : signInError.message.includes("Email not confirmed")
           ? "Confirmez votre email avant de vous connecter."
-          : error.message.includes("Too many requests")
-          ? "Trop de tentatives. Réessayez dans quelques minutes."
-          : error.message
-        setError(msg)
+          : signInError.message.includes("Too many requests")
+          ? "Trop de tentatives. Reessayez dans quelques minutes."
+          : signInError.message
+        setError(message)
         return
       }
 
       router.push(nextPath)
       router.refresh()
     } catch {
-      setError("La connexion est temporairement indisponible. Vérifiez la configuration Supabase ou réessayez.")
+      setError("La connexion est temporairement indisponible. Verifiez la configuration Supabase ou reessayez.")
     } finally {
       setLoading(false)
     }
@@ -80,7 +87,9 @@ function LoginForm() {
   return (
     <form onSubmit={handleLogin} className="space-y-4">
       <div>
-        <label htmlFor="login-email" className="block text-sm font-medium text-muted-foreground mb-1.5">Email</label>
+        <label htmlFor="login-email" className="block text-sm font-medium text-muted-foreground mb-1.5">
+          Email
+        </label>
         <input
           id="login-email"
           type="email"
@@ -94,7 +103,9 @@ function LoginForm() {
       </div>
 
       <div>
-        <label htmlFor="login-password" className="block text-sm font-medium text-muted-foreground mb-1.5">Mot de passe</label>
+        <label htmlFor="login-password" className="block text-sm font-medium text-muted-foreground mb-1.5">
+          Mot de passe
+        </label>
         <div className="relative">
           <input
             id="login-password"
@@ -117,33 +128,33 @@ function LoginForm() {
         </div>
       </div>
 
-      {info && (
+      {info ? (
         <div className="flex items-start gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           {info}
         </div>
-      )}
+      ) : null}
 
-      {error && (
+      {error ? (
         <div className="flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           {error}
         </div>
-      )}
+      ) : null}
 
       <button
         type="submit"
         disabled={loading}
         className="w-full py-3 bg-foreground hover:bg-foreground/90 disabled:opacity-60 disabled:cursor-not-allowed text-background font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-1"
       >
-        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
         {loading ? "Connexion..." : "Se connecter"}
       </button>
 
       {resetSent ? (
         <div className="flex items-center gap-2 text-emerald-700 text-xs bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
           <Check className="w-3.5 h-3.5 shrink-0" />
-          Email envoyé ! Vérifiez votre boîte mail.
+          Email envoye ! Verifiez votre boite mail.
         </div>
       ) : (
         <button
@@ -152,9 +163,15 @@ function LoginForm() {
           disabled={resetLoading}
           className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
         >
-          {resetLoading ? "Envoi..." : "Mot de passe oublié ?"}
+          {resetLoading ? "Envoi..." : "Mot de passe oublie ?"}
         </button>
       )}
+
+      <ResendConfirmationButton email={email} nextPath={nextPath} className="pt-1" />
+
+      <p className="text-center text-xs text-muted-foreground">
+        Si vous attendez l&apos;email de confirmation, pensez a verifier vos spams.
+      </p>
     </form>
   )
 }
@@ -168,24 +185,26 @@ export default function LoginPage() {
             <AxiomLogo />
           </Link>
           <h1 className="text-2xl font-bold text-foreground mb-1.5">Bon retour</h1>
-          <p className="text-muted-foreground text-sm">Connectez-vous à votre compte</p>
+          <p className="text-muted-foreground text-sm">Connectez-vous a votre compte</p>
         </div>
 
         <div className="bg-card rounded-2xl border border-border p-5 sm:p-6">
-          <Suspense fallback={
-            <div className="space-y-4 animate-pulse">
-              <div className="h-12 bg-secondary rounded-xl"/>
-              <div className="h-12 bg-secondary rounded-xl"/>
-              <div className="h-11 bg-secondary rounded-xl"/>
-            </div>
-          }>
+          <Suspense
+            fallback={
+              <div className="space-y-4 animate-pulse">
+                <div className="h-12 bg-secondary rounded-xl" />
+                <div className="h-12 bg-secondary rounded-xl" />
+                <div className="h-11 bg-secondary rounded-xl" />
+              </div>
+            }
+          >
             <LoginForm />
           </Suspense>
 
           <div className="mt-6 pt-5 border-t border-border text-center text-sm text-muted-foreground">
             Pas encore de compte ?{" "}
             <Link href="/register" className="text-foreground font-semibold underline underline-offset-4 hover:opacity-75 transition-opacity">
-              Créer un compte
+              Creer un compte
             </Link>
           </div>
         </div>

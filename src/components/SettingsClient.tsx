@@ -1,11 +1,24 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { User, CreditCard, Shield, Bell, Loader2, Check, ExternalLink, AlertCircle, Crown, Zap, Sparkles } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { cn } from "@/lib/utils"
+import {
+  User,
+  CreditCard,
+  Shield,
+  Bell,
+  Loader2,
+  Check,
+  ExternalLink,
+  AlertCircle,
+  Crown,
+  Zap,
+  Sparkles,
+} from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import { buildAuthCallbackUrl } from "@/lib/auth-redirect"
+import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 
 interface Subscription {
   id: string
@@ -34,17 +47,18 @@ interface Props {
 }
 
 const TABS = [
-  { id: "profile",       label: "Profil",        icon: User },
-  { id: "billing",       label: "Facturation",   icon: CreditCard },
-  { id: "security",      label: "Sécurité",      icon: Shield },
+  { id: "profile", label: "Profil", icon: User },
+  { id: "billing", label: "Facturation", icon: CreditCard },
+  { id: "security", label: "Securite", icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
-]
+] as const
+
 type SettingsTab = typeof TABS[number]["id"]
 
 const PLAN_META = {
-  free:    { label: "Free",    icon: Sparkles, color: "text-slate-600",   bg: "bg-secondary",   border: "border-border" },
-  pro:     { label: "Pro",     icon: Zap,      color: "text-blue-600",    bg: "bg-blue-50",     border: "border-blue-200" },
-  premium: { label: "Premium", icon: Crown,    color: "text-amber-600",   bg: "bg-amber-50",    border: "border-amber-200" },
+  free: { label: "Free", icon: Sparkles, color: "text-slate-600", bg: "bg-secondary", border: "border-border" },
+  pro: { label: "Pro", icon: Zap, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
+  premium: { label: "Premium", icon: Crown, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
 } as const
 
 export function SettingsClient({ user, profile, subscription, payments }: Props) {
@@ -59,7 +73,9 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
   const [resetLoading, setResetLoading] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleteInput, setDeleteInput] = useState("")
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
 
   const plan = (profile?.plan ?? "free") as keyof typeof PLAN_META
   const planMeta = PLAN_META[plan] ?? PLAN_META.free
@@ -75,6 +91,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
   const handleSaveProfile = async () => {
     setSaving(true)
     setSaveStatus("idle")
+
     const supabase = createClient()
     const cleanedFullName = fullName.trim()
     const { data, error } = await supabase
@@ -101,30 +118,67 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
   const handleManageSubscription = async () => {
     setPortalLoading(true)
     setPortalError("")
+
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       if (data.url) window.location.href = data.url
     } catch (err) {
-      setPortalError(err instanceof Error ? err.message : "Le portail de facturation est indisponible pour le moment.")
+      setPortalError(
+        err instanceof Error
+          ? err.message
+          : "Le portail de facturation est indisponible pour le moment."
+      )
     } finally {
       setPortalLoading(false)
     }
   }
 
   const handleDeleteAccount = async () => {
+    if (deleteInput.trim().toUpperCase() !== "DELETE") {
+      setDeleteError("Tapez DELETE pour confirmer la suppression definitive.")
+      return
+    }
+
     setDeleting(true)
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = "/login?deleted=true"
+    setDeleteError("")
+
+    try {
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: "DELETE" }),
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "Impossible de supprimer le compte pour le moment."
+        )
+      }
+
+      const supabase = createClient()
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined)
+      window.location.href = "/login?deleted=true"
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "Impossible de supprimer le compte pour le moment."
+      )
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const handleResetPassword = async () => {
     setResetLoading(true)
     const supabase = createClient()
     await supabase.auth.resetPasswordForEmail(user.email ?? "", {
-      redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+      redirectTo: buildAuthCallbackUrl(window.location.origin, "/settings"),
     })
     setResetLoading(false)
     setResetSent(true)
@@ -134,13 +188,18 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
     new Intl.NumberFormat("fr-FR", { style: "currency", currency: currency.toUpperCase() }).format(amount / 100)
 
   const formatDate = (dateStr: string | null) =>
-    dateStr ? new Date(dateStr).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "—"
+    dateStr
+      ? new Date(dateStr).toLocaleDateString("fr-FR", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : "-"
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-foreground mb-8">Paramètres</h1>
+      <h1 className="text-3xl font-bold text-foreground mb-8">Parametres</h1>
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-8 p-1 bg-secondary rounded-xl border border-border w-full sm:w-fit overflow-x-auto">
         {TABS.map((tab) => (
           <button
@@ -160,7 +219,6 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
         ))}
       </div>
 
-      {/* Profile */}
       {activeTab === "profile" && (
         <div className="p-6 rounded-2xl bg-card border border-border space-y-5">
           <h2 className="font-semibold text-lg text-foreground">Informations personnelles</h2>
@@ -183,29 +241,28 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
               disabled
               className="w-full px-4 py-3 bg-secondary border border-border rounded-xl text-muted-foreground text-sm cursor-not-allowed"
             />
-            <p className="text-xs text-muted-foreground mt-1">L&apos;email ne peut pas être modifié.</p>
+            <p className="text-xs text-muted-foreground mt-1">L&apos;email ne peut pas etre modifie.</p>
           </div>
 
-          {saveStatus === "error" && (
+          {saveStatus === "error" ? (
             <div className="flex items-center gap-2 text-red-600 text-sm px-3 py-2 bg-red-50 rounded-xl border border-red-200">
               <AlertCircle className="w-4 h-4" />
-              Erreur lors de la sauvegarde. Réessayez.
+              Erreur lors de la sauvegarde. Reessayez.
             </div>
-          )}
+          ) : null}
 
           <button
             onClick={handleSaveProfile}
             disabled={saving}
             className="flex items-center gap-2 px-6 py-2.5 bg-foreground hover:bg-foreground/90 text-background rounded-xl text-sm font-bold transition-all disabled:opacity-50"
           >
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {saveStatus === "success" && <Check className="w-4 h-4" />}
-            {saveStatus === "success" ? "Sauvegardé !" : saving ? "Sauvegarde…" : "Sauvegarder"}
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {saveStatus === "success" ? <Check className="w-4 h-4" /> : null}
+            {saveStatus === "success" ? "Sauvegarde !" : saving ? "Sauvegarde..." : "Sauvegarder"}
           </button>
         </div>
       )}
 
-      {/* Billing */}
       {activeTab === "billing" && (
         <div className="space-y-4">
           <div className="p-6 rounded-2xl bg-card border border-border">
@@ -220,11 +277,13 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                   {subscription ? (
                     <div className="text-xs text-muted-foreground mt-0.5">
                       {subscription.cancel_at_period_end
-                        ? `Annulé — actif jusqu'au ${formatDate(subscription.current_period_end)}`
+                        ? `Annule - actif jusqu'au ${formatDate(subscription.current_period_end)}`
                         : `Renouvellement le ${formatDate(subscription.current_period_end)}`}
                     </div>
                   ) : (
-                    <div className="text-xs text-muted-foreground mt-0.5">{plan === "free" ? "1 analyse IA par mois" : "Actif"}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {plan === "free" ? "1 analyse IA par mois" : "Actif"}
+                    </div>
                   )}
                 </div>
               </div>
@@ -236,7 +295,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                   className="flex items-center gap-2 px-4 py-2 bg-secondary border border-border text-foreground text-sm rounded-xl hover:bg-secondary/80 transition-all"
                 >
                   {portalLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
-                  Gérer
+                  Gerer
                 </button>
               ) : (
                 <Link
@@ -247,12 +306,12 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                 </Link>
               )}
             </div>
-            {portalError && (
+            {portalError ? (
               <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>{portalError}</p>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="p-6 rounded-2xl bg-card border border-border">
@@ -261,27 +320,34 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
               <p className="text-sm text-muted-foreground text-center py-6">Aucun paiement pour l&apos;instant.</p>
             ) : (
               <div className="space-y-2">
-                {payments.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary border border-border">
+                {payments.map((payment) => (
+                  <div key={payment.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary border border-border">
                     <div>
-                      <div className="text-sm font-semibold text-foreground">{p.description ?? "Paiement"}</div>
-                      <div className="text-xs text-muted-foreground">{formatDate(p.paid_at ?? p.created_at)}</div>
+                      <div className="text-sm font-semibold text-foreground">{payment.description ?? "Paiement"}</div>
+                      <div className="text-xs text-muted-foreground">{formatDate(payment.paid_at ?? payment.created_at)}</div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={cn(
-                        "text-xs px-2 py-0.5 rounded-md font-medium",
-                        p.status === "succeeded"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-red-50 text-red-600 border border-red-200"
-                      )}>
-                        {p.status === "succeeded" ? "Réussi" : "Échoué"}
+                      <span
+                        className={cn(
+                          "text-xs px-2 py-0.5 rounded-md font-medium",
+                          payment.status === "succeeded"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-red-50 text-red-600 border border-red-200"
+                        )}
+                      >
+                        {payment.status === "succeeded" ? "Reussi" : "Echoue"}
                       </span>
-                      <span className="font-bold text-sm text-foreground">{formatAmount(p.amount, p.currency)}</span>
-                      {p.invoice_url && (
-                        <a href={p.invoice_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                      <span className="font-bold text-sm text-foreground">{formatAmount(payment.amount, payment.currency)}</span>
+                      {payment.invoice_url ? (
+                        <a
+                          href={payment.invoice_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                        >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -291,20 +357,19 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
         </div>
       )}
 
-      {/* Security */}
       {activeTab === "security" && (
         <div className="p-6 rounded-2xl bg-card border border-border space-y-4">
-          <h2 className="font-semibold text-lg text-foreground">Sécurité du compte</h2>
+          <h2 className="font-semibold text-lg text-foreground">Securite du compte</h2>
 
           <div className="p-4 rounded-xl bg-secondary border border-border">
             <div className="text-sm font-semibold text-foreground mb-1">Changer de mot de passe</div>
             <p className="text-xs text-muted-foreground mb-3">
-              Un email de réinitialisation sera envoyé à <strong className="text-foreground">{user.email}</strong>
+              Un email de reinitialisation sera envoye a <strong className="text-foreground">{user.email}</strong>
             </p>
             {resetSent ? (
               <div className="flex items-center gap-2 text-emerald-700 text-sm bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
                 <Check className="w-4 h-4" />
-                Email envoyé ! Vérifiez votre boîte mail.
+                Email envoye ! Verifiez votre boite mail.
               </div>
             ) : (
               <button
@@ -312,44 +377,72 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                 disabled={resetLoading}
                 className="flex items-center gap-2 px-4 py-2 bg-card border border-border text-foreground text-sm rounded-xl hover:bg-secondary transition-all font-medium"
               >
-                {resetLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Envoyer le lien de réinitialisation
+                {resetLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Envoyer le lien de reinitialisation
               </button>
             )}
           </div>
 
           <div className="p-4 rounded-xl bg-secondary border border-border">
             <div className="text-sm font-semibold text-foreground mb-1 flex items-center gap-2">
-              Authentification à deux facteurs
-              <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md font-semibold">Bientôt</span>
+              Authentification a deux facteurs
+              <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md font-semibold">
+                Bientot
+              </span>
             </div>
-            <p className="text-xs text-muted-foreground">Sécurisez votre compte avec une application d&apos;authentification.</p>
+            <p className="text-xs text-muted-foreground">Securisez votre compte avec une application d&apos;authentification.</p>
           </div>
 
           <div className="p-4 rounded-xl bg-red-50 border border-red-200">
             <div className="text-sm font-semibold text-red-600 mb-1">Zone de danger</div>
-            <p className="text-xs text-muted-foreground mb-3">La suppression de votre compte est irréversible et supprime toutes vos données.</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              La suppression de votre compte est irreversible. Avec le schema actuel, les donnees reliees a votre profil seront egalement supprimees.
+            </p>
             {!deleteConfirm ? (
               <button
-                onClick={() => setDeleteConfirm(true)}
+                onClick={() => {
+                  setDeleteConfirm(true)
+                  setDeleteInput("")
+                  setDeleteError("")
+                }}
                 className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
               >
                 Supprimer mon compte
               </button>
             ) : (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-red-600">Confirmer la suppression ?</p>
+              <div role="dialog" aria-modal="true" className="space-y-3 rounded-xl border border-red-200 bg-card p-4">
+                <div>
+                  <p className="text-sm font-semibold text-red-600">Cette action supprimera definitivement votre compte.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Tapez DELETE pour confirmer. Vous serez ensuite deconnecte.</p>
+                </div>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={(e) => setDeleteInput(e.target.value)}
+                  placeholder="DELETE"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring"
+                />
+                {deleteError ? (
+                  <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <p>{deleteError}</p>
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleDeleteAccount}
-                    disabled={deleting}
+                    disabled={deleting || deleteInput.trim().toUpperCase() !== "DELETE"}
                     className="flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-60"
                   >
-                    {deleting && <Loader2 className="w-3 h-3 animate-spin" />}
+                    {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                     Oui, supprimer
                   </button>
                   <button
-                    onClick={() => setDeleteConfirm(false)}
+                    onClick={() => {
+                      setDeleteConfirm(false)
+                      setDeleteInput("")
+                      setDeleteError("")
+                    }}
                     className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg border border-border hover:bg-secondary transition-colors"
                   >
                     Annuler
@@ -361,22 +454,23 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
         </div>
       )}
 
-      {/* Notifications */}
       {activeTab === "notifications" && (
         <div className="p-6 rounded-2xl bg-card border border-border space-y-3">
           <div className="flex items-center gap-3">
-            <h2 className="font-semibold text-lg text-foreground">Préférences de notifications</h2>
-            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">Bientôt disponible</span>
+            <h2 className="font-semibold text-lg text-foreground">Preferences de notifications</h2>
+            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
+              Bientot disponible
+            </span>
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Les notifications ne sont pas encore actives. Les réglages ci-dessous sont affichés à titre indicatif et resteront désactivés jusqu’à leur mise en service.
+            Les notifications ne sont pas encore actives. Les reglages ci-dessous sont affiches a titre indicatif et resteront desactives jusqu&apos;a leur mise en service.
           </div>
           {[
-            { label: "Alertes de prix",        desc: "Notifié quand une crypto atteint votre cible",           default: true },
-            { label: "Nouvelles analyses IA",  desc: "Quand l'IA détecte une opportunité de marché",           default: true },
-            { label: "Résumé hebdomadaire",    desc: "Performance de votre portfolio chaque lundi",            default: false },
-            { label: "Actualités importantes", desc: "Régulations, hacks, actualités majeures",               default: true },
-            { label: "Facturation",            desc: "Renouvellement, paiements, factures",                   default: true },
+            { label: "Alertes de prix", desc: "Notifie quand une crypto atteint votre cible", default: true },
+            { label: "Nouvelles analyses IA", desc: "Quand l'IA detecte une opportunite de marche", default: true },
+            { label: "Resume hebdomadaire", desc: "Performance de votre portfolio chaque lundi", default: false },
+            { label: "Actualites importantes", desc: "Regulations, hacks, actualites majeures", default: true },
+            { label: "Facturation", desc: "Renouvellement, paiements, factures", default: true },
           ].map((item) => (
             <label key={item.label} className="flex items-center justify-between p-4 rounded-xl bg-secondary border border-border opacity-75 cursor-not-allowed">
               <div>
@@ -393,7 +487,12 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                   aria-label={`${item.label} indisponible pour le moment`}
                 />
                 <div className={cn("w-10 h-5 rounded-full transition-colors", item.default ? "bg-foreground/70" : "bg-border")} />
-                <div className={cn("absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all", item.default && "translate-x-5")} />
+                <div
+                  className={cn(
+                    "absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all",
+                    item.default && "translate-x-5"
+                  )}
+                />
               </div>
             </label>
           ))}
@@ -401,7 +500,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
       )}
 
       <div className="mt-6 rounded-2xl border border-border bg-card/80 px-4 py-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Légal</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Legal</p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
           <Link
             href="/legal/cgu"
@@ -413,7 +512,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
             href="/legal/privacy"
             className="rounded-lg border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
-            Politique de confidentialité
+            Politique de confidentialite
           </Link>
         </div>
       </div>

@@ -6,6 +6,7 @@ test('login page loads', async ({ page }) => {
   await expect(page.getByLabel('Email')).toBeVisible();
   await expect(page.getByLabel('Mot de passe')).toBeVisible();
   await expect(page.getByRole('button', { name: /se connecter/i })).toBeVisible();
+  await expect(page.getByTestId('resend-confirmation-button')).toBeVisible();
 });
 
 test('register page exposes accessible form labels', async ({ page }) => {
@@ -14,4 +15,5 @@ test('register page exposes accessible form labels', async ({ page }) => {
   await expect(page.getByLabel('Nom complet')).toBeVisible();
   await expect(page.getByLabel('Email')).toBeVisible();
   await expect(page.getByLabel('Mot de passe')).toBeVisible();
+  await expect(page.getByTestId('resend-confirmation-button')).toBeVisible();
 });
