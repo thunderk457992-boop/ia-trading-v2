@@ -18,6 +18,10 @@ function createPublicSupabaseClient() {
   })
 }
 
+function isFatalResendError(message: string) {
+  return /rate limit|too many|invalid email|unable to validate|public auth client is not configured/i.test(message)
+}
+
 export async function POST(request: Request) {
   let email = ""
   let nextPath = "/dashboard"
@@ -49,8 +53,20 @@ export async function POST(request: Request) {
     })
 
     if (error) {
-      const status = /rate limit|too many/i.test(error.message) ? 429 : 400
-      return NextResponse.json({ error: error.message }, { status })
+      if (isFatalResendError(error.message)) {
+        const status = /rate limit|too many/i.test(error.message) ? 429 : 400
+        return NextResponse.json({ error: error.message }, { status })
+      }
+
+      console.warn("[auth] resend confirmation accepted with ambiguous response", {
+        email,
+        message: error.message,
+      })
+
+      return NextResponse.json({
+        sent: true,
+        accepted: true,
+      })
     }
 
     return NextResponse.json({ sent: true })

@@ -21,6 +21,8 @@ function getResendErrorMessage(message: string) {
   return "Impossible de renvoyer l'email de confirmation pour le moment."
 }
 
+const RESEND_SUCCESS_MESSAGE = "Email renvoye. Verifiez votre boite mail et vos spams."
+
 export function ResendConfirmationButton({
   email,
   nextPath = "/dashboard",
@@ -77,7 +79,7 @@ export function ResendConfirmationButton({
         return
       }
 
-      setSuccess("Email renvoye. Verifiez vos spams et l'onglet Promotions.")
+      setSuccess(RESEND_SUCCESS_MESSAGE)
     } catch {
       setError("Impossible de renvoyer l'email de confirmation pour le moment.")
     } finally {

@@ -243,10 +243,12 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
             </div>
             <button
               onClick={handleLogout}
-              className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-              title="Déconnexion"
+              aria-label="Deconnexion"
+              className="shrink-0 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              title="Deconnexion"
             >
               <LogOut className="h-4 w-4" />
+              <span className="text-[12px] font-medium">Deconnexion</span>
             </button>
           </div>
         </div>
@@ -263,8 +265,14 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
           <span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold", planBadge.cls)}>
             {planBadge.label}
           </span>
-          <button onClick={handleLogout} className="p-2 text-muted-foreground transition-colors hover:text-foreground">
+          <button
+            onClick={handleLogout}
+            aria-label="Deconnexion"
+            title="Deconnexion"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
             <LogOut className="h-4 w-4" />
+            <span>Deconnexion</span>
           </button>
         </div>
       </header>

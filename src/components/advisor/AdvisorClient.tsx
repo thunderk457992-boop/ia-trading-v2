@@ -20,7 +20,7 @@ interface Props {
 type RiskLevel = "conservative" | "moderate" | "aggressive"
 type Horizon = "short" | "medium" | "long"
 type Experience = "beginner" | "intermediate" | "expert"
-type BuyStrategy = "lumpsum" | "dca-monthly" | "dca-weekly"
+type BuyStrategy = "" | "lumpsum" | "dca-monthly" | "dca-weekly"
 type LossTolerance = "" | "low" | "medium" | "high"
 type InvestmentFrequency = "" | "once" | "weekly" | "monthly" | "opportunistic"
 
@@ -343,11 +343,29 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
     riskTolerance: "moderate", horizon: "medium",
     capital: "", monthlyIncome: "", monthlyContribution: "", goals: [],
     lossTolerance: "", preciseObjective: "", investmentFrequency: "",
-    excludedCryptos: "", experience: "intermediate", buyStrategy: "lumpsum",
+    excludedCryptos: "", experience: "intermediate", buyStrategy: "",
   })
   const [formStep, setFormStep]             = useState(0)
   const [analysis, setAnalysis]             = useState<Analysis | null>(null)
   const [error, setError]                   = useState("")
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" || typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("advisorStep") !== "strategy") return
+
+    setForm((prev) => ({
+      ...prev,
+      lossTolerance: prev.lossTolerance || "medium",
+      capital: prev.capital || "1000",
+      monthlyIncome: prev.monthlyIncome || "3200",
+      goals: prev.goals.length > 0 ? prev.goals : ["Diversification"],
+      preciseObjective: prev.preciseObjective || "Construire un portefeuille progressif.",
+    }))
+    setFormStep(6)
+    setError("")
+  }, [])
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [loadingStep, setLoadingStep]       = useState(0)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -388,8 +406,8 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
       if (form.goals.length === 0) return "Choisissez au moins un objectif."
       if (!form.preciseObjective.trim()) return "Précisez votre objectif principal."
     }
-    if (formStep === 6 && !form.investmentFrequency) {
-      return "Choisissez votre rythme d'investissement."
+    if (formStep === 6 && (!form.investmentFrequency || !form.buyStrategy)) {
+      return "Choisissez une option dans chaque section pour continuer."
     }
     return ""
   }
@@ -408,7 +426,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
     if (!form.monthlyIncome) { setError("Ajoutez votre revenu mensuel."); setFormStep(3); return }
     if (form.goals.length === 0) { setError("Choisissez au moins un objectif."); setFormStep(4); return }
     if (!form.preciseObjective.trim()) { setError("Précisez votre objectif principal."); setFormStep(4); return }
-    if (!form.investmentFrequency) { setError("Choisissez votre rythme d'investissement."); setFormStep(6); return }
+    if (!form.investmentFrequency || !form.buyStrategy) { setError("Choisissez une option dans chaque section pour continuer."); setFormStep(6); return }
     setError(""); setStep("loading")
     try {
       const res  = await fetch("/api/advisor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, userId }) })
@@ -424,7 +442,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
 
   // Loading
   if (step === "loading") {
-    const maxDur  = plan === "premium" ? 30 : plan === "pro" ? 20 : 12
+    const maxDur  = plan === "premium" ? 75 : plan === "pro" ? 70 : 60
     const progress = Math.min(95, Math.round((elapsedSeconds / maxDur) * 100))
     return (
       <div className="flex items-center justify-center min-h-[65vh] px-4">
@@ -438,6 +456,9 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           <h2 className="text-2xl font-black text-foreground mb-1">Analyse en cours</h2>
           <p className="text-muted-foreground text-sm mb-8">
             {plan === "premium" ? "Claude Opus · analyse approfondie" : plan === "pro" ? "Claude Sonnet · analyse détaillée" : "Claude Haiku · analyse de base"}
+          </p>
+          <p className="text-[13px] text-muted-foreground mb-6">
+            Analyse en cours - cela peut prendre jusqu&apos;a 60 a 90 secondes selon la charge.
           </p>
           <div className="w-full bg-secondary rounded-full h-1 mb-6 overflow-hidden">
             <div className="h-1 rounded-full bg-foreground transition-all duration-1000" style={{ width: `${progress}%` }} />
@@ -474,7 +495,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           <h1 className="text-3xl font-black text-foreground tracking-tight mb-1">Conseiller IA</h1>
           <p className="text-muted-foreground text-sm">
             {plan === "premium" ? "Claude Opus · stratégie institutionnelle" : plan === "pro" ? "Claude Sonnet · analyse détaillée" : "Claude Haiku · analyse de base"}
-            {" · "}~{plan === "premium" ? "25" : plan === "pro" ? "15" : "8"} secondes
+            {" · "}analyse complete en environ 1 minute
           </p>
         </div>
 
@@ -663,7 +684,16 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
 
           {formStep === 6 && (
           <FormSection number={7} title="Stratégie d'achat">
-            <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="mb-4 rounded-xl border border-border bg-secondary/30 px-4 py-3">
+              <p className="text-xs font-semibold text-foreground">Choisissez une option dans chaque section pour continuer.</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Le rythme d&apos;investissement et le mode d&apos;execution servent a construire un plan d&apos;achat realiste.
+              </p>
+            </div>
+            <div className="mb-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">1. Rythme d&apos;investissement</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-4">
               {INVESTMENT_FREQUENCY_OPTIONS.map((opt) => (
                 <button key={opt.value} onClick={() => setForm((p) => ({ ...p, investmentFrequency: opt.value }))}
                   className={cn("p-3 rounded-lg border text-left transition-all", form.investmentFrequency === opt.value ? selBtn : defBtn)}>
@@ -671,6 +701,9 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
                   <div className={cn("text-xs mt-0.5", form.investmentFrequency === opt.value ? "text-foreground/60" : "text-muted-foreground")}>{opt.desc}</div>
                 </button>
               ))}
+            </div>
+            <div className="mb-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">2. Mode d&apos;execution</p>
             </div>
             <div className="grid grid-cols-3 gap-2">
               {BUY_STRATEGY_OPTIONS.map((opt) => (
@@ -710,7 +743,8 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
             </button>
             {formStep < lastFormStep ? (
               <button onClick={goNext}
-                className="w-full py-4 bg-foreground hover:bg-foreground/90 text-background font-black rounded-2xl transition-all flex items-center justify-center gap-2.5 text-base">
+                disabled={formStep === 6 && (!form.investmentFrequency || !form.buyStrategy)}
+                className="w-full py-4 bg-foreground hover:bg-foreground/90 disabled:opacity-60 disabled:cursor-not-allowed text-background font-black rounded-2xl transition-all flex items-center justify-center gap-2.5 text-base">
                 Continuer
                 <ArrowRight className="w-4 h-4" />
               </button>

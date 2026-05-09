@@ -5,7 +5,7 @@ test("register page lets the user resend a confirmation email", async ({ page })
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ sent: true }),
+      body: JSON.stringify({ sent: true, accepted: true }),
     })
   })
 
@@ -16,7 +16,8 @@ test("register page lets the user resend a confirmation email", async ({ page })
   await page.getByTestId("resend-confirmation-button").click()
   await resendResponse
 
-  await expect(page.getByTestId("resend-confirmation-success")).toContainText(/spams|promotions/i)
+  await expect(page.getByTestId("resend-confirmation-success")).toContainText(/boite mail/i)
+  await expect(page.getByTestId("resend-confirmation-success")).toContainText(/spams/i)
 })
 
 test("login page shows a clear error if no email is provided for confirmation resend", async ({ page }) => {

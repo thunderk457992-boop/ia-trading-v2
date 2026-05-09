@@ -2,10 +2,15 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { PricingClient } from "@/components/PricingClient"
 
-export default async function PricingPage() {
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cancelled?: string; success?: string; plan?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login?next=/pricing")
+  const params = await searchParams
 
   const [{ data: profile }, { data: subscription }] = await Promise.all([
     supabase
@@ -35,6 +40,9 @@ export default async function PricingPage() {
       currentPlan={currentPlan}
       hasSubscription={canManageBilling}
       canManageBilling={canManageBilling}
+      showCancelledNotice={params.cancelled === "true"}
+      showSuccessNotice={params.success === "true"}
+      successPlan={typeof params.plan === "string" ? params.plan : null}
     />
   )
 }

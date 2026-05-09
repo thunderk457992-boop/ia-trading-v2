@@ -22,6 +22,9 @@ interface PricingClientProps {
   currentPlan: string
   hasSubscription: boolean
   canManageBilling: boolean
+  showCancelledNotice?: boolean
+  showSuccessNotice?: boolean
+  successPlan?: string | null
 }
 
 interface Plan {
@@ -156,7 +159,14 @@ const MAX_YEARLY_DISCOUNT = Math.max(
   ...PLANS.map((plan) => getYearlyDiscount(plan))
 )
 
-export function PricingClient({ currentPlan, hasSubscription, canManageBilling }: PricingClientProps) {
+export function PricingClient({
+  currentPlan,
+  hasSubscription,
+  canManageBilling,
+  showCancelledNotice = false,
+  showSuccessNotice = false,
+  successPlan = null,
+}: PricingClientProps) {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly")
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
   const [priceIds, setPriceIds] = useState<Record<string, Record<string, string | null>>>({})
@@ -414,6 +424,22 @@ export function PricingClient({ currentPlan, hasSubscription, canManageBilling }
         <div className="mx-auto mb-8 flex max-w-lg items-center gap-2 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card-xs">
           <AlertCircle className="h-4 w-4 shrink-0" />
           Le paiement est indisponible pour le moment. Réessayez plus tard ou contactez-nous.
+        </div>
+      )}
+
+      {showCancelledNotice && (
+        <div data-testid="pricing-cancelled-banner" className="mx-auto mb-8 flex max-w-lg items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-card-xs">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>Paiement annule. Aucun montant n&apos;a ete debite.</span>
+        </div>
+      )}
+
+      {showSuccessNotice && (
+        <div data-testid="pricing-success-banner" className="mx-auto mb-8 flex max-w-lg items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 shadow-card-xs">
+          <CreditCard className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Paiement confirme{successPlan ? ` pour le plan ${successPlan}` : ""}. Votre abonnement sera synchronise dans quelques instants.
+          </span>
         </div>
       )}
 

@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, Check, Crown, MessageSquare, Sparkles, Zap } from "lucide-react"
 import { AxiomGlyph, AxiomLogo } from "@/components/branding/AxiomLogo"
+import { createClient } from "@/lib/supabase/client"
 
 const EXAMPLE_ALLOCATION = [
   { asset: "BTC", pct: 40, label: "Bitcoin" },
@@ -81,6 +82,40 @@ const HOME_MAX_DISCOUNT = Math.max(
 
 export default function HomePage() {
   const [pricingBilling, setPricingBilling] = useState<"monthly" | "yearly">("monthly")
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    const syncUserState = async () => {
+      const { data } = await supabase.auth.getUser()
+      setIsAuthenticated(Boolean(data.user))
+    }
+
+    void syncUserState()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(Boolean(session?.user))
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const navPrimaryHref = isAuthenticated ? "/dashboard" : "/login"
+  const navPrimaryLabel = isAuthenticated ? "Dashboard" : "Connexion"
+  const navSecondaryHref = isAuthenticated ? "/dashboard" : "/register"
+  const navSecondaryLabel = isAuthenticated ? "Ouvrir mon dashboard" : "Tester gratuitement"
+  const heroPrimaryHref = isAuthenticated ? "/dashboard" : "/register"
+  const heroPrimaryLabel = isAuthenticated ? "Ouvrir mon dashboard" : "Tester gratuitement"
+  const heroSecondaryHref = isAuthenticated ? "/advisor" : "#how"
+  const heroSecondaryLabel = isAuthenticated ? "Nouvelle analyse" : "Voir un exemple"
+  const marketingPlanHref = isAuthenticated ? "/pricing" : "/register"
+  const bottomCtaHref = isAuthenticated ? "/dashboard" : "/register"
+  const bottomCtaLabel = isAuthenticated ? "Ouvrir mon dashboard" : "Creer un compte gratuit"
 
   return (
     <div className="min-h-screen overflow-hidden bg-background">
@@ -90,13 +125,13 @@ export default function HomePage() {
           <div className="hidden items-center gap-8 md:flex">
             <Link href="#how" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Fonctionnement</Link>
             <Link href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Tarifs</Link>
-            <Link href="/login" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Connexion</Link>
-            <Link href="/register" className="rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-foreground/92">
-              Tester gratuitement
+            <Link href={navPrimaryHref} data-testid="home-nav-primary" className="text-sm text-muted-foreground transition-colors hover:text-foreground">{navPrimaryLabel}</Link>
+            <Link href={navSecondaryHref} data-testid="home-nav-secondary" className="rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-foreground/92">
+              {navSecondaryLabel}
             </Link>
           </div>
-          <Link href="/register" className="rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background md:hidden">
-            Tester
+          <Link href={navSecondaryHref} data-testid="home-mobile-primary" className="rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background md:hidden">
+            {isAuthenticated ? "Dashboard" : "Tester"}
           </Link>
         </div>
       </nav>
@@ -105,7 +140,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-4xl text-center">
           <div className="mb-8 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-card-xs sm:mb-10">
             <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
-            Propulsé par Claude AI - Analyses en 30 secondes
+            Propulsé par Claude AI - Analyse complète en environ 1 minute
           </div>
 
           <h1 className="mb-4 font-bold leading-[1.02] tracking-tighter text-foreground">
@@ -118,17 +153,17 @@ export default function HomePage() {
           </p>
 
           <div className="mb-12 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/register" className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-8 py-4 text-base font-semibold text-background transition-colors hover:bg-foreground/92 sm:w-auto">
-              Tester gratuitement
+            <Link href={heroPrimaryHref} data-testid="home-hero-primary" className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-8 py-4 text-base font-semibold text-background transition-colors hover:bg-foreground/92 sm:w-auto">
+              {heroPrimaryLabel}
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href="#how" className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-secondary px-8 py-4 text-base font-semibold text-foreground transition-colors hover:bg-secondary/80 sm:w-auto">
-              Voir un exemple
+            <Link href={heroSecondaryHref} data-testid="home-hero-secondary" className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-secondary px-8 py-4 text-base font-semibold text-foreground transition-colors hover:bg-secondary/80 sm:w-auto">
+              {heroSecondaryLabel}
             </Link>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-muted-foreground sm:gap-6">
-            {["Sans carte de crédit", "30 secondes chrono", "Chat IA intégré"].map((item) => (
+            {["Sans carte de crédit", "Environ 1 minute", "Chat IA intégré"].map((item) => (
               <div key={item} className="flex items-center gap-1.5">
                 <Check className="h-3.5 w-3.5 text-emerald-500" />
                 {item}
@@ -145,7 +180,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-5xl">
           <div className="mb-12 text-center sm:mb-16">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Fonctionnement</p>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">3 étapes, 30 secondes</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">3 étapes, environ 1 minute</h2>
           </div>
 
           <div className="mb-14 grid gap-8 md:mb-20 md:grid-cols-3 md:gap-10">
@@ -337,14 +372,14 @@ export default function HomePage() {
                     ))}
                   </ul>
                   <Link
-                    href={plan.href}
+                    href={marketingPlanHref}
                     className={`block rounded-2xl py-3 text-center text-sm font-semibold transition-colors ${
                       plan.highlighted
                         ? "bg-foreground text-background hover:bg-foreground/92"
                         : "border border-border bg-secondary text-foreground hover:bg-secondary/80"
                     }`}
                   >
-                    {plan.cta}
+                    {isAuthenticated ? "Voir les plans" : plan.cta}
                   </Link>
                 </div>
               )
@@ -361,26 +396,26 @@ export default function HomePage() {
         <div className="mx-auto max-w-2xl text-center">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-card-xs">
             <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-            1 analyse gratuite dès l’inscription
+            1 analyse gratuite dès l&apos;inscription
           </div>
           <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Votre premier plan crypto IA
             <br />
-            en 30 secondes.
+            en environ 1 minute.
           </h2>
           <p className="mb-10 text-lg text-muted-foreground">
             Créez un compte gratuit. Aucune carte requise.
           </p>
-          <Link href="/register" className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-8 py-4 font-semibold text-background transition-colors hover:bg-foreground/92 sm:w-auto">
-            Tester gratuitement
+          <Link href={heroPrimaryHref} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-8 py-4 font-semibold text-background transition-colors hover:bg-foreground/92 sm:w-auto">
+            {heroPrimaryLabel}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </section>
 
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background px-4 py-3 shadow-[0_-10px_30px_rgba(17,24,39,0.08)] md:hidden safe-area-bottom">
-        <Link href="/register" className="flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground py-3.5 font-semibold text-background transition-colors hover:bg-foreground/92">
-          Créer un compte gratuit
+        <Link href={bottomCtaHref} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground py-3.5 font-semibold text-background transition-colors hover:bg-foreground/92">
+          {bottomCtaLabel}
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>

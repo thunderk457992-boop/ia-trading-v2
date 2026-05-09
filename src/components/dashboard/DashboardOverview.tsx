@@ -466,9 +466,6 @@ function PortfolioLineChart({
     ? fullSnapshotSeries[fullSnapshotSeries.length - 1].timestamp - fullSnapshotSeries[0].timestamp
     : 0
   const selectedWindowMs = tf === "1D" ? ONE_DAY_RECENT_WINDOW_MS : TIMEFRAME_WINDOWS_MS[tf]
-  const selectedHistoryCoverageMs = selectedSnapshotData.length > 1
-    ? selectedSnapshotData[selectedSnapshotData.length - 1].timestamp - selectedSnapshotData[0].timestamp
-    : 0
   const selectedUsesFullHistory = selectedSnapshotData.length > 0 && selectedSnapshotData.length === fullSnapshotSeries.length
   const shortHistoryNotice = useSnapshotHistory && selectedSnapshotData.length > 1 && (
     (selectedWindowMs !== undefined && selectedUsesFullHistory && totalHistorySpanMs < selectedWindowMs)
@@ -552,50 +549,6 @@ function PortfolioLineChart({
     : missingHistoryData
     ? unavailableReason || TIMEFRAME_SHORT_HISTORY_MESSAGE
     : unavailableReason || "Période indisponible"
-
-  useEffect(() => {
-    const firstPoint = selectedSnapshotData[0] ?? null
-    const lastPoint = selectedSnapshotData[selectedSnapshotData.length - 1] ?? null
-    const payload = {
-      timeframe: tf,
-      source: useSnapshotHistory ? "portfolio_history" : "none",
-      pointCount: selectedSnapshotData.length,
-      firstValue: firstPoint?.portfolioValue ?? null,
-      lastValue: lastPoint?.portfolioValue ?? null,
-      performancePercent: selectedChange,
-      valueChange: selectedValueChange,
-      coverageMs: selectedHistoryCoverageMs,
-      available: selectedTimeframeAvailable,
-    }
-
-    console.info("[dashboard] selectedTimeframe", {
-      timeframe: tf,
-      source: useSnapshotHistory ? "portfolio_history" : "none",
-      available: selectedTimeframeAvailable,
-    })
-    console.info("[dashboard] filteredPortfolioPoints", {
-      timeframe: tf,
-      source: useSnapshotHistory ? "portfolio_history" : "none",
-      pointCount: selectedSnapshotData.length,
-      firstValue: firstPoint?.portfolioValue ?? null,
-      lastValue: lastPoint?.portfolioValue ?? null,
-      performancePercent: selectedChange,
-      valueChange: selectedValueChange,
-      coverageMs: selectedHistoryCoverageMs,
-    })
-    console.info("[dashboard] chartSeries", {
-      timeframe: tf,
-      source: useSnapshotHistory ? "portfolio_history" : "none",
-      pointCount: mergedData.length,
-      sample: mergedData.slice(0, 3).map((point) => ({
-        name: formatTimeframeLabel(tf, point.timestamp),
-        portfolio: point.portfolio,
-        performance: point.performance,
-        portfolioValue: point.portfolioValue,
-      })),
-    })
-    console.info("[dashboard] portfolio timeframe debug", payload)
-  }, [mergedData, selectedChange, selectedHistoryCoverageMs, selectedSnapshotData, selectedTimeframeAvailable, selectedValueChange, tf, useSnapshotHistory])
 
   return (
     <div className="rounded-xl border border-border bg-card" data-testid="portfolio-performance-card">
@@ -938,7 +891,15 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
   }
 
   const displayed = useMemo(() => {
-    let data = cryptoPrices.map((c, i) => ({ ...c, rank: i + 1 }))
+    let data = cryptoPrices
+      .filter((c) =>
+        Number.isFinite(c.price)
+        && c.price > 0
+        && Number.isFinite(c.marketCap)
+        && c.marketCap > 0
+        && Number.isFinite(c.change24h)
+      )
+      .map((c, i) => ({ ...c, rank: i + 1 }))
 
     if (search) data = data.filter(c =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
