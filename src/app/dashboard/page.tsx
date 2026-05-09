@@ -132,6 +132,29 @@ function getAdmin() {
   )
 }
 
+function isMissingStripeCustomerError(error: unknown) {
+  return error instanceof Error && /No such customer/i.test(error.message)
+}
+
+async function clearStoredStripeCustomer(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  userId: string
+) {
+  const { error } = await db
+    .from("profiles")
+    .update({
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+
+  if (error) {
+    console.error("[sync] failed to clear stale stripe customer:", error)
+  }
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -249,8 +272,9 @@ export default async function DashboardPage({
 
 // ── Sync active Stripe subscription into Supabase via service role ────────────
 async function syncStripeSubscription(userId: string, fallbackPlan?: string): Promise<string> {
+  const db = getAdmin()
+
   try {
-    const db = getAdmin()
 
     // Get stripe_customer_id — use service role to bypass RLS
     const { data: profile } = await db
@@ -337,6 +361,20 @@ async function syncStripeSubscription(userId: string, fallbackPlan?: string): Pr
 
     return plan
   } catch (err) {
+    if (isMissingStripeCustomerError(err)) {
+      console.warn(`[sync] stale stripe customer detected for user ${userId}`)
+      await clearStoredStripeCustomer(db, userId)
+
+      if (fallbackPlan && fallbackPlan !== "free") {
+        const { error } = await db
+          .from("profiles")
+          .upsert({ id: userId, plan: fallbackPlan, updated_at: new Date().toISOString() }, { onConflict: "id" })
+        if (error) console.error("[sync] profile upsert error after stale customer clear:", error)
+      }
+
+      return fallbackPlan ?? "free"
+    }
+
     console.error("[sync] unexpected error:", err)
     return fallbackPlan ?? "free"
   }

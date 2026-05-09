@@ -76,6 +76,10 @@ export function hasSupabaseAdminEnv() {
   )
 }
 
+export function hasStripeServerEnv() {
+  return Boolean(getEnv("STRIPE_SECRET_KEY"))
+}
+
 function getSupabaseUrl() {
   return requireEnv("NEXT_PUBLIC_SUPABASE_URL")
 }

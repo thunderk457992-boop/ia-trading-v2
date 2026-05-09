@@ -5,6 +5,7 @@ import {
   createTempUser,
   cleanupTempUser,
   hasSupabaseAdminEnv,
+  hasStripeServerEnv,
 } from "./helpers/test-supabase"
 
 // ── API-level tests (no auth required) ───────────────────────────────────────
@@ -132,6 +133,82 @@ test.describe("stripe sync with no subscription", () => {
 })
 
 // ── Checkout opens for authenticated user ─────────────────────────────────────
+
+test.describe("stripe stale customer recovery", () => {
+  test.skip(!hasSupabaseAdminEnv() || !hasStripeServerEnv(), "requires Supabase admin env and Stripe server env")
+
+  test("sync clears an invalid stored customer instead of crashing", async ({ page }) => {
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "stripe-sync-stale")
+
+    await admin
+      .from("profiles")
+      .update({
+        stripe_customer_id: "cus_stale_test_mode_customer",
+        stripe_subscription_id: "sub_stale_test_mode_subscription",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id)
+
+    try {
+      await authenticatePage(page, user)
+
+      const res = await page.context().request.post("http://localhost:3000/api/stripe/sync")
+      expect(res.status()).toBe(200)
+
+      const body = await res.json()
+      expect(body.synced).toBe(false)
+      expect(body.reason).toBe("invalid_customer")
+      expect(body.plan).toBe("free")
+
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("stripe_customer_id, stripe_subscription_id")
+        .eq("id", user.id)
+        .single()
+
+      expect(profile?.stripe_customer_id).toBeNull()
+      expect(profile?.stripe_subscription_id).toBeNull()
+    } finally {
+      await cleanupTempUser(admin, user.id)
+    }
+  })
+
+  test("portal refuses cleanly and clears an invalid stored customer", async ({ page }) => {
+    const admin = createAdminClient()
+    const user = await createTempUser(admin, "stripe-portal-stale")
+
+    await admin
+      .from("profiles")
+      .update({
+        stripe_customer_id: "cus_stale_test_mode_customer",
+        stripe_subscription_id: "sub_stale_test_mode_subscription",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id)
+
+    try {
+      await authenticatePage(page, user)
+
+      const res = await page.context().request.post("http://localhost:3000/api/stripe/portal")
+      expect(res.status()).toBe(400)
+
+      const body = await res.json()
+      expect(body.error).toMatch(/customer stripe live valide/i)
+
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("stripe_customer_id, stripe_subscription_id")
+        .eq("id", user.id)
+        .single()
+
+      expect(profile?.stripe_customer_id).toBeNull()
+      expect(profile?.stripe_subscription_id).toBeNull()
+    } finally {
+      await cleanupTempUser(admin, user.id)
+    }
+  })
+})
 
 test.describe("stripe checkout for authenticated user", () => {
   test.skip(!hasSupabaseAdminEnv(), "requires Supabase admin env")
