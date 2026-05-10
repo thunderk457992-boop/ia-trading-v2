@@ -1,7 +1,17 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { AxiomLogo } from "@/components/branding/AxiomLogo"
 import { createClient } from "@/lib/supabase/server"
 import { HomeLink } from "@/components/legal/HomeLink"
+import { buildPageMetadata } from "@/lib/seo"
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Axiom AI Privacy Policy",
+  description:
+    "Review how Axiom AI processes account data, portfolio inputs, subscriptions, and technical logs in its privacy policy.",
+  path: "/legal/privacy",
+  keywords: ["Axiom AI privacy", "crypto app privacy policy", "Axiom AI data policy"],
+})
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

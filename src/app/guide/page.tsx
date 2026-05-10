@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import {
   AlertTriangle,
@@ -9,6 +10,15 @@ import {
   Target,
 } from "lucide-react"
 import { AxiomLogo } from "@/components/branding/AxiomLogo"
+import { buildPageMetadata } from "@/lib/seo"
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Guide utilisateur Axiom AI",
+  description:
+    "Learn how Axiom AI structures crypto portfolio decisions, risk levels, and follow-up actions for clearer investing workflows.",
+  path: "/guide",
+  keywords: ["axiom ai guide", "crypto portfolio guide", "ai crypto advisor workflow"],
+})
 
 type GuideSection =
   | {
