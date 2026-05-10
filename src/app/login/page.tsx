@@ -23,8 +23,9 @@ function LoginForm() {
   const nextPath = searchParams.get("next") || "/dashboard"
 
   useEffect(() => {
-    if (searchParams.get("error") === "auth_error") {
-      setError("Le lien de confirmation est invalide ou a expire. Reessayez.")
+    const errorParam = searchParams.get("error")
+    if (errorParam === "link_expired" || errorParam === "auth_error") {
+      setError("Lien expire ou deja utilise. Demandez un nouveau lien de confirmation.")
     }
     if (searchParams.get("deleted") === "true") {
       setInfo("Votre compte a ete supprime definitivement.")
