@@ -25,13 +25,13 @@ function LoginForm() {
   useEffect(() => {
     const errorParam = searchParams.get("error")
     if (errorParam === "link_expired" || errorParam === "auth_error") {
-      setError("Lien expire ou deja utilise. Demandez un nouveau lien de confirmation.")
+      setError("Lien expiré ou déjà utilisé. Demandez un nouveau lien de confirmation.")
     }
     if (searchParams.get("deleted") === "true") {
-      setInfo("Votre compte a ete supprime definitivement.")
+      setInfo("Votre compte a été supprimé définitivement.")
     }
     if (searchParams.get("reason") === "auth_required") {
-      setInfo("Connectez-vous pour acceder a cette page.")
+      setInfo("Connectez-vous pour accéder à cette page.")
     }
   }, [searchParams])
 
@@ -50,7 +50,7 @@ function LoginForm() {
       })
       setResetSent(true)
     } catch {
-      setError("La reinitialisation est indisponible pour le moment. Reessayez un peu plus tard.")
+      setError("La réinitialisation est indisponible pour le moment. Réessayez un peu plus tard.")
     } finally {
       setResetLoading(false)
     }
@@ -70,7 +70,7 @@ function LoginForm() {
           : signInError.message.includes("Email not confirmed")
           ? "Confirmez votre email avant de vous connecter."
           : signInError.message.includes("Too many requests")
-          ? "Trop de tentatives. Reessayez dans quelques minutes."
+          ? "Trop de tentatives. Réessayez dans quelques minutes."
           : signInError.message
         setError(message)
         return
@@ -79,7 +79,7 @@ function LoginForm() {
       router.push(nextPath)
       router.refresh()
     } catch {
-      setError("La connexion est temporairement indisponible. Verifiez la configuration Supabase ou reessayez.")
+      setError("La connexion est temporairement indisponible. Réessayez dans quelques instants.")
     } finally {
       setLoading(false)
     }
@@ -155,7 +155,7 @@ function LoginForm() {
       {resetSent ? (
         <div className="flex items-center gap-2 text-emerald-700 text-xs bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
           <Check className="w-3.5 h-3.5 shrink-0" />
-          Email envoye ! Verifiez votre boite mail.
+          Email envoyé ! Vérifiez votre boite mail.
         </div>
       ) : (
         <button
@@ -164,14 +164,14 @@ function LoginForm() {
           disabled={resetLoading}
           className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
         >
-          {resetLoading ? "Envoi..." : "Mot de passe oublie ?"}
+          {resetLoading ? "Envoi..." : "Mot de passe oublié ?"}
         </button>
       )}
 
       <ResendConfirmationButton email={email} nextPath={nextPath} className="pt-1" />
 
       <p className="text-center text-xs text-muted-foreground">
-        Si vous attendez l&apos;email de confirmation, pensez a verifier vos spams.
+        Si vous attendez l&apos;email de confirmation, pensez à vérifier vos spams.
       </p>
     </form>
   )
@@ -186,7 +186,7 @@ export default function LoginPage() {
             <AxiomLogo />
           </Link>
           <h1 className="text-2xl font-bold text-foreground mb-1.5">Bon retour</h1>
-          <p className="text-muted-foreground text-sm">Connectez-vous a votre compte</p>
+          <p className="text-muted-foreground text-sm">Connectez-vous à votre compte</p>
         </div>
 
         <div className="bg-card rounded-2xl border border-border p-5 sm:p-6">
@@ -205,7 +205,7 @@ export default function LoginPage() {
           <div className="mt-6 pt-5 border-t border-border text-center text-sm text-muted-foreground">
             Pas encore de compte ?{" "}
             <Link href="/register" className="text-foreground font-semibold underline underline-offset-4 hover:opacity-75 transition-opacity">
-              Creer un compte
+              Créer un compte
             </Link>
           </div>
         </div>

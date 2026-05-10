@@ -1040,7 +1040,7 @@ export async function POST(request: Request) {
           { status: 500 }
         )
       } else {
-        console.log("[advisor] portfolio_history inserted", {
+        console.info("[advisor] portfolio_history inserted", {
           userId: user.id,
           analysisId: savedAnalysis.id,
           mode: computedPortfolioSnapshot.mode,
