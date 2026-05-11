@@ -1,23 +1,25 @@
 import { HomePageClient } from "@/components/home/HomePageClient"
 import {
   DEFAULT_SEO_DESCRIPTION,
-  DEFAULT_SEO_TITLE,
   SITE_NAME,
   SITE_URL,
   buildPageMetadata,
 } from "@/lib/seo"
 
 export const metadata = buildPageMetadata({
-  title: DEFAULT_SEO_TITLE,
-  description: DEFAULT_SEO_DESCRIPTION,
+  title: "Axiom AI - Strategie crypto personnalisee et gestion du risque",
+  description:
+    "Build a personalized crypto portfolio strategy with AI, live market context, risk guidance, and a clear action plan you can follow.",
   path: "/",
   keywords: [
     "ai crypto advisor",
     "crypto portfolio strategy",
+    "personalized crypto strategy",
     "crypto allocation tool",
     "bitcoin portfolio assistant",
     "crypto risk management",
     "crypto dca strategy",
+    "crypto portfolio beginner",
   ],
 })
 
@@ -67,7 +69,7 @@ const homeStructuredData = {
       name: SITE_NAME,
       url: SITE_URL,
       description:
-        "Educational AI-guided crypto portfolio planning for beginners and active investors.",
+        "Educational AI-guided crypto portfolio planning with risk guidance, diversification logic, and structured follow-up for beginners and active investors.",
       areaServed: "Worldwide",
       serviceType: "Crypto portfolio education and allocation guidance",
       provider: {

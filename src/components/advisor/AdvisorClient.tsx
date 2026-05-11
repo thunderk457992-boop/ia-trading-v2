@@ -69,9 +69,9 @@ const VERDICT_CONFIG = {
 } as const
 
 const EXPERIENCE_OPTIONS = [
-  { value: "beginner" as const,     label: "Débutant",      desc: "< 1 an" },
-  { value: "intermediate" as const, label: "Intermédiaire", desc: "1 à 3 ans" },
-  { value: "expert" as const,       label: "Expert",        desc: "> 3 ans" },
+  { value: "beginner" as const,     label: "Debutant",      desc: "Explications simples, vocabulaire guide" },
+  { value: "intermediate" as const, label: "Intermediaire", desc: "Bon equilibre entre pedagogie et details" },
+  { value: "expert" as const,       label: "Avance",        desc: "Lecture plus dense, plus directe, plus technique" },
 ]
 
 const BUY_STRATEGY_OPTIONS = [
@@ -159,6 +159,17 @@ const PLAN_ACCESS: Record<string, { label: string; included: string[]; locked: s
     locked: [],
   },
 }
+
+const FORM_STEP_GUIDANCE = [
+  "Le niveau de risque sert a calibrer la part du portefeuille exposee aux actifs les plus volatils.",
+  "Cette question evite de proposer une allocation que vous abandonneriez a la premiere correction serieuse.",
+  "L'horizon influence le poids des actifs coeur, la patience necessaire et le rythme de reequilibrage.",
+  "Le budget et les apports servent a distinguer le capital deja engage de ce que vous ajouterez ensuite.",
+  "Les objectifs clarifient si vous cherchez croissance, diversification, discipline ou preservation du capital.",
+  "Le mode Debutant, Intermediaire ou Avance adapte le niveau de detail et le vocabulaire de l'analyse.",
+  "Le rythme d'investissement et le mode d'execution servent a construire un plan d'achat realiste.",
+  "Les exclusions servent a retirer les actifs que vous ne voulez pas voir apparaitre dans l'allocation.",
+] as const
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeAnalysis(raw: any): Analysis {
@@ -384,8 +395,8 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
     "Horizon",
     "Capital",
     "Objectif",
-    "Experience",
-    "Rythme",
+    "Mode",
+    "Execution",
     "Exclusions",
   ]
   const lastFormStep = formSteps.length - 1
@@ -480,7 +491,14 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
 
   // Result
   if (step === "result" && analysis) {
-    return <AnalysisResult analysis={analysis} plan={plan} onNew={() => { setStep("form"); setAnalysis(null) }} />
+    return (
+      <AnalysisResult
+        analysis={analysis}
+        plan={plan}
+        experience={form.experience}
+        onNew={() => { setStep("form"); setAnalysis(null) }}
+      />
+    )
   }
 
   // Form
@@ -570,8 +588,28 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
               />
             </div>
           </div>
+          <div className="rounded-2xl border border-border bg-card/80 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Ce que l&apos;IA calibre ici
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  {FORM_STEP_GUIDANCE[formStep]}
+                </p>
+              </div>
+              <div className="rounded-full border border-border bg-secondary px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                Mode {EXPERIENCE_OPTIONS.find((option) => option.value === form.experience)?.label ?? "Intermediaire"}
+              </div>
+            </div>
+          </div>
           {formStep === 0 && (
-          <FormSection number={1} title="Tolérance au risque" icon={<Shield className="w-3.5 h-3.5 text-muted-foreground" />}>
+          <FormSection
+            number={1}
+            title="Tolérance au risque"
+            icon={<Shield className="w-3.5 h-3.5 text-muted-foreground" />}
+            helper="On cherche le niveau d'exposition que vous pouvez tenir sans paniquer au premier mouvement brutal."
+          >
             <div className="grid grid-cols-3 gap-2">
               {RISK_OPTIONS.map((opt) => (
                 <button key={opt.value} onClick={() => setForm((p) => ({ ...p, riskTolerance: opt.value }))}
@@ -585,7 +623,12 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           )}
 
           {formStep === 1 && (
-          <FormSection number={2} title="Tolérance à la perte" icon={<Shield className="w-3.5 h-3.5 text-muted-foreground" />}>
+          <FormSection
+            number={2}
+            title="Tolérance à la perte"
+            icon={<Shield className="w-3.5 h-3.5 text-muted-foreground" />}
+            helper="Cette limite sert a eviter une strategie impossible a suivre quand le marche corrige."
+          >
             <div className="grid grid-cols-3 gap-2">
               {LOSS_TOLERANCE_OPTIONS.map((opt) => (
                 <button key={opt.value} onClick={() => setForm((p) => ({ ...p, lossTolerance: opt.value }))}
@@ -599,7 +642,12 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           )}
 
           {formStep === 2 && (
-          <FormSection number={3} title="Horizon d'investissement" icon={<TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />}>
+          <FormSection
+            number={3}
+            title="Horizon d'investissement"
+            icon={<TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />}
+            helper="Plus l'horizon est long, plus on peut accepter des actifs volatils et des points d'entree etales."
+          >
             <div className="grid grid-cols-3 gap-2">
               {HORIZON_OPTIONS.map((opt) => (
                 <button key={opt.value} onClick={() => setForm((p) => ({ ...p, horizon: opt.value }))}
@@ -613,7 +661,11 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           )}
 
           {formStep === 3 && (
-          <FormSection number={4} title="Capital">
+          <FormSection
+            number={4}
+            title="Capital"
+            helper="Le capital actuel et vos apports futurs servent a separer ce qui est deja investi de ce qui sera deploye progressivement."
+          >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1.5">Capital initial (€) <span className="text-red-500">*</span></label>
@@ -641,7 +693,12 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           )}
 
           {formStep === 4 && (
-          <FormSection number={5} title="Objectifs" icon={<Target className="w-3.5 h-3.5 text-muted-foreground" />}>
+          <FormSection
+            number={5}
+            title="Objectifs"
+            icon={<Target className="w-3.5 h-3.5 text-muted-foreground" />}
+            helper="L'IA arbitre differemment selon que vous cherchez croissance, discipline, diversification ou preservation du capital."
+          >
             <div className="grid grid-cols-2 gap-2">
               {GOALS.map((goal) => {
                 const sel = form.goals.includes(goal)
@@ -669,7 +726,11 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           )}
 
           {formStep === 5 && (
-          <FormSection number={6} title="Expérience crypto">
+          <FormSection
+            number={6}
+            title="Experience crypto"
+            helper="Choisissez le niveau de vocabulaire et de densite d'analyse qui vous aide vraiment a agir."
+          >
             <div className="grid grid-cols-3 gap-2">
               {EXPERIENCE_OPTIONS.map((opt) => (
                 <button key={opt.value} onClick={() => setForm((p) => ({ ...p, experience: opt.value }))}
@@ -683,7 +744,11 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           )}
 
           {formStep === 6 && (
-          <FormSection number={7} title="Stratégie d'achat">
+          <FormSection
+            number={7}
+            title="Strategie d'achat"
+            helper="Ces deux choix permettent de transformer une allocation theorique en plan d'execution realiste."
+          >
             <div className="mb-4 rounded-xl border border-border bg-secondary/30 px-4 py-3">
               <p className="text-xs font-semibold text-foreground">Choisissez une option dans chaque section pour continuer.</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
@@ -718,7 +783,12 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           )}
 
           {formStep === 7 && (
-          <FormSection number={8} title="Actifs à exclure" optional>
+          <FormSection
+            number={8}
+            title="Actifs a exclure"
+            optional
+            helper="Si vous voulez eviter certains actifs, l'allocation les retirera completement au lieu de les surpondérer par defaut."
+          >
             <input type="text" value={form.excludedCryptos}
               onChange={(e) => setForm((p) => ({ ...p, excludedCryptos: e.target.value }))}
               placeholder="Ex : XRP, DOGE, SHIB — séparés par des virgules"
@@ -758,25 +828,37 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
             )}
           </div>
 
-          <p className="text-center text-[11px] text-muted-foreground/50 pb-2">Claude AI · données CoinGecko temps réel</p>
+          <p className="text-center text-[11px] text-muted-foreground/50 pb-2">
+            Claude AI · donnees CoinGecko, avec Kraken si disponible pour les snapshots portefeuille
+          </p>
         </div>
       </div>
     </>
   )
 }
 
-function FormSection({ number, title, icon, optional, children }: {
-  number: number; title: string; icon?: React.ReactNode; optional?: boolean; children: React.ReactNode
+function FormSection({ number, title, icon, optional, helper, children }: {
+  number: number
+  title: string
+  icon?: React.ReactNode
+  optional?: boolean
+  helper?: string
+  children: React.ReactNode
 }) {
   return (
     <div className="p-5 rounded-2xl bg-card border border-border">
       <div className="flex items-center gap-3 mb-4">
         <span className="text-[10px] font-black text-muted-foreground/50 tabular-nums w-5 shrink-0">0{number}</span>
         <div className="w-px h-3.5 bg-border shrink-0" />
-        <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
-          {icon}{title}
-          {optional && <span className="text-muted-foreground font-normal text-xs ml-1">(optionnel)</span>}
-        </h3>
+        <div>
+          <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
+            {icon}{title}
+            {optional && <span className="text-muted-foreground font-normal text-xs ml-1">(optionnel)</span>}
+          </h3>
+          {helper && (
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{helper}</p>
+          )}
+        </div>
       </div>
       {children}
     </div>
@@ -784,7 +866,17 @@ function FormSection({ number, title, icon, optional, children }: {
 }
 
 // ── Analysis Result ───────────────────────────────────────────────────────────
-function AnalysisResult({ analysis, plan, onNew }: { analysis: Analysis; plan: string; onNew: () => void }) {
+function AnalysisResult({
+  analysis,
+  plan,
+  experience,
+  onNew,
+}: {
+  analysis: Analysis
+  plan: string
+  experience: Experience
+  onNew: () => void
+}) {
   const canExport = plan === "pro" || plan === "premium"
   const isPremium = plan === "premium"
   const isPro     = plan === "pro" || plan === "premium"
@@ -832,6 +924,42 @@ function AnalysisResult({ analysis, plan, onNew }: { analysis: Analysis; plan: s
     analysis.score < 70 ? "Profil non optimisé — affinez vos paramètres" : null,
     "Risque systémique cryptomonnaies (corrélation en crise)",
     "Liquidité variable selon les actifs secondaires",
+  ].filter(Boolean).slice(0, 3) as string[]
+  const experienceGuide = {
+    beginner: {
+      label: "Mode debutant",
+      tone: "On garde le vocabulaire simple et on insiste sur ce que vous devez faire, pas sur le jargon.",
+      takeaways: [
+        "Commencez par comprendre l'allocation avant de chercher a optimiser le timing.",
+        "Les baisses intermediaires sont normales: la discipline compte plus qu'un point d'entree parfait.",
+        "Revenez sur le dashboard pour suivre le portefeuille, pas pour chasser chaque variation de prix.",
+      ],
+    },
+    intermediate: {
+      label: "Mode intermediaire",
+      tone: "On equilibre pedagogie, execution et contexte marche pour vous aider a agir sans surcharger la lecture.",
+      takeaways: [
+        "L'allocation cherche un compromis entre coeur de portefeuille et actifs satellites.",
+        "Le plan d'entree doit rester compatible avec votre rythme d'investissement reel.",
+        "Le suivi compte autant que l'achat initial: snapshots et analyses servent a garder le cap.",
+      ],
+    },
+    expert: {
+      label: "Mode avance",
+      tone: "Lecture plus directe: structure d'allocation, exposition au risque, conditions d'execution et points de relecture.",
+      takeaways: [
+        "Le portefeuille est pense comme une structure de risque avant d'etre une simple liste d'actifs.",
+        "Les satellites doivent rester proportionnes a la liquidite et au regime de volatilite.",
+        "Le plan d'action sert a arbitrer l'execution et le reequilibrage, pas a predire le marche.",
+      ],
+    },
+  }[experience]
+  const nextActions = [
+    primaryAction
+      ? `Executer l'action principale: ${primaryAction.crypto}${primaryAction.amount ? ` pour ${primaryAction.amount}` : ""}.`
+      : null,
+    strategy ? strategy : null,
+    analysis.nextReview ? `Revenir sur votre allocation: ${analysis.nextReview}.` : null,
   ].filter(Boolean).slice(0, 3) as string[]
 
   const handleExport = () => {
@@ -913,6 +1041,27 @@ ${advancedBlock}
         <button onClick={onNew} className="flex items-center gap-1.5 px-3 py-2 bg-secondary border border-border text-xs text-muted-foreground hover:text-foreground rounded-lg transition-all font-medium">
           <RefreshCw className="w-3 h-3" /> Nouvelle analyse
         </button>
+      </div>
+
+      <div className="mb-4 rounded-2xl border border-border bg-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              {experienceGuide.label}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{experienceGuide.tone}</p>
+          </div>
+          <div className={cn("rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide", risk.bg, risk.border, risk.text)}>
+            {risk.label}
+          </div>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          {experienceGuide.takeaways.map((item) => (
+            <div key={item} className="rounded-xl border border-border bg-secondary/50 px-3 py-3 text-[12px] leading-relaxed text-muted-foreground">
+              {item}
+            </div>
+          ))}
+        </div>
       </div>
 
       {planAccess.locked.length > 0 && (
@@ -1001,6 +1150,25 @@ ${advancedBlock}
           <p className="text-sm font-semibold text-emerald-700">Tu suis une logique claire, pas un hasard</p>
         </div>
       </div>
+
+      {nextActions.length > 0 && (
+        <div className="bg-card border border-border rounded-2xl p-5 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="w-4 h-4 text-foreground" />
+            <h2 className="font-bold text-foreground text-sm">Ce que vous devez faire maintenant</h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {nextActions.map((item, index) => (
+              <div key={`${item}-${index}`} className="rounded-2xl border border-border bg-secondary/60 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Etape {index + 1}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-foreground">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Exécution immédiate */}
       {showAiRecommendations && (

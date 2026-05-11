@@ -1156,6 +1156,36 @@ export function DashboardOverview({
   }, [normalizedPortfolioSnapshots, timeframeAnchorMs])
 
   const capital = Number(latestSnapshot?.investedAmount ?? (lastAnalysis?.investor_profile as Record<string, unknown> | undefined)?.capital ?? 0)
+  const lastProfile = (lastAnalysis?.investor_profile ?? {}) as Record<string, unknown>
+  const latestAllocation = lastAnalysis?.allocations ?? []
+  const coreAssets = latestAllocation
+    .filter((allocation) => ["BTC", "ETH"].includes(allocation.symbol))
+    .map((allocation) => allocation.symbol)
+  const satelliteAssets = latestAllocation
+    .filter((allocation) => !["BTC", "ETH", "USDC", "USDT"].includes(allocation.symbol))
+    .map((allocation) => allocation.symbol)
+  const riskToleranceLabel = {
+    conservative: "profil prudent",
+    moderate: "profil equilibre",
+    aggressive: "profil offensif",
+  }[String(lastProfile.riskTolerance)] ?? "profil investisseur"
+  const horizonLabel = {
+    short: "avec un horizon court",
+    medium: "avec un horizon moyen",
+    long: "avec un horizon long",
+  }[String(lastProfile.horizon)] ?? "avec votre horizon actuel"
+  const primaryGoal = Array.isArray(lastProfile.goals) ? String(lastProfile.goals[0] ?? "") : ""
+  const allocationRationale = [
+    coreAssets.length
+      ? `Le coeur ${coreAssets.join(" + ")} sert de base liquide et plus lisible pour un ${riskToleranceLabel}.`
+      : "Le coeur du portefeuille privilegie les actifs les plus liquides avant d'ajouter des satellites.",
+    satelliteAssets.length
+      ? `${satelliteAssets.join(", ")} restent limites pour chercher du potentiel sans laisser la volatilite dominer l'ensemble.`
+      : "Les satellites restent limites tant qu'un besoin clair de diversification ou de rendement supplementaire n'apparait pas.",
+    primaryGoal
+      ? `L'objectif prioritaire "${primaryGoal}" est pris en compte ${horizonLabel} pour transformer l'allocation en plan executable.`
+      : `L'allocation reste coherente ${horizonLabel}, avec un niveau de risque aligne sur vos reponses.`,
+  ]
 
   const sentiment = useMemo(() => {
     if (!cryptoPrices.length) return null
@@ -1200,11 +1230,11 @@ export function DashboardOverview({
             <p className="text-[13px] text-muted-foreground">
               Bienvenue, {firstName}.
               {marketUpdatedLabel
-                ? <span className="ml-1">Données marché à <span className="font-medium text-foreground tabular-nums">{marketUpdatedLabel}</span>.</span>
-                : <span className="ml-1 text-muted-foreground/50">Chargement des données…</span>
+                ? <span className="ml-1">Derniere mise a jour marche a <span className="font-medium text-foreground tabular-nums">{marketUpdatedLabel}</span>.</span>
+                : <span className="ml-1 text-muted-foreground/50">Chargement des prix live...</span>
               }
-              <span className="ml-1">Source portefeuille : <span className="font-medium text-foreground">{useSnapshotHistory ? "portfolio_history uniquement" : "aucune donnée"}</span>.</span>
-              <span className="ml-1">Prix marché : <span className="font-medium text-foreground">CoinGecko, avec Kraken si disponible pour le calcul des snapshots.</span></span>
+              <span className="ml-1">Source portefeuille : <span className="font-medium text-foreground">{useSnapshotHistory ? "portfolio_history uniquement" : "aucune donnee"}</span>.</span>
+              <span className="ml-1">Prix marche : <span className="font-medium text-foreground">CoinGecko, avec Kraken si disponible pour le calcul des snapshots.</span></span>
             </p>
           </div>
           <Link
@@ -1214,6 +1244,24 @@ export function DashboardOverview({
             <AxiomIcon className="h-3.5 w-3.5" />
             Nouvelle analyse
           </Link>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
+            <span className="font-semibold text-foreground">Historique reel</span>
+            <span>portfolio_history</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
+            <span className="font-semibold text-foreground">Prix live</span>
+            <span>CoinGecko / Kraken</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
+            <span className="font-semibold text-foreground">Dernier snapshot</span>
+            <span>{lastSnapshotLabel ?? "en attente"}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
+            <span className="font-semibold text-foreground">Etat data</span>
+            <span>{marketUpdatedLabel ? "a jour" : "source indisponible"}</span>
+          </div>
         </div>
         <div className="mt-3 rounded-xl border border-border bg-card px-4 py-3 text-[12px] leading-5 text-muted-foreground">
           Les cryptomonnaies comportent un risque de perte en capital. Ceci n’est pas un conseil financier.
@@ -1484,6 +1532,20 @@ export function DashboardOverview({
                     <span className="text-[11px] font-medium text-muted-foreground tabular-nums w-8 text-right">{a.percentage}%</span>
                   </div>
                 ))}
+              </div>
+              <div className="mt-4 rounded-xl border border-border bg-secondary/50 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Brain className="h-3.5 w-3.5 text-foreground" />
+                  <p className="text-[11px] font-semibold text-foreground">Pourquoi cette allocation ?</p>
+                </div>
+                <ul className="space-y-2">
+                  {allocationRationale.map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-[11px] leading-relaxed text-muted-foreground">
+                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-foreground/70 shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
               <button
                 onClick={() => setSelectedAnalysis(lastAnalysis)}
