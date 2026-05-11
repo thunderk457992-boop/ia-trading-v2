@@ -1,6 +1,13 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardNav } from "@/components/dashboard/DashboardNav"
+
+export const metadata: Metadata = {
+  title: "Dashboard — Axiom AI",
+  description: "Votre portefeuille crypto, vos analyses IA et les données de marché en temps réel.",
+  robots: { index: false, follow: false },
+}
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()

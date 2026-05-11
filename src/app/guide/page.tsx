@@ -14,9 +14,9 @@ import { AxiomLogo } from "@/components/branding/AxiomLogo"
 import { buildPageMetadata } from "@/lib/seo"
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Methodologie Axiom AI",
+  title: "Guide — Méthodologie Axiom AI",
   description:
-    "Understand how Axiom AI structures crypto portfolio decisions with diversification, risk management, market cap, liquidity, volatility, BTC dominance, and DCA discipline.",
+    "Découvrez comment Axiom AI structure une stratégie crypto : diversification, gestion du risque, DCA, dominance BTC et lecture de marché. Sans jargon.",
   path: "/guide",
   keywords: [
     "crypto methodology",

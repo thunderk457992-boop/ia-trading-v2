@@ -1361,16 +1361,14 @@ export function DashboardOverview({
       {/* Header */}
       <div className="mb-5">
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight text-foreground">Dashboard</h1>
-            <p className="text-[13px] text-muted-foreground">
-              Bienvenue, {firstName}.
+            <p className="mt-0.5 text-[13px] text-muted-foreground">
+              Bonjour, {firstName}.
               {marketUpdatedLabel
-                ? <span className="ml-1">Derniere mise a jour marche a <span className="font-medium text-foreground tabular-nums">{marketUpdatedLabel}</span>.</span>
-                : <span className="ml-1 text-muted-foreground/50">Chargement des prix live...</span>
+                ? <span className="ml-1">Prix mis à jour à <span className="font-medium text-foreground tabular-nums">{marketUpdatedLabel}</span>.</span>
+                : <span className="ml-1 text-muted-foreground/50">Chargement des prix…</span>
               }
-              <span className="ml-1">Source portefeuille : <span className="font-medium text-foreground">{useSnapshotHistory ? "portfolio_history uniquement" : "aucune donnee"}</span>.</span>
-              <span className="ml-1">Prix marche : <span className="font-medium text-foreground">Kraken quand la paire existe, sinon CoinGecko fallback visible.</span></span>
             </p>
           </div>
           <Link
@@ -1383,24 +1381,30 @@ export function DashboardOverview({
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
-            <span className="font-semibold text-foreground">Historique reel</span>
-            <span>portfolio_history</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <span className="font-semibold text-foreground">Courbe</span>
+            <span>{useSnapshotHistory ? "snapshots réels" : "aucune donnée"}</span>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
-            <span className="font-semibold text-foreground">Prix live</span>
-            <span>Kraken + fallback CoinGecko</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+            <span className="font-semibold text-foreground">Prix</span>
+            <span>Kraken + CoinGecko</span>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
-            <span className="font-semibold text-foreground">Dernier snapshot</span>
-            <span>{lastSnapshotLabel ?? "en attente"}</span>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
-            <span className="font-semibold text-foreground">Etat data</span>
-            <span>{marketUpdatedLabel ? `${krakenMarketCount} Kraken · ${fallbackMarketCount} fallback` : "source indisponible"}</span>
-          </div>
+          {lastSnapshotLabel && (
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">Dernier snapshot</span>
+              <span>{lastSnapshotLabel}</span>
+            </div>
+          )}
+          {marketUpdatedLabel && (
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">Actifs suivis</span>
+              <span>{krakenMarketCount > 0 ? `${krakenMarketCount} Kraken · ${fallbackMarketCount} fallback` : "CoinGecko"}</span>
+            </div>
+          )}
         </div>
         <div className="mt-3 rounded-xl border border-border bg-card px-4 py-3 text-[12px] leading-5 text-muted-foreground">
-          Les cryptomonnaies comportent un risque de perte en capital. Ceci n’est pas un conseil financier.
+          Les cryptomonnaies comportent un risque de perte en capital. Ceci n&apos;est pas un conseil financier.
         </div>
       </div>
 

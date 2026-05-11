@@ -167,30 +167,51 @@ const PLANS: Plan[] = [
 ]
 
 const TRUST_SIGNALS = [
-  { icon: Shield, text: "Paiement securise Stripe" },
-  { icon: Cpu, text: "Claude IA integre au produit" },
-  { icon: MessageSquare, text: "Chat IA relie au plan utilisateur" },
+  { icon: Shield, text: "Paiement sécurisé via Stripe" },
+  { icon: Cpu, text: "Claude AI intégré au produit" },
+  { icon: MessageSquare, text: "Chat IA relié à vos analyses" },
 ]
 
 const PRICING_FAQ = [
   {
     question: "Puis-je commencer sans carte bancaire ?",
-    answer: "Oui. Le plan Gratuit permet de tester Axiom sans carte bancaire.",
+    answer:
+      "Oui. Le plan Gratuit est accessible immédiatement, sans carte bancaire ni engagement. Vous pouvez tester l'Advisor, voir une première répartition et explorer le dashboard avant de décider.",
   },
   {
-    question: "Puis-je resilier a tout moment ?",
+    question: "Puis-je résilier à tout moment ?",
     answer:
-      "Oui. Le checkout et la facturation passent par Stripe, avec un espace de gestion pour modifier ou resilier l'abonnement.",
+      "Oui. La facturation passe par Stripe. Vous pouvez modifier ou résilier votre abonnement depuis votre espace client à tout moment. L'accès reste actif jusqu'à la fin de la période déjà payée, puis le compte revient automatiquement au plan Gratuit.",
+  },
+  {
+    question: "Puis-je changer de plan en cours d'abonnement ?",
+    answer:
+      "Oui. Depuis votre espace abonnement Stripe, vous pouvez monter en gamme (Free → Pro → Premium) ou résilier. La différence de prix est calculée au prorata par Stripe.",
+  },
+  {
+    question: "Quels moyens de paiement sont acceptés ?",
+    answer:
+      "Carte bancaire (Visa, Mastercard, Amex), Apple Pay et Google Pay selon votre appareil. Tout le paiement est géré par Stripe — Axiom ne stocke aucune donnée de carte.",
   },
   {
     question: "Est-ce un conseil financier ?",
     answer:
-      "Non. Axiom structure une strategie et aide a lire le risque. Le produit ne promet ni rendement, ni prediction de marche.",
+      "Non. Axiom structure une stratégie d'aide à la décision et aide à lire le risque. Le produit ne promet aucun rendement, ne gère pas votre portefeuille et ne constitue pas un conseil en investissement financier au sens réglementaire.",
   },
   {
-    question: "Quelles donnees sont utilisees ?",
+    question: "Quelles données sont utilisées ?",
     answer:
-      "Le produit combine votre profil investisseur, les allocations generees et les donnees marche disponibles via CoinGecko, avec Kraken si disponible pour les snapshots portefeuille.",
+      "Votre profil investisseur (budget, risque, horizon, objectifs), les allocations générées et les données de marché via CoinGecko et Kraken. Vos données ne sont pas revendues ni partagées avec des tiers.",
+  },
+  {
+    question: "Mes données sont-elles sécurisées ?",
+    answer:
+      "Oui. Les données sont stockées sur Supabase avec chiffrement au repos, isolation par utilisateur (Row Level Security) et authentification sécurisée. La facturation passe entièrement par Stripe.",
+  },
+  {
+    question: "Que se passe-t-il si Axiom est temporairement indisponible ?",
+    answer:
+      "Votre abonnement continue. Les analyses et l'historique sont conservés. Si une indisponibilité dépasse 24h, contactez le support — nous traitons chaque cas manuellement.",
   },
 ] as const
 
@@ -440,23 +461,23 @@ export function PricingClient({
           Choisissez le niveau d&apos;accompagnement qui vous correspond
         </h1>
         <p className="mx-auto mb-8 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg">
-          Free sert a tester. Pro sert a investir avec methode. Premium sert a suivre, comparer des scenarios
-          et garder plus de contexte dans le temps.
+          Free pour tester. Pro pour investir avec méthode. Premium pour suivre, comparer des scénarios
+          et garder plus de contexte dans la durée.
         </p>
 
         <div className="mx-auto mb-8 grid max-w-4xl gap-3 md:grid-cols-3">
           {[
             {
-              title: "Free = tester",
-              body: "Voir si la logique produit vous aide vraiment a clarifier votre premiere allocation.",
+              title: "Free — tester",
+              body: "Voir si la logique produit vous aide vraiment à clarifier votre première répartition.",
             },
             {
-              title: "Pro = investir avec methode",
-              body: "Plus d'analyses, plus de contexte marche et un historique utile pour eviter les decisions impulsives.",
+              title: "Pro — investir avec méthode",
+              body: "Plus d'analyses, plus de contexte marché et un historique utile pour éviter les décisions impulsives.",
             },
             {
-              title: "Premium = suivi avance",
-              body: "Plus de profondeur, plus de scenarios et plus de contexte pour suivre votre portefeuille dans la duree.",
+              title: "Premium — suivi avancé",
+              body: "Plus de profondeur, plus de scénarios et plus de contexte pour suivre votre portefeuille dans la durée.",
             },
           ].map((item) => (
             <div key={item.title} className="rounded-3xl border border-border bg-card p-5 text-left shadow-card-xs">

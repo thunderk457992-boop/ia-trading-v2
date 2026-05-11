@@ -1,6 +1,13 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardNav } from "@/components/dashboard/DashboardNav"
+
+export const metadata: Metadata = {
+  title: "Chat IA — Axiom AI",
+  description: "Posez vos questions crypto à l'assistant IA Axiom, relié à vos analyses et aux données de marché.",
+  robots: { index: false, follow: false },
+}
 
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()

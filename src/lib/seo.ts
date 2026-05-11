@@ -2,10 +2,10 @@ import type { Metadata } from "next"
 
 export const SITE_URL = "https://axiom-trade.dev"
 export const SITE_NAME = "Axiom AI"
-export const DEFAULT_SEO_TITLE = "Axiom AI — AI Crypto Advisor"
+export const DEFAULT_SEO_TITLE = "Axiom AI — Conseiller crypto IA pour débutants"
 export const DEFAULT_SEO_DESCRIPTION =
-  "AI-powered crypto portfolio strategy for beginners and active investors."
-export const DEFAULT_SOCIAL_IMAGE = "/icon.svg"
+  "Décrivez votre profil, obtenez une répartition crypto personnalisée et un plan d'action structuré en 1 minute. Propulsé par Claude AI. Gratuit pour commencer."
+export const DEFAULT_SOCIAL_IMAGE = "/og-image.png"
 
 type BuildPageMetadataOptions = {
   title: string
@@ -63,6 +63,8 @@ export function buildPageMetadata({
       images: [
         {
           url: image,
+          width: 1200,
+          height: 630,
           alt: DEFAULT_SEO_TITLE,
         },
       ],

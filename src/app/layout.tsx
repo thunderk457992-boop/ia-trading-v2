@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import {
   DEFAULT_SEO_DESCRIPTION,
   DEFAULT_SEO_TITLE,
@@ -7,6 +7,13 @@ import {
   SITE_URL,
 } from "@/lib/seo"
 import "./globals.css"
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#ffffff",
+}
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -17,10 +24,12 @@ export const metadata: Metadata = {
     "Axiom AI",
     "AI crypto advisor",
     "crypto portfolio strategy",
+    "personalized crypto strategy",
     "bitcoin allocation",
     "crypto DCA strategy",
     "crypto risk management",
     "crypto portfolio dashboard",
+    "crypto portfolio beginner",
   ],
   verification: {
     google: "35EwY4FQ5WRpVwp_Cz67d6agOr_LEVbt8sWhkexu_LE",
@@ -45,9 +54,12 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: SITE_NAME,
     type: "website",
+    locale: "fr_FR",
     images: [
       {
         url: DEFAULT_SOCIAL_IMAGE,
+        width: 1200,
+        height: 630,
         alt: DEFAULT_SEO_TITLE,
       },
     ],

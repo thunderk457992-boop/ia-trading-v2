@@ -1,6 +1,12 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardNav } from "@/components/dashboard/DashboardNav"
+
+export const metadata: Metadata = {
+  title: "Tarifs — Axiom AI",
+  description: "Comparez les plans Axiom AI. Gratuit pour commencer, Pro pour investir avec méthode, Premium pour un suivi avancé.",
+}
 
 export default async function PricingLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()

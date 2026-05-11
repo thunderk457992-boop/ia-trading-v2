@@ -11,12 +11,34 @@ const TAGS = [
   { open: "[DCA]",       close: "[/DCA]",       kind: "dca"       as const },
 ]
 
+// Validate parsed JSON is a usable PortfolioPlan — silently drop if malformed
+function isValidPortfolio(data: unknown): data is PortfolioPlan {
+  if (!data || typeof data !== "object") return false
+  const d = data as Record<string, unknown>
+  return (
+    Array.isArray(d.assets) &&
+    d.assets.length > 0 &&
+    typeof (d.assets[0] as Record<string, unknown>)?.symbol === "string"
+  )
+}
+
+// Validate parsed JSON is a usable DcaPlan — silently drop if malformed
+function isValidDca(data: unknown): data is DcaPlan {
+  if (!data || typeof data !== "object") return false
+  const d = data as Record<string, unknown>
+  return (
+    typeof d.total === "number" &&
+    typeof d.frequency === "string" &&
+    Array.isArray(d.breakdown) &&
+    d.breakdown.length > 0
+  )
+}
+
 function parse(raw: string): Segment[] {
   const out: Segment[] = []
   let rest = raw
 
   while (rest.length > 0) {
-    // Find the earliest opening tag
     let best: { idx: number; tag: typeof TAGS[number]; json: string } | null = null
 
     for (const tag of TAGS) {
@@ -29,7 +51,6 @@ function parse(raw: string): Segment[] {
     }
 
     if (!best) {
-      // No more structured blocks — rest is plain text
       const t = rest.trim()
       if (t) out.push({ kind: "text", content: t })
       break
@@ -39,13 +60,17 @@ function parse(raw: string): Segment[] {
     const before = rest.slice(0, best.idx).trim()
     if (before) out.push({ kind: "text", content: before })
 
-    // Parse JSON block
+    // Parse and validate — silently drop malformed blocks (never show raw JSON)
     try {
-      const parsed = JSON.parse(best.json)
-      out.push({ kind: best.tag.kind, plan: parsed } as Segment)
+      const parsed: unknown = JSON.parse(best.json)
+      if (best.tag.kind === "portfolio" && isValidPortfolio(parsed)) {
+        out.push({ kind: "portfolio", plan: parsed })
+      } else if (best.tag.kind === "dca" && isValidDca(parsed)) {
+        out.push({ kind: "dca", plan: parsed })
+      }
+      // If validation fails, block is silently dropped (no raw JSON shown)
     } catch {
-      // Unparseable — show raw text
-      if (best.json.trim()) out.push({ kind: "text", content: best.json })
+      // JSON parse error — block silently dropped
     }
 
     // Advance past closing tag
