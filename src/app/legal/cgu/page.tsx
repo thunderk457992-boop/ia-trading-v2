@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+﻿import type { Metadata } from "next"
 import Link from "next/link"
 import { AxiomLogo } from "@/components/branding/AxiomLogo"
 import { createClient } from "@/lib/supabase/server"
@@ -93,10 +93,10 @@ export default async function CGUPage() {
             En cas de suspicion de compromission, l&apos;utilisateur doit modifier immédiatement son mot de
             passe et contacter le support Axiom à l&apos;adresse{" "}
             <a
-              href="mailto:support.axiom.support@gmail.com?subject=Support%20Axiom%20%E2%80%93%20Demande%20utilisateur"
+              href="mailto:support@axiom-trade.dev?subject=Support%20Axiom%20AI"
               className="font-semibold text-slate-900 underline underline-offset-2 hover:text-slate-700"
             >
-              support.axiom.support@gmail.com
+              support@axiom-trade.dev
             </a>
             .
           </p>
@@ -222,10 +222,10 @@ export default async function CGUPage() {
           <p>
             Support Axiom :{" "}
             <a
-              href="mailto:support.axiom.support@gmail.com?subject=Support%20Axiom%20%E2%80%93%20Demande%20utilisateur"
+              href="mailto:support@axiom-trade.dev?subject=Support%20Axiom%20AI"
               className="font-semibold text-slate-900 underline underline-offset-2 hover:text-slate-700"
             >
-              support.axiom.support@gmail.com
+              support@axiom-trade.dev
             </a>
             <br />
             Éditeur du Service : <strong>Axiom</strong>, Paris, France
@@ -254,3 +254,4 @@ export default async function CGUPage() {
     </div>
   )
 }
+

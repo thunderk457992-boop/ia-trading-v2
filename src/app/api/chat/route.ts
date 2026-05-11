@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient } from "@/lib/supabase/server"
 import { fetchMarketSnapshot } from "@/lib/coingecko"
@@ -496,6 +497,7 @@ export async function POST(request: Request) {
       marketSources: { coinGecko: coinGeckoAvailable, kraken: krakenAvailable },
     })
   } catch (error) {
+    Sentry.captureException(error, { tags: { route: "chat" } })
     console.error("Chat API error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Erreur IA inattendue." },

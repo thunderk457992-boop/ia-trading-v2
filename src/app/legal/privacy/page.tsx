@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+﻿import type { Metadata } from "next"
 import Link from "next/link"
 import { AxiomLogo } from "@/components/branding/AxiomLogo"
 import { createClient } from "@/lib/supabase/server"
@@ -60,7 +60,7 @@ export default async function PrivacyPage() {
           </p>
           <p>
             Pour toute question relative à la protection des données personnelles, vous pouvez écrire à{" "}
-            <strong>support.axiom.support@gmail.com</strong>.
+            <strong>support@axiom-trade.dev</strong>.
           </p>
         </Section>
 
@@ -153,7 +153,7 @@ export default async function PrivacyPage() {
           </p>
           <p>
             Vous pouvez également demander la suppression de votre compte depuis les paramètres lorsqu&apos;une
-            telle option est disponible, ou en nous écrivant à <strong>support.axiom.support@gmail.com</strong>.
+            telle option est disponible, ou en nous écrivant à <strong>support@axiom-trade.dev</strong>.
           </p>
           <p>
             Si vous estimez que vos droits ne sont pas respectés, vous pouvez introduire une réclamation
@@ -200,10 +200,10 @@ export default async function PrivacyPage() {
           <p>
             Support Axiom :{" "}
             <a
-              href="mailto:support.axiom.support@gmail.com?subject=Support%20Axiom%20%E2%80%93%20Demande%20utilisateur"
+              href="mailto:support@axiom-trade.dev?subject=Support%20Axiom%20AI"
               className="font-semibold text-slate-900 underline underline-offset-2 hover:text-slate-700"
             >
-              support.axiom.support@gmail.com
+              support@axiom-trade.dev
             </a>
             <br />
             Responsable du traitement : <strong>Axiom</strong>, Paris, France
@@ -232,3 +232,4 @@ export default async function PrivacyPage() {
     </div>
   )
 }
+

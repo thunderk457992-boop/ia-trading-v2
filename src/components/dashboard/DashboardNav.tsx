@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -28,7 +28,7 @@ const navItems = [
   { href: "/settings", icon: Settings, label: "Paramètres", mobileLabel: "Réglages" },
 ]
 
-const SUPPORT_EMAIL = "support.axiom.support@gmail.com"
+const SUPPORT_EMAIL = "support@axiom-trade.dev"
 const SUPPORT_SUBJECT = "Support Axiom – Demande utilisateur"
 const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(SUPPORT_SUBJECT)}`
 
@@ -302,3 +302,4 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
     </>
   )
 }
+

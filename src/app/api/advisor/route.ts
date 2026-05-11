@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient } from "@/lib/supabase/server"
 import { createServerClient } from "@supabase/ssr"
@@ -652,6 +653,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
+    // ── DB-based cross-instance cooldown (primary rate limit) ──────────────
+    // Uses last_analysis_at from profiles — reliable across all serverless
+    // instances. The in-memory Map is a supplemental same-instance soft guard.
+    const adminRateLimit = getAdmin()
+    const { data: profileForCooldown } = await adminRateLimit
+      .from("profiles")
+      .select("plan, last_analysis_at")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    if (profileForCooldown?.last_analysis_at) {
+      const msSinceLast = Date.now() - new Date(profileForCooldown.last_analysis_at).getTime()
+      if (msSinceLast < COOLDOWN_MS) {
+        const wait = Math.ceil((COOLDOWN_MS - msSinceLast) / 1000)
+        return NextResponse.json(
+          { error: `Veuillez attendre ${wait} secondes avant de relancer une analyse.` },
+          { status: 429 }
+        )
+      }
+    }
+
+    // Supplemental in-memory guard (same-instance, best-effort)
     const lastCall = cooldowns.get(user.id) ?? 0
     if (Date.now() - lastCall < COOLDOWN_MS) {
       const wait = Math.ceil((COOLDOWN_MS - (Date.now() - lastCall)) / 1000)
@@ -699,6 +722,12 @@ export async function POST(request: Request) {
     }
 
     cooldowns.set(user.id, Date.now())
+
+    // Persist the timestamp to DB for cross-instance enforcement
+    void adminRateLimit
+      .from("profiles")
+      .update({ last_analysis_at: new Date().toISOString() })
+      .eq("id", user.id)
 
     const body = await request.json()
     const {
@@ -1083,6 +1112,7 @@ export async function POST(request: Request) {
       marketSources: { coinGecko: coinGeckoAvailable, kraken: krakenAvailable },
     })
   } catch (error) {
+    Sentry.captureException(error, { tags: { route: "advisor" } })
     console.error("Advisor API error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Erreur serveur inattendue" },

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import { stripe } from "@/lib/stripe"
 import { createServerClient } from "@supabase/ssr"
 import type Stripe from "stripe"
@@ -235,6 +236,7 @@ export async function POST(request: Request) {
       }
     }
   } catch (err) {
+    Sentry.captureException(err, { tags: { route: "stripe-webhook", eventType: event?.type ?? "unknown" } })
     const msg = err instanceof Error ? err.message : "Unknown error"
     console.error(`Webhook handler error [${event.type}]:`, msg)
     // If service role key is missing, return 200 to avoid Stripe retries

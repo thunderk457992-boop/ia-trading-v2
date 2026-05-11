@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next"
+import { Suspense } from "react"
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { PostHogProvider } from "@/components/providers/PostHogProvider"
 import {
   DEFAULT_SEO_DESCRIPTION,
   DEFAULT_SEO_TITLE,
@@ -78,7 +80,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className="min-h-screen bg-background text-foreground antialiased">
-        {children}
+        <Suspense>
+          <PostHogProvider>
+            {children}
+          </PostHogProvider>
+        </Suspense>
         <Analytics />
         <SpeedInsights />
       </body>

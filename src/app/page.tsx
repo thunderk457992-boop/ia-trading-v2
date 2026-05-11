@@ -1,4 +1,4 @@
-import { HomePageClient } from "@/components/home/HomePageClient"
+﻿import { HomePageClient } from "@/components/home/HomePageClient"
 import { fetchMarketSnapshot } from "@/lib/coingecko"
 import {
   DEFAULT_SEO_DESCRIPTION,
@@ -33,7 +33,7 @@ const homeStructuredData = {
       name: SITE_NAME,
       url: SITE_URL,
       logo: `${SITE_URL}/icon.svg`,
-      email: "support.axiom.support@gmail.com",
+      email: "support@axiom-trade.dev",
       sameAs: [SITE_URL],
     },
     {
@@ -93,3 +93,4 @@ export default async function HomePage() {
     </>
   )
 }
+
