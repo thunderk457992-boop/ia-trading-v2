@@ -1,28 +1,35 @@
 import { NextResponse } from "next/server"
-import { fetchKrakenTickers } from "@/lib/kraken"
+import { fetchMarketSnapshot } from "@/lib/coingecko"
 
 export const runtime = "nodejs"
 
 export async function GET() {
   try {
-    const tickers = await fetchKrakenTickers()
+    const market = await fetchMarketSnapshot()
+    const hasData = market.prices.length > 0
 
-    return NextResponse.json({
-      source: "Kraken",
-      updatedAt: Date.now(),
-      tickers,
-    })
+    return NextResponse.json(
+      {
+        source: market.summary?.primarySource ?? "CoinGecko",
+        updatedAt: Date.now(),
+        tickers: market.prices,
+        summary: market.summary,
+        marketGlobal: market.global,
+        error: hasData ? undefined : "Impossible de recuperer les donnees de marche",
+      },
+      { status: hasData ? 200 : 503 }
+    )
   } catch (error) {
     console.error("Kraken route error:", error)
 
     return NextResponse.json(
       {
-        source: "Kraken",
+        source: "CoinGecko",
         updatedAt: Date.now(),
         tickers: [],
-        error: "Impossible de récupérer les prix Kraken",
+        error: "Impossible de recuperer les prix de marche",
       },
-      { status: 500 }
+      { status: 503 }
     )
   }
 }

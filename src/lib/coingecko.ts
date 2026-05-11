@@ -1,3 +1,10 @@
+import {
+  getCryptoCategories as getUniverseCryptoCategories,
+  getTrackedCryptoUniverse,
+  normalizeTrackedSymbol,
+} from "@/lib/crypto-universe"
+import { fetchKrakenTickers, type KrakenTicker } from "@/lib/kraken"
+
 export interface CryptoPrice {
   id: string
   symbol: string
@@ -10,6 +17,9 @@ export interface CryptoPrice {
   volume24h: number
   image: string
   sparkline7d: number[]
+  categories?: string[]
+  source?: "Kraken" | "CoinGecko" | "fallback"
+  pair?: string | null
 }
 
 export interface MarketGlobal {
@@ -22,6 +32,17 @@ export interface MarketSnapshot {
   prices: CryptoPrice[]
   global: MarketGlobal | null
   fetchedAt: number
+  summary?: {
+    trackedAssets: number
+    positiveAssets: number
+    negativeAssets: number
+    avgVolatility24h: number | null
+    krakenAssets: number
+    coinGeckoAssets: number
+    fallbackAssets: number
+    unavailableAssets: string[]
+    primarySource: string
+  }
 }
 
 export interface MarketChartPoint {
@@ -34,52 +55,8 @@ export interface PortfolioAssetHistory {
   prices: MarketChartPoint[]
 }
 
-export const CRYPTO_CATEGORY_MAP: Record<string, string[]> = {
-  BTC: ["Large cap", "Reserve"],
-  ETH: ["Large cap", "Layer 1", "DeFi", "Infrastructure"],
-  SOL: ["Layer 1", "Large cap"],
-  XRP: ["Large cap", "Payments"],
-  BNB: ["Large cap", "Exchange", "Infrastructure"],
-  AVAX: ["Layer 1"],
-  SUI: ["Layer 1"],
-  SEI: ["Layer 1", "Trading"],
-  ADA: ["Layer 1"],
-  LINK: ["Infrastructure", "Oracle"],
-  ONDO: ["RWA", "DeFi"],
-  AAVE: ["DeFi"],
-  ARB: ["Layer 2", "DeFi"],
-  OP: ["Layer 2", "Infrastructure"],
-  RENDER: ["AI", "Infrastructure"],
-  RNDR: ["AI", "Infrastructure"],
-  TAO: ["AI"],
-  FET: ["AI"],
-  INJ: ["DeFi", "Infrastructure"],
-  HBAR: ["Infrastructure"],
-  DOGE: ["Memecoin"],
-  PEPE: ["Memecoin"],
-  WIF: ["Memecoin"],
-  BONK: ["Memecoin"],
-  KAS: ["Infrastructure"],
-  ATOM: ["Infrastructure", "Layer 1"],
-  IMX: ["Gaming", "Layer 2"],
-  GALA: ["Gaming"],
-  NEAR: ["AI", "Layer 1"],
-  POL: ["Infrastructure", "Layer 2"],
-  MATIC: ["Infrastructure", "Layer 2"],
-  UNI: ["DeFi"],
-  LTC: ["Payments", "Large cap"],
-  BCH: ["Payments"],
-  TRX: ["Infrastructure"],
-  TON: ["Infrastructure", "Layer 1"],
-  XLM: ["Payments"],
-  FIL: ["Infrastructure"],
-  ICP: ["Infrastructure"],
-  HYPE: ["Layer 1"],
-}
-
 export function getCryptoCategories(symbol: string): string[] {
-  const normalized = symbol.toUpperCase()
-  return CRYPTO_CATEGORY_MAP[normalized] ?? ["Large cap"]
+  return getUniverseCryptoCategories(symbol)
 }
 
 function cgHeaders(): HeadersInit {
@@ -106,7 +83,7 @@ function mapCoin(coin: {
 }): CryptoPrice {
   return {
     id: coin.id,
-    symbol: coin.symbol.toUpperCase(),
+    symbol: normalizeTrackedSymbol(coin.symbol.toUpperCase()),
     name: coin.name,
     price: coin.current_price,
     change1h: coin.price_change_percentage_1h_in_currency ?? 0,
@@ -116,6 +93,152 @@ function mapCoin(coin: {
     volume24h: coin.total_volume ?? 0,
     image: coin.image,
     sparkline7d: downsample(coin.sparkline_in_7d?.price ?? [], 40),
+    categories: getUniverseCryptoCategories(coin.symbol.toUpperCase()),
+    source: "CoinGecko",
+    pair: null,
+  }
+}
+
+async function fetchSpecificCryptoPrices(ids: string[]): Promise<CryptoPrice[]> {
+  if (!ids.length) return []
+
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(ids.join(","))}&sparkline=true&price_change_percentage=1h,24h,7d`,
+      { next: { revalidate: 45 }, headers: cgHeaders(), signal: controller.signal }
+    ).finally(() => clearTimeout(timeout))
+
+    if (!res.ok) {
+      console.warn("[CoinGecko] fetchSpecificCryptoPrices non-ok response", {
+        ids,
+        status: res.status,
+        statusText: res.statusText,
+      })
+      return []
+    }
+
+    const data = await res.json()
+    if (!Array.isArray(data)) return []
+    return data.map(mapCoin)
+  } catch (err) {
+    console.error("[CoinGecko] fetchSpecificCryptoPrices error:", err)
+    return []
+  }
+}
+
+function mergePriceMaps(primary: CryptoPrice[], secondary: CryptoPrice[]) {
+  const byId = new Map<string, CryptoPrice>()
+  const bySymbol = new Map<string, CryptoPrice>()
+
+  for (const coin of [...primary, ...secondary]) {
+    if (!byId.has(coin.id)) byId.set(coin.id, coin)
+    if (!bySymbol.has(coin.symbol)) bySymbol.set(coin.symbol, coin)
+  }
+
+  return { byId, bySymbol }
+}
+
+function resolveCoinForAsset(
+  assetSymbol: string,
+  coinById: Map<string, CryptoPrice>,
+  coinBySymbol: Map<string, CryptoPrice>
+) {
+  const universeAsset = getTrackedCryptoUniverse().find((asset) => asset.symbol === assetSymbol)
+  if (!universeAsset) return null
+
+  const byId = coinById.get(universeAsset.coingeckoId)
+  if (byId) return byId
+
+  return coinBySymbol.get(universeAsset.symbol)
+    ?? (universeAsset.aliases ?? []).map((alias) => coinBySymbol.get(alias)).find(Boolean)
+    ?? null
+}
+
+function buildTrackedMarketPrices(
+  coinGeckoPrices: CryptoPrice[],
+  krakenTickers: KrakenTicker[]
+) {
+  const universe = getTrackedCryptoUniverse()
+  const { byId, bySymbol } = mergePriceMaps(coinGeckoPrices, [])
+  const krakenBySymbol = new Map(
+    krakenTickers.map((ticker) => [normalizeTrackedSymbol(ticker.symbol), ticker] as const)
+  )
+  const krakenAvailable = krakenTickers.length > 0
+  const unavailableAssets: string[] = []
+
+  const priceCandidates: Array<CryptoPrice | null> = universe
+    .map((asset) => {
+      const coin = resolveCoinForAsset(asset.symbol, byId, bySymbol)
+      const krakenTicker = krakenBySymbol.get(asset.symbol)
+
+      if (!coin && !krakenTicker) {
+        unavailableAssets.push(asset.symbol)
+        return null
+      }
+
+      const price = krakenTicker?.price ?? coin?.price ?? null
+      if (price === null || !Number.isFinite(price) || price <= 0) {
+        unavailableAssets.push(asset.symbol)
+        return null
+      }
+
+      const source: CryptoPrice["source"] = krakenTicker
+        ? "Kraken"
+        : krakenAvailable
+        ? "fallback"
+        : "CoinGecko"
+
+      return {
+        id: coin?.id ?? asset.coingeckoId,
+        symbol: asset.symbol,
+        name: coin?.name ?? asset.name,
+        price,
+        change1h: coin?.change1h ?? Number.NaN,
+        change24h: coin?.change24h ?? Number.NaN,
+        change7d: coin?.change7d ?? Number.NaN,
+        marketCap: coin?.marketCap ?? Number.NaN,
+        volume24h: coin?.volume24h ?? Number.NaN,
+        image: coin?.image ?? "",
+        sparkline7d: coin?.sparkline7d ?? [],
+        categories: asset.categories,
+        source,
+        pair: krakenTicker?.pair ?? null,
+      }
+    })
+
+  const prices = priceCandidates
+    .filter((price): price is CryptoPrice => Boolean(price))
+    .sort((left, right) => {
+      if (left.marketCap && right.marketCap) return right.marketCap - left.marketCap
+      return left.symbol.localeCompare(right.symbol)
+    })
+
+  const pricesWithChange = prices.filter((price) => Number.isFinite(price.change24h))
+  const positiveAssets = pricesWithChange.filter((price) => price.change24h > 0).length
+  const negativeAssets = pricesWithChange.filter((price) => price.change24h < 0).length
+  const avgVolatility24h = pricesWithChange.length
+    ? pricesWithChange.reduce((sum, price) => sum + Math.abs(price.change24h), 0) / pricesWithChange.length
+    : null
+  const krakenAssets = prices.filter((price) => price.source === "Kraken").length
+  const fallbackAssets = prices.filter((price) => price.source === "fallback").length
+  const coinGeckoAssets = prices.filter((price) => price.source === "CoinGecko").length
+
+  return {
+    prices,
+    summary: {
+      trackedAssets: prices.length,
+      positiveAssets,
+      negativeAssets,
+      avgVolatility24h,
+      krakenAssets,
+      coinGeckoAssets,
+      fallbackAssets,
+      unavailableAssets,
+      primarySource: krakenAssets > 0 ? "Kraken + CoinGecko fallback" : "CoinGecko",
+    },
   }
 }
 
@@ -300,6 +423,28 @@ export async function fetchPortfolioMarketHistory(
 }
 
 export async function fetchMarketSnapshot(): Promise<MarketSnapshot> {
-  const [prices, global] = await Promise.all([fetchCryptoPrices(), fetchMarketGlobal()])
-  return { prices, global, fetchedAt: Date.now() }
+  const [rankedMarkets, global, krakenTickers] = await Promise.all([
+    fetchMarketsData(100),
+    fetchMarketGlobal(),
+    fetchKrakenTickers().catch((error) => {
+      console.warn("[Kraken] fetchMarketSnapshot fallback to CoinGecko only", error)
+      return [] as KrakenTicker[]
+    }),
+  ])
+
+  const trackedIds = getTrackedCryptoUniverse().map((asset) => asset.coingeckoId)
+  const presentIds = new Set(rankedMarkets.map((coin) => coin.id))
+  const missingIds = trackedIds.filter((id) => !presentIds.has(id))
+  const specificPrices = missingIds.length > 0 ? await fetchSpecificCryptoPrices(missingIds) : []
+  const { prices, summary } = buildTrackedMarketPrices(
+    [...rankedMarkets, ...specificPrices],
+    krakenTickers
+  )
+
+  return {
+    prices,
+    global,
+    fetchedAt: Date.now(),
+    summary,
+  }
 }

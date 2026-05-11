@@ -154,6 +154,20 @@ const FAQ_ITEMS = [
   },
 ] as const
 
+const LANDING_LIVE_MARKET_SYMBOLS = [
+  "BTC",
+  "ETH",
+  "SOL",
+  "XRP",
+  "AVAX",
+  "LINK",
+  "DOGE",
+  "RENDER",
+  "TAO",
+  "FET",
+  "ONDO",
+] as const
+
 const EURO_FORMATTER = new Intl.NumberFormat("fr-FR", {
   style: "currency",
   currency: "EUR",
@@ -172,12 +186,18 @@ interface HomePageClientProps {
 export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const liveMarketRows = useMemo(
-    () => (marketSnapshot?.prices ?? [])
-      .filter((coin) => Number.isFinite(coin.price) && coin.price > 0)
-      .slice(0, 6),
+    () => LANDING_LIVE_MARKET_SYMBOLS
+      .map((symbol) => marketSnapshot?.prices.find((coin) => coin.symbol === symbol) ?? null)
+      .filter((coin): coin is NonNullable<typeof coin> => (
+        coin !== null
+        && Number.isFinite(coin.price)
+        && coin.price > 0
+        && Number.isFinite(coin.change24h)
+      ))
+      .slice(0, 8),
     [marketSnapshot]
   )
-  const marketLead = liveMarketRows.slice(0, 3)
+  const marketLead = liveMarketRows
   const topMover = liveMarketRows.length
     ? [...liveMarketRows].sort((left, right) => right.change24h - left.change24h)[0]
     : null
@@ -185,6 +205,14 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
     ? {
         cap: `$${(marketSnapshot.global.totalMarketCapUsd / 1e12).toFixed(2)}T`,
         dominance: `${marketSnapshot.global.btcDominance.toFixed(1)}%`,
+      }
+    : null
+  const liveMarketPulse = marketSnapshot?.summary
+    ? {
+        tracked: marketSnapshot.summary.trackedAssets,
+        positive: marketSnapshot.summary.positiveAssets,
+        negative: marketSnapshot.summary.negativeAssets,
+        fallback: marketSnapshot.summary.fallbackAssets,
       }
     : null
   const liveDataLabel = marketSnapshot?.fetchedAt
@@ -331,19 +359,41 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                     <p className="mt-1 text-sm font-semibold text-foreground">
                       {liveDataSummary
                         ? `${liveDataSummary.cap} de capitalisation · BTC dominance ${liveDataSummary.dominance}`
-                        : "Prix live CoinGecko avec contexte marche"}
+                        : "Prix live avec fallback transparent si Kraken ne couvre pas un actif"}
                     </p>
                   </div>
-                  {topMover && (
-                    <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700">
-                      Top mover: {topMover.symbol} {topMover.change24h >= 0 ? "+" : ""}{topMover.change24h.toFixed(1)}%
+                  <div className="flex flex-wrap gap-2">
+                    {topMover && (
+                      <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700">
+                        Top mover: {topMover.symbol} {topMover.change24h >= 0 ? "+" : ""}{topMover.change24h.toFixed(1)}%
+                      </div>
+                    )}
+                    <div className="rounded-full border border-border bg-secondary px-3 py-1.5 text-[11px] font-semibold text-muted-foreground">
+                      Live market
                     </div>
-                  )}
+                  </div>
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {liveMarketPulse && (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                    {[
+                      { label: "Actifs suivis", value: String(liveMarketPulse.tracked) },
+                      { label: "Hausse 24h", value: String(liveMarketPulse.positive) },
+                      { label: "Baisse 24h", value: String(liveMarketPulse.negative) },
+                      { label: "Fallback", value: liveMarketPulse.fallback > 0 ? `${liveMarketPulse.fallback} actif(s)` : "Aucun" },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-2xl border border-border bg-secondary px-3 py-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          {item.label}
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-foreground">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {marketLead.map((coin) => (
-                    <div key={coin.symbol} className="rounded-2xl border border-border bg-secondary p-4">
-                      <div className="flex items-center justify-between gap-3">
+                    <div key={coin.symbol} className="rounded-2xl border border-border bg-secondary p-4 transition-transform hover:-translate-y-0.5">
+                      <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                             {coin.symbol}
@@ -353,6 +403,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                               maximumFractionDigits: coin.price >= 1000 ? 0 : coin.price >= 1 ? 2 : 4,
                             })}
                           </p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">{coin.name}</p>
                         </div>
                         <div className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                           coin.change24h >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
@@ -360,12 +411,25 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                           {coin.change24h >= 0 ? "+" : ""}{coin.change24h.toFixed(1)}%
                         </div>
                       </div>
-                      <p className="mt-3 text-[11px] text-muted-foreground">
-                        Donnees live pour lire le regime marche avant l&apos;allocation.
-                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold text-foreground">
+                          Source : {coin.source === "Kraken" ? "Kraken" : coin.source === "fallback" ? "Fallback" : "CoinGecko"}
+                        </span>
+                        {(coin.categories ?? []).slice(0, 2).map((category) => (
+                          <span
+                            key={category}
+                            className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[10px] text-muted-foreground"
+                          >
+                            {category}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  Axiom lit les prix live, les variations 24 h et le contexte de marche avant de generer une allocation. Si Kraken ne couvre pas un actif, le fallback CoinGecko est visible.
+                </p>
               </div>
             )}
           </div>

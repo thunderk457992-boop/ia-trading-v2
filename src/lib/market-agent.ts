@@ -48,10 +48,11 @@ export function buildMarketDecision(
   global: MarketGlobal | null,
   latestAllocations?: AllocationItem[] | null
 ): MarketDecision | null {
-  if (!prices.length) return null
+  const validPrices = prices.filter((asset) => Number.isFinite(asset.change24h))
+  if (!validPrices.length) return null
 
-  const avgAbsChange24h = prices.reduce((sum, asset) => sum + Math.abs(asset.change24h), 0) / prices.length
-  const positiveBreadthPct = (prices.filter((asset) => asset.change24h > 0).length / prices.length) * 100
+  const avgAbsChange24h = validPrices.reduce((sum, asset) => sum + Math.abs(asset.change24h), 0) / validPrices.length
+  const positiveBreadthPct = (validPrices.filter((asset) => asset.change24h > 0).length / validPrices.length) * 100
   const btcDominance = global?.btcDominance ?? null
   const marketChange24h = global?.change24h ?? null
   const portfolioCoreWeight = sumCoreAllocation(latestAllocations)

@@ -111,10 +111,13 @@ function buildKrakenContext(tickers: KrakenTicker[]): string {
 
   return [
     "FLUX KRAKEN:",
-    ...tickers.slice(0, 4).map((ticker) => {
+    ...[...tickers]
+      .sort((left, right) => right.volume24h - left.volume24h)
+      .slice(0, 6)
+      .map((ticker) => {
       const spread = ticker.ask - ticker.bid
       const spreadPct = ticker.bid > 0 ? (spread / ticker.bid) * 100 : 0
-      return `- ${ticker.symbol}: spot ${formatKrakenPrice(ticker.price)} | bid ${formatKrakenPrice(ticker.bid)} | ask ${formatKrakenPrice(ticker.ask)} | volume 24h ${formatKrakenVolume(ticker.volume24h)} | spread ${spreadPct.toFixed(3)}%`
+      return `- ${ticker.symbol}: spot ${formatKrakenPrice(ticker.price)} | bid ${formatKrakenPrice(ticker.bid)} | ask ${formatKrakenPrice(ticker.ask)} | volume 24h ${formatKrakenVolume(ticker.volume24h)} | spread ${spreadPct.toFixed(3)}% | paire ${ticker.pair}`
     }),
   ].join("\n")
 }
@@ -304,8 +307,6 @@ ${MARKET_LOGIC}
 ${planFeatureRules}
 ${marketAvailabilityRule}
 ${assetSelectionRules}
-${assetSelectionRules}
-${assetSelectionRules}
 
 MOTEUR DE DÉCISION STRUCTURÉ:
 ${marketDecisionJson}
@@ -390,6 +391,7 @@ ${STYLE_RULES}
 ${MARKET_LOGIC}
 ${planFeatureRules}
 ${marketAvailabilityRule}
+${assetSelectionRules}
 
 MOTEUR DE DÉCISION STRUCTURÉ:
 ${marketDecisionJson}
@@ -477,6 +479,7 @@ ${STYLE_RULES}
 ${MARKET_LOGIC}
 ${planFeatureRules}
 ${marketAvailabilityRule}
+${assetSelectionRules}
 
 MOTEUR DE DÉCISION STRUCTURÉ:
 ${marketDecisionJson}
@@ -747,9 +750,22 @@ export async function POST(request: Request) {
     const krakenCtx = buildKrakenContext(krakenTickers)
     const marketDecision = buildMarketDecision(prices, globalData, null)
     const availableAssets = prices.length
-      ? Array.from(new Set(
-          prices.map((price) => `${price.symbol} [${getCryptoCategories(price.symbol).join(", ")}]`)
-        )).join(", ")
+      ? prices
+          .filter((price) => (
+            Number.isFinite(price.price)
+            && Number.isFinite(price.change24h)
+            && Number.isFinite(price.marketCap)
+            && Number.isFinite(price.volume24h)
+          ))
+          .slice(0, 32)
+          .map((price) => (
+            `${price.symbol} [${getCryptoCategories(price.symbol).join(", ")}] ` +
+            `prix ${fmtPrice(price.price)} | 24h ${price.change24h >= 0 ? "+" : ""}${price.change24h.toFixed(1)}% | ` +
+            `cap ${price.marketCap >= 1e9 ? `${(price.marketCap / 1e9).toFixed(1)}B` : `${(price.marketCap / 1e6).toFixed(0)}M`} | ` +
+            `volume ${price.volume24h >= 1e9 ? `${(price.volume24h / 1e9).toFixed(1)}B` : `${(price.volume24h / 1e6).toFixed(0)}M`} | ` +
+            `source ${price.source ?? "CoinGecko"}`
+          ))
+          .join(", ")
       : "BTC [Large cap, Reserve], ETH [Large cap, Layer 1, DeFi], SOL [Layer 1], XRP [Payments], BNB [Exchange, Infrastructure], AVAX [Layer 1], SUI [Layer 1], SEI [Layer 1, Trading], ADA [Layer 1], LINK [Infrastructure, Oracle], ONDO [RWA], AAVE [DeFi], ARB [Layer 2], OP [Layer 2], RNDR [AI], TAO [AI], FET [AI], INJ [DeFi], HBAR [Infrastructure], DOGE [Memecoin], PEPE [Memecoin], WIF [Memecoin], BONK [Memecoin], KAS [Infrastructure], ATOM [Infrastructure], IMX [Gaming], GALA [Gaming]"
     const coinGeckoAvailable = prices.length > 0
     const krakenAvailable = krakenTickers.length > 0

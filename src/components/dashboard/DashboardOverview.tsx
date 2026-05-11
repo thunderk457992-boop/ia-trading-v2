@@ -123,6 +123,18 @@ function fmtCapShort(n: number | null | undefined) {
   if (value >= 1e9)  return `${(value / 1e9).toFixed(0)}B`
   return `${(value / 1e6).toFixed(0)}M`
 }
+
+function getMarketSourceLabel(source: CryptoPrice["source"]) {
+  if (source === "Kraken") return "Kraken"
+  if (source === "fallback") return "CoinGecko fallback"
+  return "CoinGecko"
+}
+
+function getMarketSourceClasses(source: CryptoPrice["source"]) {
+  if (source === "Kraken") return "border-emerald-200 bg-emerald-50 text-emerald-700"
+  if (source === "fallback") return "border-amber-200 bg-amber-50 text-amber-700"
+  return "border-border bg-secondary text-muted-foreground"
+}
 function fmtPortfolioEuroDelta(value: number | null | undefined) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—"
 
@@ -920,6 +932,10 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
 
     return data
   }, [cryptoPrices, search, filter, sortKey, sortDir])
+  const positives = displayed.filter((coin) => coin.change24h > 0).length
+  const negatives = displayed.filter((coin) => coin.change24h < 0).length
+  const krakenCount = displayed.filter((coin) => coin.source === "Kraken").length
+  const fallbackCount = displayed.filter((coin) => coin.source === "fallback").length
 
   const filters = [
     { id: "all",     label: "Tout" },
@@ -932,7 +948,7 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
       <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-[15px] font-semibold text-foreground">Marchés</h3>
-          <p className="text-[11px] text-muted-foreground">Prix en direct avec performance 24h</p>
+          <p className="text-[11px] text-muted-foreground">Prix live, variation 24h, categories et source visible par actif.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -967,6 +983,23 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
+      </div>
+      <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3 text-[11px]">
+        <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-muted-foreground">
+          {displayed.length} actifs suivis
+        </span>
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">
+          {positives} en hausse
+        </span>
+        <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-red-700">
+          {negatives} en baisse
+        </span>
+        <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-muted-foreground">
+          {krakenCount} via Kraken
+        </span>
+        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-700">
+          {fallbackCount} en fallback
+        </span>
       </div>
 
       <div className="overflow-x-auto">
@@ -1027,7 +1060,17 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
                       </div>
                       <div>
                         <p className="text-[13px] font-medium text-foreground">{c.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{c.symbol}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <p className="text-[10px] text-muted-foreground">{c.symbol}</p>
+                          <span className={cn("rounded-full border px-2 py-0.5 text-[9px] font-semibold", getMarketSourceClasses(c.source))}>
+                            {getMarketSourceLabel(c.source)}
+                          </span>
+                          {(c.categories ?? []).slice(0, 2).map((category) => (
+                            <span key={category} className="rounded-full border border-border bg-background px-2 py-0.5 text-[9px] text-muted-foreground">
+                              {category}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -1063,7 +1106,7 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
       </div>
 
       <div className="border-t border-border px-4 py-2.5 flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">{displayed.length} actifs affichés</span>
+        <span className="text-[11px] text-muted-foreground">Source prix : Kraken quand la paire existe, sinon CoinGecko fallback visible.</span>
         <Link href="/kraken-live" className="text-[11px] font-medium text-accent hover:underline">
           Voir Kraken Live →
         </Link>
@@ -1209,6 +1252,27 @@ export function DashboardOverview({
     )),
     [cryptoPrices]
   )
+  const trackedMarketCount = marketUniverse.length
+  const positiveMarketCount = useMemo(
+    () => marketUniverse.filter((coin) => coin.change24h > 0).length,
+    [marketUniverse]
+  )
+  const negativeMarketCount = useMemo(
+    () => marketUniverse.filter((coin) => coin.change24h < 0).length,
+    [marketUniverse]
+  )
+  const krakenMarketCount = useMemo(
+    () => marketUniverse.filter((coin) => coin.source === "Kraken").length,
+    [marketUniverse]
+  )
+  const fallbackMarketCount = useMemo(
+    () => marketUniverse.filter((coin) => coin.source === "fallback").length,
+    [marketUniverse]
+  )
+  const coinGeckoMarketCount = useMemo(
+    () => marketUniverse.filter((coin) => coin.source === "CoinGecko").length,
+    [marketUniverse]
+  )
   const btcCoin = marketUniverse.find((coin) => coin.symbol === "BTC") ?? null
   const altCoins = marketUniverse.filter((coin) => !["BTC", "ETH", "USDT", "USDC", "DAI", "USDE", "FDUSD"].includes(coin.symbol))
   const topMovers = useMemo(
@@ -1306,7 +1370,7 @@ export function DashboardOverview({
                 : <span className="ml-1 text-muted-foreground/50">Chargement des prix live...</span>
               }
               <span className="ml-1">Source portefeuille : <span className="font-medium text-foreground">{useSnapshotHistory ? "portfolio_history uniquement" : "aucune donnee"}</span>.</span>
-              <span className="ml-1">Prix marche : <span className="font-medium text-foreground">CoinGecko, avec Kraken si disponible pour le calcul des snapshots.</span></span>
+              <span className="ml-1">Prix marche : <span className="font-medium text-foreground">Kraken quand la paire existe, sinon CoinGecko fallback visible.</span></span>
             </p>
           </div>
           <Link
@@ -1324,7 +1388,7 @@ export function DashboardOverview({
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
             <span className="font-semibold text-foreground">Prix live</span>
-            <span>CoinGecko / Kraken</span>
+            <span>Kraken + fallback CoinGecko</span>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
             <span className="font-semibold text-foreground">Dernier snapshot</span>
@@ -1332,7 +1396,7 @@ export function DashboardOverview({
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
             <span className="font-semibold text-foreground">Etat data</span>
-            <span>{marketUpdatedLabel ? "a jour" : "source indisponible"}</span>
+            <span>{marketUpdatedLabel ? `${krakenMarketCount} Kraken · ${fallbackMarketCount} fallback` : "source indisponible"}</span>
           </div>
         </div>
         <div className="mt-3 rounded-xl border border-border bg-card px-4 py-3 text-[12px] leading-5 text-muted-foreground">
@@ -1573,12 +1637,24 @@ export function DashboardOverview({
                 {marketTrend ? <span className={cn("font-semibold", marketTrend.tone)}>{marketTrend.label}</span> : "Trend indisponible"}
               </span>
               <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-muted-foreground">
-                Source : CoinGecko / Kraken
+                Source : {krakenMarketCount > 0 ? "Kraken + fallback CoinGecko" : "CoinGecko"}
+              </span>
+              <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-muted-foreground">
+                {trackedMarketCount} actifs suivis
               </span>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-xl border border-border bg-secondary/60 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Marche suivi</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">
+                {trackedMarketCount}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {positiveMarketCount} en hausse · {negativeMarketCount} en baisse
+              </p>
+            </div>
             <div className="rounded-xl border border-border bg-secondary/60 p-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">BTC dominance</p>
               <p className="mt-2 text-lg font-semibold text-foreground">
@@ -1598,21 +1674,42 @@ export function DashboardOverview({
               </p>
             </div>
             <div className="rounded-xl border border-border bg-secondary/60 p-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Altseason</p>
-              <p className="mt-2 text-lg font-semibold text-foreground">
-                {altseasonStatus?.label ?? "—"}
-              </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                {altseasonStatus?.note ?? "Aucune lecture large disponible"}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-secondary/60 p-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Volatilite 24h</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Volatilite moyenne</p>
               <p className="mt-2 text-lg font-semibold text-foreground">
                 {marketVolatility !== null ? `${marketVolatility.toFixed(1)}%` : "—"}
               </p>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {marketVolatility !== null && marketVolatility > 6 ? "Regime nerveux" : "Regime plutot lisible"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-xl border border-border bg-background px-3 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fallback status</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {fallbackMarketCount > 0 ? `${fallbackMarketCount} actif(s)` : "Aucun actif"}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {fallbackMarketCount > 0 ? "CoinGecko prend le relais quand Kraken ne couvre pas la paire." : "Kraken couvre le coeur du flux actuellement."}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-background px-3 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Top movers</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {topMovers[0] ? `${topMovers[0].symbol} ${topMovers[0].change24h >= 0 ? "+" : ""}${topMovers[0].change24h.toFixed(1)}%` : "Indisponible"}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Lecture des accelerations de prix sur 24 h.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-background px-3 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Source data</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {krakenMarketCount} Kraken · {coinGeckoMarketCount} CoinGecko
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Derniere mise a jour {marketUpdatedLabel ?? "en attente"}.
               </p>
             </div>
           </div>
@@ -1699,7 +1796,7 @@ export function DashboardOverview({
             <div className="rounded-xl border border-border bg-background px-3 py-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Infrastructure</p>
               <ul className="mt-2 space-y-2 text-[11px] text-muted-foreground">
-                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-foreground/70 shrink-0" /><span>Prix live issus de CoinGecko et completes par Kraken quand le flux est disponible.</span></li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-foreground/70 shrink-0" /><span>Prix live issus de Kraken quand la paire existe, sinon CoinGecko fallback visible par actif.</span></li>
                 <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-foreground/70 shrink-0" /><span>Historique portefeuille base uniquement sur portfolio_history et snapshots reels.</span></li>
                 <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-foreground/70 shrink-0" /><span>Si une source manque, le dashboard l&apos;assume au lieu de fabriquer un signal.</span></li>
               </ul>
