@@ -47,9 +47,10 @@ export const CHAT_PLAN_CONFIG: Record<ChatPlan, ChatPlanConfig> = {
     ],
     upgradeMessage: "Passez au Pro pour relier le chat à vos analyses récentes.",
     suggestions: [
-      "Explique-moi simplement le DCA sur Bitcoin.",
-      "Quelles erreurs éviter quand on débute en crypto ?",
-      "Que peut faire mon plan actuel ?",
+      "Je débute, par où commencer ?",
+      "C'est quoi le DCA et comment l'utiliser ?",
+      "Quelles sont les erreurs à éviter au début ?",
+      "Explique-moi BTC et ETH simplement.",
     ],
   },
   pro: {
@@ -69,9 +70,10 @@ export const CHAT_PLAN_CONFIG: Record<ChatPlan, ChatPlanConfig> = {
     ],
     upgradeMessage: "Passez au Premium pour une lecture de marché plus poussée et plus de contexte.",
     suggestions: [
-      "À partir de ma dernière analyse, que dois-je vérifier cette semaine ?",
-      "Mon allocation actuelle est-elle trop agressive ?",
-      "Comment fonctionne exactement l'Advisor ?",
+      "Mon plan est-il trop risqué ?",
+      "Fais-moi un plan DCA simple.",
+      "Que vérifier cette semaine sur ma stratégie ?",
+      "Je veux limiter mes pertes.",
     ],
   },
   premium: {
@@ -88,9 +90,10 @@ export const CHAT_PLAN_CONFIG: Record<ChatPlan, ChatPlanConfig> = {
     locked: [],
     upgradeMessage: null,
     suggestions: [
-      "Compare ma dernière analyse avec le contexte marché actuel.",
-      "Quels ajustements prudents ferais-tu sur mon allocation maintenant ?",
-      "Explique simplement les points faibles de ma stratégie actuelle.",
+      "Mon plan tient-il face au marché actuel ?",
+      "Qu'est-ce que j'ajusterais maintenant ?",
+      "Points faibles de ma stratégie actuelle.",
+      "Comment réduire le risque sans tout vendre ?",
     ],
   },
 }

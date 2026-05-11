@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowUp, Bot, Loader2, Lock, MessageSquare, ShieldAlert, Sparkles } from "lucide-react"
+import { ArrowUp, Bot, Loader2, Lock, MessageSquare, ShieldAlert, Sparkles, Zap } from "lucide-react"
 import { CHAT_PLAN_CONFIG, type ChatPlan, type ChatUsage } from "@/lib/chat"
 import { type MarketDecision } from "@/lib/market-agent"
 import { cn } from "@/lib/utils"
@@ -38,21 +38,28 @@ function formatDate(date: string | null): string {
   }).format(new Date(date))
 }
 
+const QUICK_ACTIONS = [
+  { label: "Je veux investir 50€", message: "Je veux commencer à investir 50€ en crypto. Par où commencer ?" },
+  { label: "Limiter le risque", message: "Comment limiter mes risques en crypto ? Je débute." },
+  { label: "BTC / ETH — c'est quoi ?", message: "Explique-moi simplement la différence entre Bitcoin et Ethereum." },
+  { label: "Plan DCA", message: "Fais-moi un plan DCA simple pour débuter avec un petit budget." },
+  { label: "Explique plus simplement", message: "Explique ta dernière réponse plus simplement, comme si j'avais zéro expérience." },
+]
+
 export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarketDecision }: ChatClientProps) {
   const planConfig = CHAT_PLAN_CONFIG[plan]
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage(
       "assistant",
       latestAnalysisAt
-        ? "Bonjour. Je peux expliquer un terme crypto, résumer votre dernière analyse Axiom et vous aider à choisir la suite."
-        : "Bonjour. Je peux expliquer les bases crypto, clarifier une stratégie prudente et vous aider à décider de la prochaine étape."
+        ? "Bonjour ! Je peux reprendre ta dernière analyse, t'expliquer un terme crypto ou t'aider à décider de la prochaine étape. Pose ta question."
+        : "Bonjour ! Je peux t'expliquer les bases crypto, t'aider à structurer une première stratégie ou répondre à tes questions. Pose ta question."
     ),
   ])
   const [input, setInput] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [usage, setUsage] = useState<ChatUsage>(initialUsage)
   const [isLoading, setIsLoading] = useState(false)
-  const [contextSummary, setContextSummary] = useState<{ analyses: number; market: boolean } | null>(null)
   const [marketDecision, setMarketDecision] = useState<MarketDecision | null>(initialMarketDecision)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -102,7 +109,6 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
 
       setMessages((current) => [...current, createMessage("assistant", data.reply)])
       if (data.usage) setUsage(data.usage)
-      if (data.context) setContextSummary(data.context)
       if (data.marketDecision) setMarketDecision(data.marketDecision)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Le chat a rencontré une erreur.")
@@ -121,32 +127,23 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
             Chat IA
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl md:text-4xl">
-            Posez une question. Obtenez une réponse claire.
+            Pose ta question. Obtiens une réponse claire.
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
-            Le chat répond selon votre plan, vos analyses récentes et les données réellement disponibles dans l’application.
+            Répond simplement, sur ta stratégie, tes analyses ou les bases crypto. Sans jargon.
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-card px-4 py-3 shadow-card-xs">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Plan actif</p>
-            <p className="mt-2 text-lg font-semibold text-foreground">{planConfig.label}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {usage.limit === null ? "Sans quota mensuel dur" : `${usage.remaining ?? 0} message(s) restants ce mois-ci`}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-border bg-card px-4 py-3 shadow-card-xs">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Contexte perso</p>
-            <p className="mt-2 text-sm font-medium text-foreground">
-              {latestAnalysisAt ? `Dernière analyse du ${formatDate(latestAnalysisAt)}` : "Pas encore d’analyse Advisor"}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {planConfig.analysisContextCount === 0
-                ? "Le plan Free répond sans relire vos analyses."
-                : `${planConfig.analysisContextCount} analyse(s) max relues par réponse.`}
-            </p>
-          </div>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            <Sparkles className="h-3 w-3" />
+            Plan {planConfig.label} · {usage.limit === null ? "illimité" : `${usage.remaining ?? 0} messages restants`}
+          </span>
+          {latestAnalysisAt && (
+            <span className="hidden rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground sm:inline-flex">
+              Analyse du {formatDate(latestAnalysisAt)} disponible
+            </span>
+          )}
         </div>
       </div>
 
@@ -154,10 +151,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
         <section className="overflow-hidden rounded-[28px] border border-border bg-card shadow-card sm:rounded-3xl">
           <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
-              <p className="text-sm font-medium text-foreground">Historique de la session</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Les messages de cette session restent visibles pour garder le fil de la conversation.
-              </p>
+              <p className="text-sm font-medium text-foreground">Conversation</p>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className={cn(
@@ -234,6 +228,22 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
               </div>
             )}
 
+            {/* Quick action chips */}
+            <div className="mb-3 flex flex-wrap gap-2">
+              {QUICK_ACTIONS.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => void submitMessage(action.message)}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary/70 disabled:opacity-40"
+                >
+                  <Zap className="h-3 w-3 text-muted-foreground" />
+                  {action.label}
+                </button>
+              ))}
+            </div>
+
             <div className="rounded-3xl border border-border bg-background p-1.5 shadow-card-xs sm:p-2">
               <div className="flex flex-col gap-3">
                 <textarea
@@ -246,15 +256,12 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
                       void submitMessage()
                     }
                   }}
-                  placeholder="Exemple: explique-moi ce que change une dominance BTC élevée sur mon allocation."
-                  className="min-h-[88px] w-full resize-none rounded-2xl border-0 bg-transparent px-3 py-3 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground sm:min-h-[96px]"
+                  placeholder="Pose ta question... ex : comment investir 100€ en crypto sans trop risquer ?"
+                  className="min-h-[72px] w-full resize-none rounded-2xl border-0 bg-transparent px-3 py-3 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground sm:min-h-[88px]"
                   disabled={isLoading}
                   onFocus={handleTextareaFocus}
                 />
-                <div className="flex flex-col gap-3 px-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Le message doit contenir du texte. L’envoi reste bloqué pendant la réponse.
-                  </p>
+                <div className="flex flex-col gap-3 px-2 pb-2 sm:flex-row sm:items-center sm:justify-end">
                   <button
                     type="button"
                     onClick={() => void submitMessage()}
@@ -324,27 +331,24 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
           </div>
 
           <div className="rounded-3xl border border-border bg-card p-4 shadow-card sm:p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Contexte utilisé</p>
-            <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
-              <p>
-                Analyses reliées: {contextSummary ? contextSummary.analyses : Math.min(planConfig.analysisContextCount, latestAnalysisAt ? 1 : 0)}
-              </p>
-              <p>
-                Marché live: {contextSummary ? (contextSummary.market ? "oui" : "non") : planConfig.marketContextDepth === "none" ? "non" : "selon disponibilité"}
-              </p>
-              <p>
-                Si une donnée manque, le chat le dit clairement au lieu d’inventer une réponse.
-              </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mon contexte</p>
+            <div className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
+              {latestAnalysisAt ? (
+                <p>Dernière analyse du {formatDate(latestAnalysisAt)} disponible.</p>
+              ) : (
+                <p>Pas encore d’analyse personnelle.</p>
+              )}
+              <p className="text-xs">Le chat ne devine pas — il dit clairement si une info manque.</p>
             </div>
-            {!latestAnalysisAt && plan !== "free" && (
+            {!latestAnalysisAt && (
               <Link href="/advisor" className="mt-4 inline-flex items-center text-sm font-medium text-foreground underline underline-offset-4">
-                Créer ma première analyse
+                Faire ma première analyse →
               </Link>
             )}
           </div>
 
           <div className="rounded-3xl border border-border bg-card p-4 shadow-card sm:p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Moteur de marché</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Signal marché</p>
             {marketDecision ? (
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
@@ -362,13 +366,12 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">{marketDecision.strategy}</p>
                 <div className="rounded-2xl border border-border bg-secondary px-3 py-2 text-xs text-foreground">
-                  BTC {marketDecision.allocation.BTC}% · ETH {marketDecision.allocation.ETH}% · Alt {marketDecision.allocation.ALT}%
+                  BTC {marketDecision.allocation.BTC}% · ETH {marketDecision.allocation.ETH}% · Autres {marketDecision.allocation.ALT}%
                 </div>
-                <p className="text-sm leading-6 text-muted-foreground">{marketDecision.executionNow}</p>
               </div>
             ) : (
               <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                Lecture du marché indisponible pour l’instant.
+                Signal marché indisponible pour l’instant.
               </p>
             )}
           </div>
