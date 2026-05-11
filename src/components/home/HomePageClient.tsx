@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -30,9 +30,9 @@ const PRODUCT_ALLOCATION = [
 ] as const
 
 const PRODUCT_TIMELINE = [
-  "Profil investisseur clarifie en moins d'une minute",
-  "Allocation structuree par niveau de risque",
-  "Plan d'entree progressif et suivi du portefeuille",
+  "Profil investisseur clarifié en moins d'une minute",
+  "Allocation structurée par niveau de risque",
+  "Plan d'entrée progressif et suivi du portefeuille",
 ] as const
 
 const HERO_METRICS = [
@@ -46,7 +46,7 @@ const HOME_PRICING_PLANS = [
     name: "Gratuit",
     price: { monthly: 0, yearly: 0 },
     icon: Sparkles,
-    audience: "Pour tester la methode sans carte bancaire.",
+    audience: "Pour tester la méthode sans carte bancaire.",
     summary: "Decouvrir le produit et voir si la logique vous convient.",
     features: [
       "1 analyse IA par mois",
@@ -54,7 +54,7 @@ const HOME_PRICING_PLANS = [
       "Allocation de base et plan initial",
       "Historique limite a 3 analyses",
     ],
-    cta: "Creer mon plan gratuit",
+    cta: "Créer mon plan gratuit",
     highlighted: false,
     href: "/register",
     badge: "Aucune carte requise",
@@ -63,11 +63,11 @@ const HOME_PRICING_PLANS = [
     name: "Pro",
     price: { monthly: 24.99, yearly: 219.99 },
     icon: Zap,
-    audience: "Pour investir avec methode et plus de contexte marche.",
+    audience: "Pour investir avec méthode et plus de contexte marché.",
     summary: "Le bon niveau si vous voulez un cadre, pas seulement une premiere opinion.",
     features: [
       "20 analyses IA par mois",
-      "Signal marche detaille",
+      "Signal marché détaillé",
       "Historique sur 10 analyses",
       "Export PDF et chat relie aux analyses",
     ],
@@ -97,8 +97,8 @@ const HOME_PRICING_PLANS = [
 
 const TRUST_ITEMS = [
   {
-    title: "Donnees de marche reelles",
-    body: "Les prix et variations viennent de CoinGecko, avec Kraken quand il est disponible pour les snapshots portefeuille.",
+    title: "Données de marché réelles",
+    body: "Les prix et variations viennent de CoinGecko, avec Kraken quand disponible pour les snapshots portefeuille.",
     icon: Database,
   },
   {
@@ -107,8 +107,8 @@ const TRUST_ITEMS = [
     icon: Shield,
   },
   {
-    title: "Compte securise",
-    body: "Authentification Supabase, routes protegees et donnees utilisateur separees par compte.",
+    title: "Compte sécurisé",
+    body: "Authentification Supabase, routes protégées et données utilisateur séparées par compte.",
     icon: Lock,
   },
   {
@@ -122,7 +122,7 @@ const FIT_ITEMS = {
   yes: [
     "Vous voulez savoir quoi acheter sans empiler dix dashboards.",
     "Vous avez un budget defini et vous voulez une allocation adaptee a votre risque.",
-    "Vous cherchez un plan d'entree progressif au lieu d'acheter sous impulsion.",
+    "Vous cherchez un plan d'entrée progressif au lieu d'acheter sous impulsion.",
   ],
   no: [
     "Vous cherchez des promesses de rendement ou des signaux miracles.",
@@ -135,17 +135,17 @@ const FAQ_ITEMS = [
   {
     question: "Qu'est-ce que je recois concretement apres 1 minute ?",
     answer:
-      "Un profil investisseur clarifie, une allocation crypto, un score de risque lisible, des actions a faire maintenant et un dashboard qui suit le portefeuille reel.",
+      "Un profil investisseur clarifié, une allocation crypto, un score de risque lisible, des actions à faire maintenant et un dashboard qui suit le portefeuille réel.",
   },
   {
-    question: "Est-ce que l'IA predit le marche ?",
+    question: "Est-ce que l'IA prédit le marché ?",
     answer:
-      "Non. Axiom ne predit pas le marche. Il structure une strategie a partir de votre profil, de la volatilite, de la liquidite et du contexte marche disponible.",
+      "Non. Axiom ne prédit pas le marché. Il structure une stratégie à partir de votre profil, de la volatilité, de la liquidité et du contexte marché disponible.",
   },
   {
-    question: "Est-ce adapte aux debutants ?",
+    question: "Est-ce adapté aux débutants ?",
     answer:
-      "Oui. Le questionnaire reste simple, le vocabulaire peut etre guide et le produit explique pourquoi une allocation est proposee.",
+      "Oui. Le questionnaire reste simple, le vocabulaire peut être guidé et le produit explique pourquoi une allocation est proposée.",
   },
   {
     question: "Comment eviter de confondre performance et nouveau capital ?",
@@ -247,14 +247,14 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
   const navPrimaryHref = isAuthenticated ? "/dashboard" : "/login"
   const navPrimaryLabel = isAuthenticated ? "Dashboard" : "Connexion"
   const navSecondaryHref = isAuthenticated ? "/advisor" : "/register"
-  const navSecondaryLabel = isAuthenticated ? "Nouvelle analyse" : "Creer mon plan gratuit"
+  const navSecondaryLabel = isAuthenticated ? "Nouvelle analyse" : "Créer mon plan gratuit"
   const heroPrimaryHref = isAuthenticated ? "/dashboard" : "/register"
-  const heroPrimaryLabel = isAuthenticated ? "Ouvrir mon dashboard" : "Creer mon plan gratuit"
+  const heroPrimaryLabel = isAuthenticated ? "Ouvrir mon dashboard" : "Créer mon plan gratuit"
   const heroSecondaryHref = isAuthenticated ? "/advisor" : "#example"
   const heroSecondaryLabel = isAuthenticated ? "Nouvelle analyse" : "Voir un exemple d'analyse"
   const pricingHref = isAuthenticated ? "/pricing" : "/register"
   const bottomCtaHref = isAuthenticated ? "/dashboard" : "/register"
-  const bottomCtaLabel = isAuthenticated ? "Ouvrir mon dashboard" : "Creer mon plan gratuit"
+  const bottomCtaLabel = isAuthenticated ? "Ouvrir mon dashboard" : "Créer mon plan gratuit"
 
   return (
     <div className="min-h-screen overflow-hidden bg-background">
@@ -265,9 +265,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
             <Link href="#product" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               Produit
             </Link>
-            <Link href="#method" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Methode
-            </Link>
+            <Link href="#method" className="text-sm text-muted-foreground transition-colors hover:text-foreground"></Link>
             <Link href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               Tarifs
             </Link>
@@ -627,7 +625,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
           <div className="rounded-[32px] border border-border bg-card p-7 shadow-card">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Methodologie</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Axiom ne predit pas le marche. Il structure une strategie.
+              Axiom ne prédit pas le marché. Il structure une stratégie.
             </h2>
             <p className="mt-4 text-sm leading-7 text-muted-foreground sm:text-base">
               L&apos;allocation ne sort pas d&apos;un slogan. Elle combine votre profil, votre budget, votre horizon,
@@ -981,3 +979,4 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
     </div>
   )
 }
+

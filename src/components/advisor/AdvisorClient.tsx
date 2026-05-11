@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { Analytics } from "@/lib/analytics"
 import { PortfolioChart } from "./PortfolioChart"
 
 interface Props {
@@ -439,13 +440,17 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
     if (!form.preciseObjective.trim()) { setError("Précisez votre objectif principal."); setFormStep(4); return }
     if (!form.investmentFrequency || !form.buyStrategy) { setError("Choisissez une option dans chaque section pour continuer."); setFormStep(6); return }
     setError(""); setStep("loading")
+    Analytics.advisorStarted(plan)
     try {
       const res  = await fetch("/api/advisor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, userId }) })
       const data = await res.json()
       if (res.status === 429 && data.upgradeRequired) { setStep("form"); setShowUpgradeModal(true); return }
       if (!res.ok) throw new Error(data.error || "L'analyse n'a pas pu être générée. Réessayez dans quelques instants.")
-      setAnalysis(normalizeAnalysis(data)); setStep("result")
+      const normalized = normalizeAnalysis(data)
+      Analytics.advisorCompleted(plan, normalized.allocation?.length ?? 0, normalized.score ?? 0)
+      setAnalysis(normalized); setStep("result")
     } catch (err) {
+      Analytics.advisorError(plan, err instanceof Error ? err.message.slice(0, 60) : "unknown")
       setError(err instanceof Error ? err.message : "L'analyse n'a pas pu être générée. Réessayez dans quelques instants.")
       setStep("form")
     }
@@ -469,7 +474,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
             {plan === "premium" ? "Claude Opus · analyse approfondie" : plan === "pro" ? "Claude Sonnet · analyse détaillée" : "Claude Haiku · analyse de base"}
           </p>
           <p className="text-[13px] text-muted-foreground mb-6">
-            Analyse en cours - cela peut prendre jusqu&apos;a 60 a 90 secondes selon la charge.
+            Cela peut prendre jusqu&apos;à 60-90 secondes selon la charge serveur.
           </p>
           <div className="w-full bg-secondary rounded-full h-1 mb-6 overflow-hidden">
             <div className="h-1 rounded-full bg-foreground transition-all duration-1000" style={{ width: `${progress}%` }} />
@@ -513,7 +518,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           <h1 className="text-3xl font-black text-foreground tracking-tight mb-1">Conseiller IA</h1>
           <p className="text-muted-foreground text-sm">
             {plan === "premium" ? "Claude Opus · stratégie institutionnelle" : plan === "pro" ? "Claude Sonnet · analyse détaillée" : "Claude Haiku · analyse de base"}
-            {" · "}analyse complete en 60 a 90 secondes selon la charge
+            {" · "}analyse complète en 60-90 s selon la charge
           </p>
         </div>
 

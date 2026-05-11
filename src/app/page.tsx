@@ -8,19 +8,19 @@ import {
 } from "@/lib/seo"
 
 export const metadata = buildPageMetadata({
-  title: "Axiom AI - Strategie crypto personnalisee et gestion du risque",
+  title: "Axiom AI — Conseiller crypto IA, répartition personnalisée",
   description:
-    "Build a personalized crypto portfolio strategy with AI, live market context, risk guidance, and a clear action plan you can follow.",
+    "Décrivez votre profil, obtenez une répartition crypto personnalisée et un plan d'action structuré en 1 minute. Propulsé par Claude AI. Gratuit pour commencer, sans carte bancaire.",
   path: "/",
   keywords: [
-    "ai crypto advisor",
-    "crypto portfolio strategy",
-    "personalized crypto strategy",
-    "crypto allocation tool",
-    "bitcoin portfolio assistant",
-    "crypto risk management",
-    "crypto dca strategy",
-    "crypto portfolio beginner",
+    "conseiller crypto IA",
+    "répartition portefeuille crypto",
+    "stratégie crypto personnalisée",
+    "crypto débutant",
+    "DCA bitcoin",
+    "gestion risque crypto",
+    "IA investissement crypto",
+    "allocations crypto Claude AI",
   ],
 })
 

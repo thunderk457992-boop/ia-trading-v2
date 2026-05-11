@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Analytics } from "@/lib/analytics"
 
 interface PricingClientProps {
   currentPlan: string
@@ -349,6 +350,7 @@ export function PricingClient({
       return
     }
 
+    Analytics.checkoutStarted(planId, billing)
     setLoadingPlan(planId)
     const startCheckout = () =>
       fetch("/api/stripe/checkout", {

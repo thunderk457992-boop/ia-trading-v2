@@ -34,6 +34,9 @@ const MODEL_CONFIG: Record<string, { model: string; maxTokens: number; thinking:
   premium: { model: "claude-opus-4-7",           maxTokens: 6000, thinking: true  },
 }
 
+// In-memory cooldown — soft guard against accidental double-submits on the
+// SAME serverless instance. Not reliable across instances (use DB monthly
+// count as the authoritative rate limit). COOLDOWN_MS must stay short.
 const cooldowns = new Map<string, number>()
 const COOLDOWN_MS = 20_000
 
