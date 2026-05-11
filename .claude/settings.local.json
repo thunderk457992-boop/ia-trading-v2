@@ -40,7 +40,12 @@
       "Bash(powershell *)",
       "Bash(unzip -o \"b_1gxDyfBkb4g \\(1\\).zip\" -d design_ref)",
       "PowerShell($items = Get-ChildItem \"C:\\\\Users\\\\oller\\\\Desktop\\\\ia-trading-v2\"; foreach \\($i in $items\\) { Write-Output $i.Name })",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(git push *)",
+      "Bash(npm install *)",
+      "Bash(npx lighthouse *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); cats=d['categories']; [print\\(f'{k}: {round\\(v[\\\\\"score\\\\\"]*100\\)}'\\) for k,v in cats.items\\(\\)]\")",
+      "Bash(npm list *)"
     ]
   },
   "enableAllProjectMcpServers": true
