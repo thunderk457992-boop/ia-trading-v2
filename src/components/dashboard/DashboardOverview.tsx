@@ -1157,7 +1157,10 @@ export function DashboardOverview({
 
   const capital = Number(latestSnapshot?.investedAmount ?? (lastAnalysis?.investor_profile as Record<string, unknown> | undefined)?.capital ?? 0)
   const lastProfile = (lastAnalysis?.investor_profile ?? {}) as Record<string, unknown>
-  const latestAllocation = lastAnalysis?.allocations ?? []
+  const latestAllocation = useMemo(
+    () => lastAnalysis?.allocations ?? [],
+    [lastAnalysis]
+  )
   const coreAssets = latestAllocation
     .filter((allocation) => ["BTC", "ETH"].includes(allocation.symbol))
     .map((allocation) => allocation.symbol)
@@ -1196,6 +1199,75 @@ export function DashboardOverview({
     if (avg > -3)   return { label: "Baissier",       score: 35, color: "text-destructive" }
     return                  { label: "Très baissier", score: 20, color: "text-destructive" }
   }, [cryptoPrices])
+  const marketUniverse = useMemo(
+    () => cryptoPrices.filter((coin) => (
+      Number.isFinite(coin.price)
+      && coin.price > 0
+      && Number.isFinite(coin.marketCap)
+      && coin.marketCap > 0
+      && Number.isFinite(coin.change24h)
+    )),
+    [cryptoPrices]
+  )
+  const btcCoin = marketUniverse.find((coin) => coin.symbol === "BTC") ?? null
+  const altCoins = marketUniverse.filter((coin) => !["BTC", "ETH", "USDT", "USDC", "DAI", "USDE", "FDUSD"].includes(coin.symbol))
+  const topMovers = useMemo(
+    () => [...marketUniverse].sort((left, right) => Math.abs(right.change24h) - Math.abs(left.change24h)).slice(0, 6),
+    [marketUniverse]
+  )
+  const heatmapCoins = useMemo(() => marketUniverse.slice(0, 12), [marketUniverse])
+  const marketVolatility = useMemo(() => {
+    if (!marketUniverse.length) return null
+    return marketUniverse.slice(0, 10).reduce((sum, coin) => sum + Math.abs(coin.change24h), 0) / Math.min(10, marketUniverse.length)
+  }, [marketUniverse])
+  const altAverageChange = useMemo(() => {
+    if (!altCoins.length) return null
+    return altCoins.slice(0, 12).reduce((sum, coin) => sum + coin.change24h, 0) / Math.min(12, altCoins.length)
+  }, [altCoins])
+  const fearGreedProxy = useMemo(() => {
+    if (!marketUniverse.length || marketVolatility === null) return null
+    const avg = marketUniverse.slice(0, 10).reduce((sum, coin) => sum + coin.change24h, 0) / Math.min(10, marketUniverse.length)
+    const btcPenalty = marketGlobal ? Math.max(-12, Math.min(12, (52 - marketGlobal.btcDominance) * 1.2)) : 0
+    const rawScore = 50 + avg * 4 + btcPenalty - Math.max(0, marketVolatility - 6) * 2.2
+    const score = Math.max(0, Math.min(100, Math.round(rawScore)))
+    const label = score >= 70 ? "Greed" : score >= 55 ? "Optimiste" : score >= 40 ? "Neutre" : score >= 25 ? "Prudent" : "Fear"
+    return { score, label }
+  }, [marketGlobal, marketUniverse, marketVolatility])
+  const altseasonStatus = useMemo(() => {
+    if (altAverageChange === null) return null
+    if (marketGlobal && marketGlobal.btcDominance >= 56) {
+      return { label: "BTC dominant", note: "Le capital reste concentre sur le coeur du marche." }
+    }
+    if (btcCoin && altAverageChange > btcCoin.change24h + 2 && (marketGlobal?.btcDominance ?? 50) < 50) {
+      return { label: "Altseason possible", note: "Les altcoins surperforment le beta BTC a court terme." }
+    }
+    if (btcCoin && altAverageChange > btcCoin.change24h) {
+      return { label: "Rotation alt en veille", note: "Les alts se tiennent mieux, mais le signal n'est pas encore large." }
+    }
+    return { label: "Selection stricte", note: "Le marche demande encore de privilegier les actifs les plus liquides." }
+  }, [altAverageChange, btcCoin, marketGlobal])
+  const marketTrend = useMemo(() => {
+    if (!marketGlobal) return null
+    if (marketGlobal.change24h >= 3) return { label: "Trend haussier", tone: "text-success" }
+    if (marketGlobal.change24h >= 0) return { label: "Trend constructif", tone: "text-success" }
+    if (marketGlobal.change24h > -3) return { label: "Trend fragile", tone: "text-warning" }
+    return { label: "Trend sous pression", tone: "text-destructive" }
+  }, [marketGlobal])
+  const contextualSignals = useMemo(() => {
+    const signals = [
+      marketVolatility !== null && marketVolatility > 6
+        ? "Le marche devient plus nerveux: l'entree progressive garde plus de valeur qu'un achat impulsif."
+        : "Le marche reste suffisamment ordonne pour lire la structure des prix sans surreactivite.",
+      altseasonStatus?.label === "Altseason possible"
+        ? "Les altcoins surperforment actuellement: gardez-les en satellites, pas en coeur de portefeuille."
+        : "Le coeur du portefeuille doit rester liquide tant que la rotation alt n'est pas plus large.",
+      latestAllocation.length > 0 && latestAllocation.some((allocation) => allocation.percentage >= 25 && !["BTC", "ETH"].includes(allocation.symbol))
+        ? "Votre exposition actuelle est agressive sur au moins un satellite: surveillez le sizing avant de renforcer."
+        : "L'exposition actuelle reste relativement structuree entre actifs coeur et satellites.",
+    ].filter(Boolean)
+
+    return signals.slice(0, 3)
+  }, [altseasonStatus, latestAllocation, marketVolatility])
 
   const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1)
   const planFeatures = PLAN_CAPABILITIES[plan] ?? PLAN_CAPABILITIES.free
@@ -1486,6 +1558,153 @@ export function DashboardOverview({
             )}
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground leading-relaxed">{planFeatures.upsell}</p>
+        </div>
+      </div>
+
+      <div className="mb-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Terminal marche</p>
+              <h2 className="mt-1 text-[15px] font-semibold text-foreground">Lecture financee par les donnees reelles</h2>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[11px]">
+              <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-muted-foreground">
+                {marketTrend ? <span className={cn("font-semibold", marketTrend.tone)}>{marketTrend.label}</span> : "Trend indisponible"}
+              </span>
+              <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-muted-foreground">
+                Source : CoinGecko / Kraken
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-xl border border-border bg-secondary/60 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">BTC dominance</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">
+                {marketGlobal ? `${marketGlobal.btcDominance.toFixed(1)}%` : "—"}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {marketGlobal && marketGlobal.btcDominance >= 55 ? "Marche plutot defensif" : "Plus de place pour les alts si le flux suit"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-secondary/60 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fear &amp; Greed</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">
+                {fearGreedProxy ? `${fearGreedProxy.score}/100` : "—"}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {fearGreedProxy ? `${fearGreedProxy.label} (proxy interne)` : "Indisponible si le flux marche est incomplet"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-secondary/60 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Altseason</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">
+                {altseasonStatus?.label ?? "—"}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {altseasonStatus?.note ?? "Aucune lecture large disponible"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-secondary/60 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Volatilite 24h</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">
+                {marketVolatility !== null ? `${marketVolatility.toFixed(1)}%` : "—"}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {marketVolatility !== null && marketVolatility > 6 ? "Regime nerveux" : "Regime plutot lisible"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="rounded-xl border border-border bg-background p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-[11px] font-semibold text-foreground">Top movers</p>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">24h</span>
+              </div>
+              <div className="space-y-2.5">
+                {topMovers.slice(0, 5).map((coin) => (
+                  <div key={coin.id} className="grid grid-cols-[minmax(0,1fr)_84px_72px] items-center gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] font-semibold text-foreground">{coin.symbol}</span>
+                        <span className="truncate text-[11px] text-muted-foreground">{coin.name}</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-center">
+                      <SparklineChart
+                        symbol={coin.symbol}
+                        currentPrice={coin.price}
+                        change24h={coin.change24h}
+                        sparklineData={coin.sparkline7d}
+                        width={84}
+                        height={32}
+                      />
+                    </div>
+                    <div className="text-right">
+                      <p className={cn("text-[12px] font-semibold tabular-nums", coin.change24h >= 0 ? "text-success" : "text-destructive")}>
+                        {coin.change24h >= 0 ? "+" : ""}{coin.change24h.toFixed(1)}%
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">{fmtPrice(coin.price)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-background p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-[11px] font-semibold text-foreground">Heatmap crypto</p>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Top market cap</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {heatmapCoins.map((coin) => (
+                  <div
+                    key={coin.id}
+                    className={cn(
+                      "rounded-xl border px-3 py-3 transition-transform hover:-translate-y-0.5",
+                      coin.change24h >= 0 ? "border-emerald-200 bg-emerald-50/70" : "border-red-200 bg-red-50/70"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold text-foreground">{coin.symbol}</span>
+                      <span className={cn("text-[10px] font-semibold", coin.change24h >= 0 ? "text-success" : "text-destructive")}>
+                        {coin.change24h >= 0 ? "+" : ""}{coin.change24h.toFixed(1)}%
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[10px] text-muted-foreground">{fmtCapShort(coin.marketCap)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Brain className="h-4 w-4 text-foreground" />
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">IA contextuelle</p>
+              <h3 className="text-[15px] font-semibold text-foreground">Ce que le marche implique pour vous</h3>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {contextualSignals.map((signal, index) => (
+              <div key={signal} className="rounded-xl border border-border bg-secondary/50 px-3 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Signal {index + 1}</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-foreground">{signal}</p>
+              </div>
+            ))}
+            <div className="rounded-xl border border-border bg-background px-3 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Infrastructure</p>
+              <ul className="mt-2 space-y-2 text-[11px] text-muted-foreground">
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-foreground/70 shrink-0" /><span>Prix live issus de CoinGecko et completes par Kraken quand le flux est disponible.</span></li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-foreground/70 shrink-0" /><span>Historique portefeuille base uniquement sur portfolio_history et snapshots reels.</span></li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-foreground/70 shrink-0" /><span>Si une source manque, le dashboard l&apos;assume au lieu de fabriquer un signal.</span></li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 

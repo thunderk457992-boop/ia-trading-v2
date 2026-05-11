@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   Activity,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { AxiomLogo } from "@/components/branding/AxiomLogo"
 import { createClient } from "@/lib/supabase/client"
+import type { MarketSnapshot } from "@/lib/coingecko"
 
 const PRODUCT_ALLOCATION = [
   { asset: "BTC", pct: 42, label: "Bitcoin", tone: "bg-amber-400" },
@@ -164,8 +165,35 @@ function formatHomePrice(value: number) {
   return EURO_FORMATTER.format(value)
 }
 
-export function HomePageClient() {
+interface HomePageClientProps {
+  marketSnapshot?: MarketSnapshot
+}
+
+export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const liveMarketRows = useMemo(
+    () => (marketSnapshot?.prices ?? [])
+      .filter((coin) => Number.isFinite(coin.price) && coin.price > 0)
+      .slice(0, 6),
+    [marketSnapshot]
+  )
+  const marketLead = liveMarketRows.slice(0, 3)
+  const topMover = liveMarketRows.length
+    ? [...liveMarketRows].sort((left, right) => right.change24h - left.change24h)[0]
+    : null
+  const liveDataSummary = marketSnapshot?.global
+    ? {
+        cap: `$${(marketSnapshot.global.totalMarketCapUsd / 1e12).toFixed(2)}T`,
+        dominance: `${marketSnapshot.global.btcDominance.toFixed(1)}%`,
+      }
+    : null
+  const liveDataLabel = marketSnapshot?.fetchedAt
+    ? new Date(marketSnapshot.fetchedAt).toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Paris",
+      })
+    : null
 
   useEffect(() => {
     const supabase = createClient()
@@ -292,6 +320,54 @@ export function HomePageClient() {
               Les cryptomonnaies comportent un risque de perte en capital. Axiom structure une strategie; il ne promet
               ni gain, ni prediction de marche.
             </p>
+
+            {liveMarketRows.length > 0 && (
+              <div className="mt-6 rounded-[28px] border border-border bg-card p-4 shadow-card">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Marche observe maintenant
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {liveDataSummary
+                        ? `${liveDataSummary.cap} de capitalisation · BTC dominance ${liveDataSummary.dominance}`
+                        : "Prix live CoinGecko avec contexte marche"}
+                    </p>
+                  </div>
+                  {topMover && (
+                    <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700">
+                      Top mover: {topMover.symbol} {topMover.change24h >= 0 ? "+" : ""}{topMover.change24h.toFixed(1)}%
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {marketLead.map((coin) => (
+                    <div key={coin.symbol} className="rounded-2xl border border-border bg-secondary p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                            {coin.symbol}
+                          </p>
+                          <p className="mt-1 text-base font-semibold text-foreground">
+                            ${coin.price.toLocaleString("en-US", {
+                              maximumFractionDigits: coin.price >= 1000 ? 0 : coin.price >= 1 ? 2 : 4,
+                            })}
+                          </p>
+                        </div>
+                        <div className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          coin.change24h >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                        }`}>
+                          {coin.change24h >= 0 ? "+" : ""}{coin.change24h.toFixed(1)}%
+                        </div>
+                      </div>
+                      <p className="mt-3 text-[11px] text-muted-foreground">
+                        Donnees live pour lire le regime marche avant l&apos;allocation.
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="relative">
@@ -305,7 +381,9 @@ export function HomePageClient() {
                       Produit
                     </span>
                   </div>
-                  <span className="text-[11px] font-medium text-white/50">Derniere mise a jour 14:28</span>
+                  <span className="text-[11px] font-medium text-white/50">
+                    {liveDataLabel ? `Derniere mise a jour ${liveDataLabel}` : "Derniere mise a jour en cours"}
+                  </span>
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">

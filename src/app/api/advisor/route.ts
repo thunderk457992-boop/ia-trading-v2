@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient } from "@/lib/supabase/server"
 import { createServerClient } from "@supabase/ssr"
-import { fetchMarketSnapshot } from "@/lib/coingecko"
+import { fetchMarketSnapshot, getCryptoCategories } from "@/lib/coingecko"
 import type { CryptoPrice, MarketGlobal } from "@/lib/coingecko"
 import { fetchKrakenTickers, type KrakenTicker } from "@/lib/kraken"
 import { buildMarketDecision } from "@/lib/market-agent"
@@ -282,6 +282,8 @@ function buildPrompt(
     ? "DONNÉES LIVE DISPONIBLES: appuie-toi explicitement sur les données CoinGecko et le flux Kraken fournis."
     : "DONNÉES LIVE PARTIELLES OU ABSENTES: dis-le clairement, n'invente aucun prix, aucune variation ni aucun signal live."
 
+  const assetSelectionRules = "UNIVERS D'ACTIFS: rester sur les actifs du top 50 fournis. Justifier chaque selection par la liquidite, la dominance, la volatilite, la diversification ou la categorie de l'actif. Les memecoins ne peuvent etre que des satellites minoritaires, jamais le coeur du portefeuille."
+
   if (plan === "free") {
     return `Tu es un analyste crypto. Génère une allocation concise et directement utilisable.
 
@@ -301,6 +303,9 @@ ${STYLE_RULES}
 ${MARKET_LOGIC}
 ${planFeatureRules}
 ${marketAvailabilityRule}
+${assetSelectionRules}
+${assetSelectionRules}
+${assetSelectionRules}
 
 MOTEUR DE DÉCISION STRUCTURÉ:
 ${marketDecisionJson}
@@ -742,8 +747,10 @@ export async function POST(request: Request) {
     const krakenCtx = buildKrakenContext(krakenTickers)
     const marketDecision = buildMarketDecision(prices, globalData, null)
     const availableAssets = prices.length
-      ? Array.from(new Set(prices.map((price) => price.symbol))).join(", ")
-      : "BTC, ETH, SOL, BNB, XRP, ADA, AVAX, LINK, DOT"
+      ? Array.from(new Set(
+          prices.map((price) => `${price.symbol} [${getCryptoCategories(price.symbol).join(", ")}]`)
+        )).join(", ")
+      : "BTC [Large cap, Reserve], ETH [Large cap, Layer 1, DeFi], SOL [Layer 1], XRP [Payments], BNB [Exchange, Infrastructure], AVAX [Layer 1], SUI [Layer 1], SEI [Layer 1, Trading], ADA [Layer 1], LINK [Infrastructure, Oracle], ONDO [RWA], AAVE [DeFi], ARB [Layer 2], OP [Layer 2], RNDR [AI], TAO [AI], FET [AI], INJ [DeFi], HBAR [Infrastructure], DOGE [Memecoin], PEPE [Memecoin], WIF [Memecoin], BONK [Memecoin], KAS [Infrastructure], ATOM [Infrastructure], IMX [Gaming], GALA [Gaming]"
     const coinGeckoAvailable = prices.length > 0
     const krakenAvailable = krakenTickers.length > 0
     const marketDataAvailable = coinGeckoAvailable || krakenAvailable

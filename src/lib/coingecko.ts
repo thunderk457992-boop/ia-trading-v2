@@ -34,6 +34,54 @@ export interface PortfolioAssetHistory {
   prices: MarketChartPoint[]
 }
 
+export const CRYPTO_CATEGORY_MAP: Record<string, string[]> = {
+  BTC: ["Large cap", "Reserve"],
+  ETH: ["Large cap", "Layer 1", "DeFi", "Infrastructure"],
+  SOL: ["Layer 1", "Large cap"],
+  XRP: ["Large cap", "Payments"],
+  BNB: ["Large cap", "Exchange", "Infrastructure"],
+  AVAX: ["Layer 1"],
+  SUI: ["Layer 1"],
+  SEI: ["Layer 1", "Trading"],
+  ADA: ["Layer 1"],
+  LINK: ["Infrastructure", "Oracle"],
+  ONDO: ["RWA", "DeFi"],
+  AAVE: ["DeFi"],
+  ARB: ["Layer 2", "DeFi"],
+  OP: ["Layer 2", "Infrastructure"],
+  RENDER: ["AI", "Infrastructure"],
+  RNDR: ["AI", "Infrastructure"],
+  TAO: ["AI"],
+  FET: ["AI"],
+  INJ: ["DeFi", "Infrastructure"],
+  HBAR: ["Infrastructure"],
+  DOGE: ["Memecoin"],
+  PEPE: ["Memecoin"],
+  WIF: ["Memecoin"],
+  BONK: ["Memecoin"],
+  KAS: ["Infrastructure"],
+  ATOM: ["Infrastructure", "Layer 1"],
+  IMX: ["Gaming", "Layer 2"],
+  GALA: ["Gaming"],
+  NEAR: ["AI", "Layer 1"],
+  POL: ["Infrastructure", "Layer 2"],
+  MATIC: ["Infrastructure", "Layer 2"],
+  UNI: ["DeFi"],
+  LTC: ["Payments", "Large cap"],
+  BCH: ["Payments"],
+  TRX: ["Infrastructure"],
+  TON: ["Infrastructure", "Layer 1"],
+  XLM: ["Payments"],
+  FIL: ["Infrastructure"],
+  ICP: ["Infrastructure"],
+  HYPE: ["Layer 1"],
+}
+
+export function getCryptoCategories(symbol: string): string[] {
+  const normalized = symbol.toUpperCase()
+  return CRYPTO_CATEGORY_MAP[normalized] ?? ["Large cap"]
+}
+
 function cgHeaders(): HeadersInit {
   const key = process.env.COINGECKO_API_KEY
   return {
@@ -77,7 +125,7 @@ export async function fetchCryptoPrices(): Promise<CryptoPrice[]> {
     const timeout = setTimeout(() => controller.abort(), 8000)
 
     const res = await fetch(
-      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,ripple,binancecoin,cardano,dogecoin,the-open-network,avalanche-2,chainlink,matic-network,polkadot,tron,litecoin,bitcoin-cash&order=market_cap_desc&per_page=15&sparkline=true&price_change_percentage=1h,24h,7d",
+      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&sparkline=true&price_change_percentage=1h,24h,7d",
       { next: { revalidate: 30 }, headers: cgHeaders(), signal: controller.signal }
     ).finally(() => clearTimeout(timeout))
 

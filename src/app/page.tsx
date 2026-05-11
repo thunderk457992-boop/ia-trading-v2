@@ -1,4 +1,5 @@
 import { HomePageClient } from "@/components/home/HomePageClient"
+import { fetchMarketSnapshot } from "@/lib/coingecko"
 import {
   DEFAULT_SEO_DESCRIPTION,
   SITE_NAME,
@@ -79,14 +80,16 @@ const homeStructuredData = {
   ],
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const marketSnapshot = await fetchMarketSnapshot()
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeStructuredData) }}
       />
-      <HomePageClient />
+      <HomePageClient marketSnapshot={marketSnapshot} />
     </>
   )
 }
