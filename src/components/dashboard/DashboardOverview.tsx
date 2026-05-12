@@ -16,6 +16,9 @@ import { AxiomGlyph } from "@/components/branding/AxiomLogo"
 import { SparklineChart } from "@/components/SparklineChart"
 import { PortfolioChart } from "@/components/advisor/PortfolioChart"
 import { ProfessionalMarketChart } from "@/components/charts/ProfessionalMarketChart"
+import { WhyNowCard } from "@/components/dashboard/WhyNowCard"
+import { SinceAnalysisCard } from "@/components/dashboard/SinceAnalysisCard"
+import { DisciplineCard } from "@/components/dashboard/DisciplineCard"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Subscription {
@@ -58,6 +61,8 @@ interface Props {
   marketReferenceAsset: CryptoPrice | null
   marketSeriesShort: MarketSeriesPoint[]
   marketSeriesAll: MarketSeriesPoint[]
+  btcSeriesAll: MarketSeriesPoint[]
+  ethSeriesAll: MarketSeriesPoint[]
 }
 
 interface AdvisorOutput {
@@ -632,7 +637,7 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
 export function DashboardOverview({
   user, profile, analyses, subscription, justUpgraded,
   monthlyCount, cryptoPrices, portfolioSnapshots, marketGlobal, marketDecision, marketFetchedAt,
-  marketReferenceAsset, marketSeriesShort, marketSeriesAll,
+  marketReferenceAsset, marketSeriesShort, marketSeriesAll, btcSeriesAll, ethSeriesAll,
 }: Props) {
   const router = useRouter()
   const [showUpgradeToast, setShowUpgradeToast] = useState(!!justUpgraded)
@@ -1401,6 +1406,28 @@ export function DashboardOverview({
               </Link>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="mb-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <WhyNowCard
+          marketGlobal={marketGlobal}
+          positiveAssets={positiveMarketCount}
+          negativeAssets={negativeMarketCount}
+          marketVolatility={marketVolatility}
+          latestAllocation={latestAllocation}
+        />
+        <div className="grid gap-4">
+          <SinceAnalysisCard
+            lastAnalysisDate={lastAnalysis?.created_at ?? null}
+            portfolioSnapshots={portfolioSnapshots}
+            btcSeries={btcSeriesAll}
+            ethSeries={ethSeriesAll}
+          />
+          <DisciplineCard
+            lastAnalysisDate={lastAnalysis?.created_at ?? null}
+            snapshotCount={normalizedPortfolioSnapshots.length}
+          />
         </div>
       </div>
 

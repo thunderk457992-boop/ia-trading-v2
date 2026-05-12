@@ -128,13 +128,15 @@ export default async function DashboardPage({
   const marketDecision = buildMarketDecision(market.prices, market.global, lastAnalysis?.allocations ?? null)
   const marketReferenceSymbol = lastAnalysis?.allocations?.[0]?.symbol ?? "BTC"
   const marketReferenceUniverseAsset = getUniverseAsset(marketReferenceSymbol) ?? getUniverseAsset("BTC")
+  const btcUniverseAsset = getUniverseAsset("BTC")
+  const ethUniverseAsset = getUniverseAsset("ETH")
   const marketReferenceAsset = market.prices.find((coin) => coin.symbol === marketReferenceUniverseAsset?.symbol) ?? null
-  const [marketSeriesShort, marketSeriesAll] = marketReferenceUniverseAsset
-    ? await Promise.all([
-        fetchCoinMarketSeries(marketReferenceUniverseAsset.coingeckoId, 90),
-        fetchCoinMarketSeries(marketReferenceUniverseAsset.coingeckoId, "max"),
-      ])
-    : [[], []]
+  const [marketSeriesShort, marketSeriesAll, btcSeriesAll, ethSeriesAll] = await Promise.all([
+    marketReferenceUniverseAsset ? fetchCoinMarketSeries(marketReferenceUniverseAsset.coingeckoId, 90) : Promise.resolve([]),
+    marketReferenceUniverseAsset ? fetchCoinMarketSeries(marketReferenceUniverseAsset.coingeckoId, "max") : Promise.resolve([]),
+    btcUniverseAsset ? fetchCoinMarketSeries(btcUniverseAsset.coingeckoId, "max") : Promise.resolve([]),
+    ethUniverseAsset ? fetchCoinMarketSeries(ethUniverseAsset.coingeckoId, "max") : Promise.resolve([]),
+  ])
 
 
   return (
@@ -153,6 +155,8 @@ export default async function DashboardPage({
       marketReferenceAsset={marketReferenceAsset}
       marketSeriesShort={marketSeriesShort}
       marketSeriesAll={marketSeriesAll}
+      btcSeriesAll={btcSeriesAll}
+      ethSeriesAll={ethSeriesAll}
     />
   )
 }
