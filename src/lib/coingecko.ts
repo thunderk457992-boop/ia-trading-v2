@@ -50,6 +50,10 @@ export interface MarketChartPoint {
   price: number
 }
 
+export interface MarketSeriesPoint extends MarketChartPoint {
+  volume: number | null
+}
+
 export interface PortfolioAssetHistory {
   symbol: string
   prices: MarketChartPoint[]
@@ -359,6 +363,71 @@ export async function fetchCoinMarketChart(coinId: string, days = 7): Promise<Ma
       .map((point) => ({ timestamp: point[0], price: point[1] }))
   } catch (err) {
     console.error(`[CoinGecko] fetchCoinMarketChart error for ${coinId}:`, err)
+    return []
+  }
+}
+
+export async function fetchCoinMarketSeries(
+  coinId: string,
+  days: number | "max" = 90
+): Promise<MarketSeriesPoint[]> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 9000)
+
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`,
+      { next: { revalidate: 90 }, headers: cgHeaders(), signal: controller.signal }
+    ).finally(() => clearTimeout(timeout))
+
+    if (!res.ok) {
+      console.warn("[CoinGecko] fetchCoinMarketSeries non-ok response", {
+        coinId,
+        days,
+        status: res.status,
+        statusText: res.statusText,
+      })
+      return []
+    }
+
+    const data = await res.json()
+    const rawPrices: unknown[] = Array.isArray(data?.prices) ? data.prices : []
+    const rawVolumes: unknown[] = Array.isArray(data?.total_volumes) ? data.total_volumes : []
+
+    const prices = rawPrices
+      .filter((point: unknown): point is [number, number] => (
+        Array.isArray(point)
+        && point.length >= 2
+        && Number.isFinite(point[0])
+        && Number.isFinite(point[1])
+      ))
+      .sort((a, b) => a[0] - b[0])
+
+    const volumes = rawVolumes
+      .filter((point: unknown): point is [number, number] => (
+        Array.isArray(point)
+        && point.length >= 2
+        && Number.isFinite(point[0])
+        && Number.isFinite(point[1])
+      ))
+      .sort((a, b) => a[0] - b[0])
+
+    if (prices.length <= 1) return []
+
+    return prices.map(([timestamp, price], index) => {
+      const indexedVolume = volumes[index]
+      const matchedVolume = indexedVolume && Math.abs(indexedVolume[0] - timestamp) <= 60 * 60 * 1000
+        ? indexedVolume[1]
+        : null
+
+      return {
+        timestamp,
+        price,
+        volume: matchedVolume !== null && Number.isFinite(matchedVolume) ? matchedVolume : null,
+      }
+    })
+  } catch (err) {
+    console.error(`[CoinGecko] fetchCoinMarketSeries error for ${coinId}:`, err)
     return []
   }
 }

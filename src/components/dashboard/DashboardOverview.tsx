@@ -8,17 +8,14 @@ import {
   Zap, Clock, AlertTriangle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState, useEffect, useMemo, useId, useRef } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import type { CryptoPrice, MarketGlobal } from "@/lib/coingecko"
+import type { CryptoPrice, MarketGlobal, MarketSeriesPoint } from "@/lib/coingecko"
 import type { MarketDecision } from "@/lib/market-agent"
 import { AxiomGlyph } from "@/components/branding/AxiomLogo"
 import { SparklineChart } from "@/components/SparklineChart"
 import { PortfolioChart } from "@/components/advisor/PortfolioChart"
-import {
-  AreaChart, Area, Tooltip as RechartsTooltip,
-  XAxis, YAxis, CartesianGrid,
-} from "recharts"
+import { ProfessionalMarketChart } from "@/components/charts/ProfessionalMarketChart"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Subscription {
@@ -58,6 +55,9 @@ interface Props {
   marketGlobal: MarketGlobal | null
   marketDecision: MarketDecision | null
   marketFetchedAt?: number
+  marketReferenceAsset: CryptoPrice | null
+  marketSeriesShort: MarketSeriesPoint[]
+  marketSeriesAll: MarketSeriesPoint[]
 }
 
 interface AdvisorOutput {
@@ -209,48 +209,8 @@ const TIMEFRAME_MIN_COVERAGE_MS: Partial<Record<TF, number>> = {
   "3M": 60 * DAY_MS,
   "1Y": 180 * DAY_MS,
 }
-const TIMEFRAME_SHORT_HISTORY_MESSAGE = "Historique encore trop court pour cette période."
 const INTRAHOUR_MESSAGE = "Disponible quand plusieurs snapshots sont créés dans la même heure."
 const RECENT_DATA_MESSAGE = "Disponible dès que deux snapshots existent sur les dernières 48h."
-const SNAPSHOT_BUILD_MESSAGE = "La courbe se construit avec vos analyses et les snapshots quotidiens."
-
-function getPreferredTimeframe(availability: Record<TF, TimeframeAvailability>): TF {
-  if (availability["1H"]?.available) return "1H"
-  return TIMEFRAMES.find((timeframe) => availability[timeframe]?.available) ?? "1H"
-}
-
-function formatTimeframeLabel(timeframe: TF, timestamp: number) {
-  const date = new Date(timestamp)
-
-  if (timeframe === "1H") {
-    return date.toLocaleTimeString(DISPLAY_LOCALE, {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: DISPLAY_TIME_ZONE,
-    })
-  }
-
-  if (timeframe === "1D") {
-    return date.toLocaleDateString(DISPLAY_LOCALE, {
-      day: "2-digit",
-      hour: "2-digit",
-      timeZone: DISPLAY_TIME_ZONE,
-    })
-  }
-
-  if (timeframe === "7D") {
-    return date.toLocaleDateString(DISPLAY_LOCALE, {
-      weekday: "short",
-      timeZone: DISPLAY_TIME_ZONE,
-    })
-  }
-
-  return date.toLocaleDateString(DISPLAY_LOCALE, {
-    day: "2-digit",
-    month: "short",
-    timeZone: DISPLAY_TIME_ZONE,
-  })
-}
 
 interface PortfolioSnapshotChartPoint {
   timestamp: number
@@ -263,21 +223,6 @@ interface NormalizedPortfolioSnapshot {
   timestamp: number
   portfolioValue: number
   investedAmount: number | null
-}
-
-interface PortfolioChartDataPoint {
-  timestamp: number
-  portfolio: number
-  performance: number
-  portfolioValue: number
-  valueChange: number
-}
-
-function formatPortfolioValue(value: number) {
-  return `${value.toLocaleString("fr-FR", {
-    minimumFractionDigits: value < 100 ? 2 : 0,
-    maximumFractionDigits: value < 100 ? 2 : 0,
-  })}€`
 }
 
 function parseFiniteNumber(value: number | string | null | undefined) {
@@ -403,7 +348,7 @@ function getTimeframeAvailability(
   if (timeframe === "ALL") {
     return snapshots.length >= 2
       ? { available: true, reason: "" }
-      : { available: false, reason: TIMEFRAME_SHORT_HISTORY_MESSAGE }
+      : { available: false, reason: "Historique encore trop court pour cette période." }
   }
 
   const filteredSnapshots = getPortfolioSnapshotsForTimeframe(snapshots, timeframe, anchorMs)
@@ -414,13 +359,13 @@ function getTimeframeAvailability(
         ? INTRAHOUR_MESSAGE
         : timeframe === "1D"
         ? RECENT_DATA_MESSAGE
-        : TIMEFRAME_SHORT_HISTORY_MESSAGE,
+        : "Historique encore trop court pour cette période.",
     }
   }
 
   const minCoverageMs = TIMEFRAME_MIN_COVERAGE_MS[timeframe] ?? 0
   if (minCoverageMs > 0 && getSnapshotCoverageMs(filteredSnapshots) < minCoverageMs) {
-    return { available: false, reason: TIMEFRAME_SHORT_HISTORY_MESSAGE }
+    return { available: false, reason: "Historique encore trop court pour cette période." }
   }
 
   return { available: true, reason: "" }
@@ -432,438 +377,6 @@ function usesRecentOneDayFallback(
 ) {
   const exactOneDaySnapshots = getSnapshotsWithinWindow(snapshots, anchorMs, DAY_MS)
   return exactOneDaySnapshots.length < 2 && getPortfolioSnapshotsForTimeframe(snapshots, "1D", anchorMs).length >= 2
-}
-
-function PortfolioLineChart({
-  portfolioSnapshots, capital, timeframeAvailability, timeframeAnchorMs, lastSnapshotLabel, oneDayUsesRecentFallback,
-}: {
-  portfolioSnapshots: PortfolioSnapshot[]
-  capital: number
-  timeframeAvailability: Record<TF, TimeframeAvailability>
-  timeframeAnchorMs: number
-  lastSnapshotLabel: string | null
-  oneDayUsesRecentFallback: boolean
-}) {
-  const [tf, setTf] = useState<TF>(() => getPreferredTimeframe(timeframeAvailability))
-  const chartContainerRef = useRef<HTMLDivElement | null>(null)
-  const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
-  const uid = useId().replace(/:/g, "")
-  const normalizedSnapshots = useMemo(
-    () => normalizePortfolioSnapshots(portfolioSnapshots),
-    [portfolioSnapshots]
-  )
-  const useSnapshotHistory = normalizedSnapshots.length > 0
-  const usableSnapshotCount = normalizedSnapshots.length
-  const snapshotSeriesByTimeframe = useMemo(() => (
-    Object.fromEntries(
-      TIMEFRAMES.map((timeframe) => [
-        timeframe,
-        buildPortfolioSnapshotData(normalizedSnapshots, timeframe, timeframeAnchorMs),
-      ])
-    ) as Record<TF, PortfolioSnapshotChartPoint[]>
-  ), [normalizedSnapshots, timeframeAnchorMs])
-  const selectedSnapshotData = snapshotSeriesByTimeframe[tf]
-  const selectedChange = selectedSnapshotData.length > 1
-    ? selectedSnapshotData[selectedSnapshotData.length - 1].performance
-    : null
-  const selectedValueChange = selectedSnapshotData.length > 1
-    ? selectedSnapshotData[selectedSnapshotData.length - 1].valueChange
-    : null
-  const selectedTimeframeAvailable = timeframeAvailability[tf].available
-  const fullSnapshotSeries = useMemo(
-    () => normalizedSnapshots.filter((snapshot) => snapshot.timestamp <= timeframeAnchorMs),
-    [normalizedSnapshots, timeframeAnchorMs]
-  )
-  const totalHistorySpanMs = fullSnapshotSeries.length > 1
-    ? fullSnapshotSeries[fullSnapshotSeries.length - 1].timestamp - fullSnapshotSeries[0].timestamp
-    : 0
-  const selectedWindowMs = tf === "1D" ? ONE_DAY_RECENT_WINDOW_MS : TIMEFRAME_WINDOWS_MS[tf]
-  const selectedUsesFullHistory = selectedSnapshotData.length > 0 && selectedSnapshotData.length === fullSnapshotSeries.length
-  const shortHistoryNotice = useSnapshotHistory && selectedSnapshotData.length > 1 && (
-    (selectedWindowMs !== undefined && selectedUsesFullHistory && totalHistorySpanMs < selectedWindowMs)
-    || (tf === "ALL" && totalHistorySpanMs < 7 * DAY_MS)
-  )
-  const hasUnavailableTimeframes = TIMEFRAMES.some((timeframe) => !timeframeAvailability[timeframe].available)
-
-  useEffect(() => {
-    if (timeframeAvailability[tf]?.available) return
-    const preferred = getPreferredTimeframe(timeframeAvailability)
-    if (preferred !== tf) setTf(preferred)
-  }, [tf, timeframeAvailability])
-
-  useEffect(() => {
-    const container = chartContainerRef.current
-    if (!container) return
-
-    const updateSize = (width: number, height: number) => {
-      if (width <= 0 || height <= 0) return
-      setChartSize((current) => (
-        current.width === width && current.height === height
-          ? current
-          : { width, height }
-      ))
-    }
-
-    updateSize(container.clientWidth, container.clientHeight)
-
-    if (typeof ResizeObserver === "undefined") return
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (!entry) return
-      updateSize(entry.contentRect.width, entry.contentRect.height)
-    })
-
-    observer.observe(container)
-    return () => observer.disconnect()
-  }, [])
-
-  const mergedData = useMemo<PortfolioChartDataPoint[]>(() => {
-    if (!selectedTimeframeAvailable) return []
-    if (selectedSnapshotData.length < 2) return []
-
-    return selectedSnapshotData.map((point) => ({
-      timestamp: point.timestamp,
-      portfolio: point.portfolioValue,
-      performance: point.performance,
-      portfolioValue: point.portfolioValue,
-      valueChange: point.valueChange,
-    }))
-  }, [selectedSnapshotData, selectedTimeframeAvailable])
-
-  const lastValue = mergedData[mergedData.length - 1]?.performance ?? selectedChange ?? 0
-  const isUp = lastValue >= 0
-  const maxVal = mergedData.length ? Math.max(...mergedData.map(d => d.performance)) : 0
-  const minVal = mergedData.length ? Math.min(...mergedData.map(d => d.performance)) : 0
-  const color = isUp ? "#3b82f6" : "#ef4444"
-  const gradId = `grad-${uid}`
-  const timeframeButtonLabel = (timeframe: TF) => (
-    timeframe === "1D" && oneDayUsesRecentFallback ? "Récent" : timeframe
-  )
-  const selectedTimeframeLabel = tf === "1D" && oneDayUsesRecentFallback ? "RÉCENT" : tf
-  const selectedVariationLabel = tf === "1D" && oneDayUsesRecentFallback ? "Variation récente" : `Variation ${tf}`
-  const curveType = mergedData.length >= 5 ? "monotone" : "linear"
-  const dotStyle = mergedData.length <= 2
-    ? { r: 3, fill: color, stroke: "#ffffff", strokeWidth: 1.5 }
-    : mergedData.length <= 4
-    ? { r: 2, fill: color, stroke: "#ffffff", strokeWidth: 1 }
-    : false
-  const missingHistoryData = useSnapshotHistory && mergedData.length === 0
-  const unavailableReason = timeframeAvailability[tf].reason
-  const insufficientSnapshotHistory = useSnapshotHistory && missingHistoryData && !selectedTimeframeAvailable
-  const singleSnapshotHistory = useSnapshotHistory && usableSnapshotCount === 1
-  const emptyStateMessage = !useSnapshotHistory
-    ? "Aucune donnée de performance portefeuille pour le moment."
-    : singleSnapshotHistory
-    ? "Un deuxième snapshot est nécessaire pour afficher la première variation."
-    : insufficientSnapshotHistory
-    ? TIMEFRAME_SHORT_HISTORY_MESSAGE
-    : missingHistoryData
-    ? unavailableReason || TIMEFRAME_SHORT_HISTORY_MESSAGE
-    : unavailableReason || "Période indisponible"
-
-  return (
-    <div className="rounded-xl border border-border bg-card" data-testid="portfolio-performance-card">
-      <div className="p-5 border-b border-border">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Performance Portfolio</span>
-              {useSnapshotHistory && (
-                <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-dot" />
-              )}
-            </div>
-            {mergedData.length > 0 ? (
-              <>
-                <div className="flex flex-wrap items-center gap-3">
-                  <h2
-                    className={cn("text-3xl font-bold tracking-tight tabular-nums", isUp ? "text-success" : "text-destructive")}
-                    data-testid="portfolio-performance-percent"
-                  >
-                    {isUp ? "+" : ""}{lastValue.toFixed(2)}%
-                  </h2>
-                  <div className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide",
-                    isUp ? "border-success/20 bg-success/10 text-success" : "border-destructive/20 bg-destructive/10 text-destructive"
-                  )}>
-                    {isUp ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    {selectedTimeframeLabel}
-                  </div>
-                </div>
-                {selectedValueChange !== null && (
-                  <>
-                    <p
-                      className={cn("mt-1 text-lg font-semibold tabular-nums", isUp ? "text-success" : "text-destructive")}
-                      data-testid="portfolio-performance-euro"
-                    >
-                      {fmtPortfolioEuroDelta(selectedValueChange)}
-                    </p>
-                    <p className="text-[12px] text-muted-foreground">
-                      {selectedVariationLabel} sur <span className="font-medium text-foreground">{capital.toLocaleString("fr-FR")}€</span> investis
-                    </p>
-                    {tf === "1D" && oneDayUsesRecentFallback && (
-                      <p className="mt-1 text-[12px] text-muted-foreground" data-testid="portfolio-performance-recent-label">
-                        Dernières données disponibles
-                      </p>
-                    )}
-                    {shortHistoryNotice && (
-                      <p className="mt-1 text-[12px] text-muted-foreground" data-testid="portfolio-performance-short-history">
-                        Historique encore trop court pour différencier cette période.
-                      </p>
-                    )}
-                  </>
-                )}
-              </>
-            ) : (
-              <p className="text-[15px] text-muted-foreground mt-1" data-testid="portfolio-performance-empty">
-                {emptyStateMessage}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5 bg-secondary/30">
-              {TIMEFRAMES.map((t) => {
-                const availability = timeframeAvailability[t]
-                const enabled = availability.available
-                return (
-                  <button
-                    key={t}
-                    onClick={() => {
-                      if (enabled) setTf(t)
-                    }}
-                    data-testid={`portfolio-timeframe-${t}`}
-                    title={enabled ? timeframeButtonLabel(t) : availability.reason}
-                    aria-label={enabled ? timeframeButtonLabel(t) : `${timeframeButtonLabel(t)} indisponible: ${availability.reason}`}
-                    aria-disabled={!enabled}
-                    disabled={!enabled}
-                    className={cn(
-                      "rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-all",
-                      enabled && t === tf
-                        ? "bg-foreground text-background shadow-sm"
-                        : !enabled && t === tf
-                        ? "bg-secondary text-muted-foreground border border-border"
-                        : enabled
-                        ? "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                        : "cursor-not-allowed text-muted-foreground/40"
-                    )}
-                  >
-                    {timeframeButtonLabel(t)}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-          <span>{SNAPSHOT_BUILD_MESSAGE}</span>
-          {hasUnavailableTimeframes && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <span>{TIMEFRAME_SHORT_HISTORY_MESSAGE}</span>
-            </>
-          )}
-        </div>
-
-        {mergedData.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-            <div className="flex items-center gap-1.5">
-              <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-              <span className="text-[11px] font-medium text-foreground">Portfolio</span>
-              <span className={cn("text-[11px] font-semibold", isUp ? "text-success" : "text-destructive")}>
-                {isUp ? "+" : ""}{lastValue.toFixed(2)}%
-              </span>
-            </div>
-            <div className="ml-auto flex items-center gap-4 text-[11px]">
-              <div>
-                <span className="text-muted-foreground">Max&nbsp;</span>
-                <span className={cn("font-medium tabular-nums", maxVal >= 0 ? "text-success" : "text-destructive")}>
-                  {maxVal >= 0 ? "+" : ""}{maxVal.toFixed(2)}%
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Min&nbsp;</span>
-                <span className={cn("font-medium tabular-nums", minVal >= 0 ? "text-success" : "text-destructive")}>
-                  {minVal >= 0 ? "+" : ""}{minVal.toFixed(2)}%
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {mergedData.length > 0 ? (
-        <div className="h-[300px] w-full min-w-0 p-4 pt-2">
-          <div ref={chartContainerRef} className="h-full w-full min-h-0 min-w-0">
-            {chartSize.width > 0 && chartSize.height > 0 ? (
-              <AreaChart
-                width={chartSize.width}
-                height={chartSize.height}
-                data={mergedData}
-                margin={{ top: 10, right: 10, left: 0, bottom: 6 }}
-              >
-                <defs>
-                  <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity={0.14} />
-                    <stop offset="100%" stopColor={color} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="4 6" stroke="rgba(100,116,139,0.16)" vertical={false} />
-                <XAxis
-                  dataKey="timestamp"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#64748b", fontSize: 10 }}
-                  tickFormatter={(value) => formatTimeframeLabel(tf, Number(value))}
-                  dy={8}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#64748b", fontSize: 10 }}
-                  tickFormatter={(value) => formatPortfolioValue(Number(value))}
-                  dx={-4}
-                  width={74}
-                  domain={["auto", "auto"]}
-                />
-                <RechartsTooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null
-                    const point = payload[0]?.payload as PortfolioChartDataPoint | undefined
-                    if (!point) return null
-                    const tooltipLabel = new Date(point.timestamp).toLocaleString(DISPLAY_LOCALE, {
-                      day: "2-digit",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      timeZone: DISPLAY_TIME_ZONE,
-                    })
-                    return (
-                      <div className="min-w-[220px] rounded-xl border border-border bg-card/95 px-3 py-2.5 shadow-xl backdrop-blur">
-                        <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{tooltipLabel}</p>
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-[11px] text-muted-foreground">Valeur portefeuille</span>
-                            <span className="text-[13px] font-semibold tabular-nums text-foreground">
-                              {formatPortfolioValue(point.portfolioValue)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-[11px] text-muted-foreground">Variation période</span>
-                            <span
-                              className={cn(
-                                "text-[12px] font-semibold tabular-nums",
-                                point.performance >= 0 ? "text-success" : "text-destructive"
-                              )}
-                            >
-                              {point.performance >= 0 ? "+" : ""}
-                              {point.performance.toFixed(2)}%
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-[11px] text-muted-foreground">Variation €</span>
-                            <span
-                              className={cn(
-                                "text-[12px] font-semibold tabular-nums",
-                                point.valueChange >= 0 ? "text-success" : "text-destructive"
-                              )}
-                            >
-                              {fmtPortfolioEuroDelta(point.valueChange)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  }}
-                  cursor={{ stroke: "#e2e8f0", strokeWidth: 1 }}
-                />
-                <Area
-                  type={curveType}
-                  dataKey="portfolio"
-                  stroke={color}
-                  strokeWidth={2}
-                  fill={`url(#${gradId})`}
-                  dot={dotStyle}
-                  activeDot={{ r: 4, fill: color, stroke: "#ffffff", strokeWidth: 2 }}
-                />
-              </AreaChart>
-            ) : (
-              <div className="h-full w-full animate-pulse rounded-lg bg-secondary/40" />
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="h-60 flex flex-col items-center justify-center gap-4 px-8">
-          {!useSnapshotHistory ? (
-            <>
-              <div className="flex items-center">
-                {(["Analyse", "Historique", "Graphique"] as const).map((label, i) => (
-                  <div key={label} className="flex items-center">
-                    {i > 0 && <div className="w-8 h-px bg-border mx-1" />}
-                    <div className="flex flex-col items-center gap-1.5">
-                      <div className="h-8 w-8 rounded-full border-2 border-border bg-secondary flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                        {i + 1}
-                      </div>
-                      <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[13px] text-muted-foreground text-center" data-testid="portfolio-performance-empty">
-                Lancez votre première analyse pour démarrer le suivi de performance.
-              </p>
-              <Link href="/advisor" className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background text-xs font-bold rounded-lg transition-colors hover:opacity-90">
-                Première analyse <ArrowRight className="h-3 w-3" />
-              </Link>
-            </>
-          ) : (
-            <div className="w-full max-w-xs flex flex-col items-center gap-3">
-              <div className="w-full">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-medium text-muted-foreground">Historique en construction</span>
-                  <span className="text-[11px] tabular-nums font-semibold text-foreground">
-                    {usableSnapshotCount}&nbsp;snapshot{usableSnapshotCount > 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="h-1 w-full rounded-full bg-secondary overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-blue-500 transition-[width] duration-500"
-                    style={{ width: `${Math.min(100, Math.round((usableSnapshotCount / 2) * 100))}%` }}
-                  />
-                </div>
-                <p className="mt-1.5 text-[10px] text-muted-foreground/70 text-right">
-                  2 snapshots pour une première variation, 3+ pour une courbe plus lisible
-                </p>
-              </div>
-              <p className="text-[12px] text-muted-foreground text-center" data-testid="portfolio-performance-empty">
-                {emptyStateMessage}
-              </p>
-              <p className="text-[10px] text-muted-foreground/60 text-center" data-testid="portfolio-performance-build-note">
-                {SNAPSHOT_BUILD_MESSAGE}
-              </p>
-              <Link href="/advisor" className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-foreground text-background text-xs font-bold rounded-lg transition-colors hover:opacity-90">
-                Générer une analyse <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Data source footer */}
-      <div className="px-5 py-2 border-t border-border/60 flex items-center flex-wrap gap-x-3 gap-y-1">
-        <span className="text-[10px] text-muted-foreground/60" data-testid="portfolio-performance-source">Source&nbsp;: {useSnapshotHistory ? "portfolio_history uniquement" : "aucune donnée portefeuille"}</span>
-        <span className="text-[10px] text-muted-foreground/40">·</span>
-        <span className="text-[10px] text-muted-foreground/60">Snapshots calculés côté serveur avec Kraken si disponible, sinon CoinGecko</span>
-        {lastSnapshotLabel && (
-          <>
-            <span className="text-[10px] text-muted-foreground/40">·</span>
-            <span className="text-[10px] text-muted-foreground/60">Dernier snapshot&nbsp;: {lastSnapshotLabel}</span>
-          </>
-        )}
-      </div>
-    </div>
-  )
 }
 
 // ── Market Table ──────────────────────────────────────────────────────────────
@@ -1119,6 +632,7 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
 export function DashboardOverview({
   user, profile, analyses, subscription, justUpgraded,
   monthlyCount, cryptoPrices, portfolioSnapshots, marketGlobal, marketDecision, marketFetchedAt,
+  marketReferenceAsset, marketSeriesShort, marketSeriesAll,
 }: Props) {
   const router = useRouter()
   const [showUpgradeToast, setShowUpgradeToast] = useState(!!justUpgraded)
@@ -1812,13 +1326,14 @@ export function DashboardOverview({
       {/* Charts row */}
       <div className="mt-4 grid gap-4 lg:grid-cols-3 mb-4">
         <div className="lg:col-span-2">
-          <PortfolioLineChart
+          <ProfessionalMarketChart
             portfolioSnapshots={portfolioSnapshots}
+            marketReferenceAsset={marketReferenceAsset}
+            marketSeriesShort={marketSeriesShort}
+            marketSeriesAll={marketSeriesAll}
             capital={capital}
-            timeframeAvailability={timeframeAvailability}
-            timeframeAnchorMs={timeframeAnchorMs}
             lastSnapshotLabel={lastSnapshotLabel}
-            oneDayUsesRecentFallback={oneDayUsesRecentFallback}
+            marketUpdatedLabel={marketUpdatedLabel}
           />
         </div>
         <div>

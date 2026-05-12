@@ -2,9 +2,10 @@ import { createClient } from "@/lib/supabase/server"
 import { createServerClient } from "@supabase/ssr"
 import { redirect } from "next/navigation"
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview"
-import { fetchMarketSnapshot } from "@/lib/coingecko"
+import { fetchCoinMarketSeries, fetchMarketSnapshot } from "@/lib/coingecko"
 import { buildMarketDecision } from "@/lib/market-agent"
 import { stripe } from "@/lib/stripe"
+import { getUniverseAsset } from "@/lib/crypto-universe"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type StripeSub = Record<string, any>
@@ -125,6 +126,15 @@ export default async function DashboardPage({
     : profile?.plan ?? "free"
   const lastAnalysis = (analyses ?? []).slice(0, HISTORY_LIMIT[plan] ?? 3)[0] ?? null
   const marketDecision = buildMarketDecision(market.prices, market.global, lastAnalysis?.allocations ?? null)
+  const marketReferenceSymbol = lastAnalysis?.allocations?.[0]?.symbol ?? "BTC"
+  const marketReferenceUniverseAsset = getUniverseAsset(marketReferenceSymbol) ?? getUniverseAsset("BTC")
+  const marketReferenceAsset = market.prices.find((coin) => coin.symbol === marketReferenceUniverseAsset?.symbol) ?? null
+  const [marketSeriesShort, marketSeriesAll] = marketReferenceUniverseAsset
+    ? await Promise.all([
+        fetchCoinMarketSeries(marketReferenceUniverseAsset.coingeckoId, 90),
+        fetchCoinMarketSeries(marketReferenceUniverseAsset.coingeckoId, "max"),
+      ])
+    : [[], []]
 
 
   return (
@@ -140,6 +150,9 @@ export default async function DashboardPage({
       marketGlobal={market.global}
       marketDecision={marketDecision}
       marketFetchedAt={market.fetchedAt}
+      marketReferenceAsset={marketReferenceAsset}
+      marketSeriesShort={marketSeriesShort}
+      marketSeriesAll={marketSeriesAll}
     />
   )
 }
