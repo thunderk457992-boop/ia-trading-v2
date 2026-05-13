@@ -18,21 +18,21 @@ export interface PortfolioPlan {
 }
 
 const ASSET_PALETTE: Record<string, { bg: string; text: string; bar: string; dot: string }> = {
-  BTC:  { bg: "bg-amber-50",   text: "text-amber-800",   bar: "bg-amber-400",   dot: "bg-amber-400" },
-  ETH:  { bg: "bg-blue-50",    text: "text-blue-800",    bar: "bg-blue-500",    dot: "bg-blue-500" },
-  SOL:  { bg: "bg-violet-50",  text: "text-violet-800",  bar: "bg-violet-500",  dot: "bg-violet-500" },
-  BNB:  { bg: "bg-yellow-50",  text: "text-yellow-800",  bar: "bg-yellow-400",  dot: "bg-yellow-400" },
-  XRP:  { bg: "bg-sky-50",     text: "text-sky-800",     bar: "bg-sky-500",     dot: "bg-sky-500" },
-  ADA:  { bg: "bg-indigo-50",  text: "text-indigo-800",  bar: "bg-indigo-400",  dot: "bg-indigo-400" },
-  AVAX: { bg: "bg-rose-50",    text: "text-rose-800",    bar: "bg-rose-500",    dot: "bg-rose-500" },
-  DOT:  { bg: "bg-pink-50",    text: "text-pink-800",    bar: "bg-pink-500",    dot: "bg-pink-500" },
-  LINK: { bg: "bg-blue-50",    text: "text-blue-800",    bar: "bg-blue-600",    dot: "bg-blue-600" },
-  MATIC:{ bg: "bg-violet-50",  text: "text-violet-800",  bar: "bg-violet-600",  dot: "bg-violet-600" },
-  POL:  { bg: "bg-violet-50",  text: "text-violet-800",  bar: "bg-violet-600",  dot: "bg-violet-600" },
-  DOGE: { bg: "bg-amber-50",   text: "text-amber-800",   bar: "bg-amber-500",   dot: "bg-amber-500" },
-  TON:  { bg: "bg-sky-50",     text: "text-sky-800",     bar: "bg-sky-400",     dot: "bg-sky-400" },
-  USDC: { bg: "bg-emerald-50", text: "text-emerald-800", bar: "bg-emerald-500", dot: "bg-emerald-500" },
-  USDT: { bg: "bg-green-50",   text: "text-green-800",   bar: "bg-green-500",   dot: "bg-green-500" },
+  BTC:  { bg: "bg-background", text: "text-foreground", bar: "bg-amber-400", dot: "bg-amber-400" },
+  ETH:  { bg: "bg-background", text: "text-foreground", bar: "bg-blue-500", dot: "bg-blue-500" },
+  SOL:  { bg: "bg-background", text: "text-foreground", bar: "bg-violet-500", dot: "bg-violet-500" },
+  BNB:  { bg: "bg-background", text: "text-foreground", bar: "bg-yellow-400", dot: "bg-yellow-400" },
+  XRP:  { bg: "bg-background", text: "text-foreground", bar: "bg-sky-500", dot: "bg-sky-500" },
+  ADA:  { bg: "bg-background", text: "text-foreground", bar: "bg-indigo-400", dot: "bg-indigo-400" },
+  AVAX: { bg: "bg-background", text: "text-foreground", bar: "bg-rose-500", dot: "bg-rose-500" },
+  DOT:  { bg: "bg-background", text: "text-foreground", bar: "bg-pink-500", dot: "bg-pink-500" },
+  LINK: { bg: "bg-background", text: "text-foreground", bar: "bg-blue-600", dot: "bg-blue-600" },
+  MATIC:{ bg: "bg-background", text: "text-foreground", bar: "bg-violet-600", dot: "bg-violet-600" },
+  POL:  { bg: "bg-background", text: "text-foreground", bar: "bg-violet-600", dot: "bg-violet-600" },
+  DOGE: { bg: "bg-background", text: "text-foreground", bar: "bg-amber-500", dot: "bg-amber-500" },
+  TON:  { bg: "bg-background", text: "text-foreground", bar: "bg-sky-400", dot: "bg-sky-400" },
+  USDC: { bg: "bg-background", text: "text-foreground", bar: "bg-emerald-500", dot: "bg-emerald-500" },
+  USDT: { bg: "bg-background", text: "text-foreground", bar: "bg-green-500", dot: "bg-green-500" },
 }
 
 function getPalette(symbol: string) {
@@ -46,13 +46,13 @@ function AssetRow({ asset }: { asset: PortfolioAsset }) {
   const p = getPalette(asset.symbol)
 
   return (
-    <div className={cn("rounded-2xl px-4 py-3 transition-all", p.bg)}>
+    <div className={cn("rounded-2xl border border-border px-4 py-3 transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]", p.bg)}>
       <div className="flex items-center gap-3">
         {/* Icon */}
-        <div className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-white shadow-sm",
-          p.dot
-        )}>
+          <div className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-white shadow-sm",
+            p.dot
+          )}>
           {asset.symbol.slice(0, 2)}
         </div>
 
@@ -79,7 +79,7 @@ function AssetRow({ asset }: { asset: PortfolioAsset }) {
               type="button"
               onClick={() => setOpen(!open)}
               aria-label={open ? "Masquer l'explication" : "Voir pourquoi"}
-              className="flex items-center gap-1 rounded-full border border-black/10 bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground transition hover:bg-white active:scale-95"
+              className="flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground transition hover:bg-secondary active:scale-95"
             >
               Pourquoi ?
               {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -90,7 +90,7 @@ function AssetRow({ asset }: { asset: PortfolioAsset }) {
 
       {/* Expandable explanation */}
       {open && asset.why && (
-        <p className={cn("mt-2.5 text-xs leading-relaxed", p.text, "opacity-75")}>
+        <p className={cn("mt-2.5 text-xs leading-relaxed text-muted-foreground")}>
           {asset.why}
         </p>
       )}
@@ -100,10 +100,10 @@ function AssetRow({ asset }: { asset: PortfolioAsset }) {
 
 export function ChatPortfolioCard({ plan }: { plan: PortfolioPlan }) {
   return (
-    <div className="mt-3 overflow-hidden rounded-3xl border border-border bg-card shadow-card">
+    <div className="surface-card mt-3 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Ton plan
         </p>
         {plan.profile && (
@@ -114,11 +114,11 @@ export function ChatPortfolioCard({ plan }: { plan: PortfolioPlan }) {
       </div>
 
       {/* Asset rows */}
-      <div className="flex flex-col gap-2 p-3">
-        {plan.assets.map((asset) => (
-          <AssetRow key={asset.symbol} asset={asset} />
-        ))}
-      </div>
+        <div className="flex flex-col gap-2 p-3">
+          {plan.assets.map((asset) => (
+            <AssetRow key={asset.symbol} asset={asset} />
+          ))}
+        </div>
 
       {/* Avoid section */}
       {plan.avoid && plan.avoid.length > 0 && (

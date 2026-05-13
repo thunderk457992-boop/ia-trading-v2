@@ -295,7 +295,7 @@ function buildPrompt(
     : "DONNÉES LIVE PARTIELLES OU ABSENTES: dis-le clairement, n'invente aucun prix, aucune variation ni aucun signal live."
 
   const assetSelectionRules = "UNIVERS D'ACTIFS: rester sur les actifs du top 50 fournis. Justifier chaque selection par la liquidite, la dominance, la volatilite, la diversification ou la categorie de l'actif. Les memecoins ne peuvent etre que des satellites minoritaires, jamais le coeur du portefeuille."
-  const answerStructureRule = "STRUCTURE DE FOND: ton resultat doit rester sobre, rationnel et professionnel. Pas de ton marketing, pas de promesse implicite, pas de formule hype."
+  const answerStructureRule = "STRUCTURE DE FOND: ton resultat doit ressembler a une note d'investissement courte. Format sobre, raisonnement propre, risques explicites, prochaine action concrete. Pas de ton marketing, pas de promesse implicite, pas de formule hype."
 
   if (plan === "free") {
     return `Tu es un analyste crypto. Génère une allocation concise et directement utilisable.

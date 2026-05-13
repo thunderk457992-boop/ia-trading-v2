@@ -20,6 +20,10 @@ import {
 import { AxiomLogo } from "@/components/branding/AxiomLogo"
 import { createClient } from "@/lib/supabase/client"
 import type { MarketSnapshot } from "@/lib/coingecko"
+import { MetricCard } from "@/components/ui/MetricCard"
+import { PremiumBadge } from "@/components/ui/PremiumBadge"
+import { SectionHeader } from "@/components/ui/SectionHeader"
+import { TrustBar } from "@/components/ui/TrustBar"
 
 const PRODUCT_ALLOCATION = [
   { asset: "BTC", pct: 42, label: "Bitcoin", tone: "bg-amber-400" },
@@ -39,6 +43,13 @@ const HERO_METRICS = [
   { label: "Prix live", value: "CoinGecko + Kraken" },
   { label: "Historique", value: "Snapshots reels" },
   { label: "Sortie", value: "Allocation + plan d'action" },
+] as const
+
+const HERO_TRUST_ITEMS = [
+  { icon: Database, text: "Prix live CoinGecko / Kraken" },
+  { icon: Shield, text: "Paiement securise via Stripe" },
+  { icon: Lock, text: "Compte protege par Supabase" },
+  { icon: Brain, text: "Methodologie et risques expliques" },
 ] as const
 
 const HOME_PRICING_PLANS = [
@@ -118,18 +129,20 @@ const TRUST_ITEMS = [
   },
 ] as const
 
-const FIT_ITEMS = {
-  yes: [
-    "Vous voulez savoir quoi acheter sans empiler dix dashboards.",
-    "Vous avez un budget defini et vous voulez une allocation adaptee a votre risque.",
-    "Vous cherchez un plan d'entrée progressif au lieu d'acheter sous impulsion.",
+const EXPECTATION_ITEMS = {
+  does: [
+    "structure une strategie personnalisee a partir du budget, du risque et de l'horizon",
+    "explique les risques et les compromis avant l'execution",
+    "utilise des donnees marche live et des snapshots reels pour le suivi",
+    "aide a eviter les decisions impulsives et les changements de plan a chaud",
   ],
-  no: [
-    "Vous cherchez des promesses de rendement ou des signaux miracles.",
-    "Vous voulez trader des memecoins sans cadre ni limite de risque.",
-    "Vous ne voulez ni lire le risque, ni suivre un plan dans la duree.",
+  doesNot: [
+    "ne promet pas de gains ni de prediction magique",
+    "ne pousse pas aux memecoins ni au trading agressif",
+    "ne remplace pas un conseiller financier reglemente",
+    "n'invente pas de donnees quand une source manque",
   ],
-}
+} as const
 
 const FAQ_ITEMS = [
   {
@@ -279,7 +292,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
             <Link
               href={navSecondaryHref}
               data-testid="home-nav-secondary"
-              className="rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-foreground/92"
+              className="btn-primary min-h-0 px-4 py-2 text-sm"
             >
               {navSecondaryLabel}
             </Link>
@@ -287,7 +300,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
           <Link
             href={navSecondaryHref}
             data-testid="home-mobile-primary"
-            className="rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background md:hidden"
+            className="btn-primary min-h-0 px-4 py-2 text-sm md:hidden"
           >
             {isAuthenticated ? "Dashboard" : "Tester"}
           </Link>
@@ -299,25 +312,25 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
           <div className="max-w-2xl">
             <div className="mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-card-xs">
               <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
-              Strategie crypto personnalisee, donnee marche reelle, plan d&apos;action concret
+              Strategie crypto personnalisee, donnees live et cadre de risque
             </div>
 
             <h1 className="text-balance text-4xl font-bold leading-[0.98] tracking-tighter text-foreground sm:text-5xl md:text-6xl xl:text-7xl">
-              Une strategie crypto
-              <span className="block text-muted-foreground">personnalisee, claire et suivable.</span>
+              Dans 2 minutes, tu sais quoi acheter,
+              <span className="block text-muted-foreground">combien investir, et pourquoi.</span>
             </h1>
 
             <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Axiom AI transforme votre budget, votre tolerance au risque et le contexte marche en allocation,
-              plan d&apos;entree et suivi portefeuille. Vous savez quoi acheter, combien allouer, quand lisser votre
-              entree et quels risques garder sous controle.
+              Axiom construit un plan crypto personnalise a partir de ton budget, ton niveau de risque
+              et des donnees de marche live. Tu obtiens une repartition, un plan d&apos;entree, une lecture
+              du risque et la prochaine action, sans jargon inutile.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href={heroPrimaryHref}
                 data-testid="home-hero-primary"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-8 py-4 text-base font-semibold text-background transition-colors hover:bg-foreground/92 sm:w-auto"
+                className="btn-primary w-full sm:w-auto"
               >
                 {heroPrimaryLabel}
                 <ArrowRight className="h-4 w-4" />
@@ -325,7 +338,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
               <Link
                 href={heroSecondaryHref}
                 data-testid="home-hero-secondary"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-secondary px-8 py-4 text-base font-semibold text-foreground transition-colors hover:bg-secondary/80 sm:w-auto"
+                className="btn-secondary w-full sm:w-auto"
               >
                 {heroSecondaryLabel}
               </Link>
@@ -333,13 +346,18 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
               {HERO_METRICS.map((item) => (
-                <div key={item.label} className="rounded-2xl border border-border bg-card px-4 py-3 shadow-card-xs">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {item.label}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-foreground">{item.value}</p>
-                </div>
+                <MetricCard
+                  key={item.label}
+                  label={item.label}
+                  value={<span className="text-base font-semibold tracking-normal">{item.value}</span>}
+                  className="rounded-2xl p-4"
+                  valueClassName="mt-2 text-base font-semibold tracking-normal"
+                />
               ))}
+            </div>
+
+            <div className="mt-6">
+              <TrustBar items={HERO_TRUST_ITEMS.map((item) => ({ ...item }))} />
             </div>
 
             <p className="mt-6 max-w-2xl text-xs leading-6 text-muted-foreground">
@@ -663,38 +681,43 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-[32px] border border-emerald-200 bg-emerald-50 p-6 shadow-card-xs">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Pour qui</p>
-              <h3 className="mt-3 text-2xl font-semibold text-foreground">Pour les investisseurs qui veulent une methode.</h3>
+            <div className="surface-card p-6">
+              <PremiumBadge tone="success" size="sm">Axiom fait</PremiumBadge>
+              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">Une logique d&apos;investissement, pas un casino crypto.</h3>
               <ul className="mt-5 space-y-3">
-                {FIT_ITEMS.yes.map((item) => (
+                {EXPECTATION_ITEMS.does.map((item) => (
                   <li key={item} className="flex items-start gap-3">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                    <span className="text-sm leading-6 text-slate-700">{item}</span>
+                    <span className="text-sm leading-6 text-muted-foreground">{item}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="rounded-[32px] border border-amber-200 bg-amber-50 p-6 shadow-card-xs">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Pas pour qui</p>
-              <h3 className="mt-3 text-2xl font-semibold text-foreground">Pas pour une logique casino crypto.</h3>
+            <div className="surface-card p-6">
+              <PremiumBadge tone="warning" size="sm">Axiom ne fait pas</PremiumBadge>
+              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">Une promesse forte, mais des limites claires.</h3>
               <ul className="mt-5 space-y-3">
-                {FIT_ITEMS.no.map((item) => (
+                {EXPECTATION_ITEMS.doesNot.map((item) => (
                   <li key={item} className="flex items-start gap-3">
                     <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-                    <span className="text-sm leading-6 text-slate-700">{item}</span>
+                    <span className="text-sm leading-6 text-muted-foreground">{item}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="rounded-[32px] border border-border bg-card p-6 shadow-card sm:col-span-2">
-              <div className="grid gap-4 md:grid-cols-2">
+            <div className="surface-card p-6 sm:col-span-2">
+              <SectionHeader
+                eyebrow="Confiance"
+                title="Pourquoi le produit parait plus serieux que la moyenne"
+                description="On prefere montrer les sources, les limites et les vraies donnees plutot que surjouer des promesses."
+              />
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {TRUST_ITEMS.map((item) => {
                   const Icon = item.icon
                   return (
-                    <div key={item.title} className="rounded-3xl border border-border bg-secondary p-5">
+                    <div key={item.title} className="surface-soft p-5">
                       <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-background">
                         <Icon className="h-4 w-4 text-foreground" />
                       </div>
@@ -711,18 +734,13 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
 
       <section id="example" className="border-y border-border bg-secondary px-5 py-18 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-5xl">
-          <div className="mb-10 text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Exemple d&apos;analyse
-            </p>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Voila ce que tu obtiens en 90 secondes
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Exemple d&apos;analyse fictif, non personalise. Il montre la structure reelle du resultat:
-              une allocation, un niveau de risque, une action recommande et la logique marche utilisee.
-            </p>
-          </div>
+          <SectionHeader
+            eyebrow="Exemple d'analyse"
+            title="Voila ce que tu obtiens en 90 secondes"
+            description="Exemple d'analyse fictif, non personnalise. Il montre la structure reelle du resultat: une repartition, un niveau de risque, une action recommandee et les donnees marche utilisees."
+            align="center"
+            className="mb-10"
+          />
 
           <div className="overflow-hidden rounded-[32px] border border-border bg-card shadow-card">
             <div className="flex flex-col gap-3 border-b border-border bg-background px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -731,9 +749,9 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                 <span className="text-sm font-medium text-muted-foreground">Exemple d&apos;analyse</span>
               </div>
               <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                <span className="rounded-full border border-border bg-secondary px-3 py-1">Profil modere</span>
-                <span className="rounded-full border border-border bg-secondary px-3 py-1">Capital 5 000 EUR</span>
-                <span className="rounded-full border border-border bg-secondary px-3 py-1">Horizon 3-5 ans</span>
+                <PremiumBadge>Profil modere</PremiumBadge>
+                <PremiumBadge>Capital 5 000 EUR</PremiumBadge>
+                <PremiumBadge>Horizon 3-5 ans</PremiumBadge>
               </div>
             </div>
 
@@ -823,16 +841,13 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
 
       <section id="pricing" className="px-5 py-18 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-12 text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Tarifs</p>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Comparez les offres avant de vous engager
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Free sert a tester la methode. Pro sert a investir avec une vraie discipline. Premium sert a suivre,
-              comparer des scenarios et garder plus de contexte dans le temps.
-            </p>
-          </div>
+          <SectionHeader
+            eyebrow="Tarifs"
+            title="Comparez les offres avant de vous engager"
+            description="Free sert a tester la methode. Pro sert a investir avec une vraie discipline. Premium sert a suivre, comparer des scenarios et garder plus de contexte dans le temps."
+            align="center"
+            className="mb-12"
+          />
 
           <div className="grid gap-4 md:grid-cols-3">
             {HOME_PRICING_PLANS.map((plan) => {
@@ -887,11 +902,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
 
                   <Link
                     href={pricingHref}
-                    className={`block rounded-2xl py-3 text-center text-sm font-semibold transition-colors ${
-                      plan.highlighted
-                        ? "bg-foreground text-background hover:bg-foreground/92"
-                        : "border border-border bg-secondary text-foreground hover:bg-secondary/80"
-                    }`}
+                    className={plan.highlighted ? "btn-primary block text-center" : "btn-secondary block text-center"}
                   >
                     {isAuthenticated ? "Comparer les offres" : plan.cta}
                   </Link>
@@ -904,14 +915,12 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
 
       <section className="border-y border-border bg-secondary px-5 py-18 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-5xl">
-          <div className="mb-10 text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Questions frequentes
-            </p>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Ce que les utilisateurs veulent comprendre avant de commencer
-            </h2>
-          </div>
+          <SectionHeader
+            eyebrow="Questions frequentes"
+            title="Ce que les utilisateurs veulent comprendre avant de commencer"
+            align="center"
+            className="mb-10"
+          />
 
           <div className="grid gap-4 md:grid-cols-2">
             {FAQ_ITEMS.map((item) => (
@@ -940,14 +949,14 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Link
               href={bottomCtaHref}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-foreground px-8 py-4 font-semibold text-background transition-colors hover:bg-foreground/92"
+              className="btn-primary"
             >
               {bottomCtaLabel}
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href={pricingHref}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-secondary px-8 py-4 font-semibold text-foreground transition-colors hover:bg-secondary/80"
+              className="btn-secondary"
             >
               Comparer les offres
             </Link>
@@ -958,7 +967,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background px-4 py-3 shadow-[0_-10px_30px_rgba(17,24,39,0.08)] md:hidden">
         <Link
           href={bottomCtaHref}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground py-3.5 font-semibold text-background transition-colors hover:bg-foreground/92"
+          className="btn-primary flex w-full"
         >
           {bottomCtaLabel}
           <ArrowRight className="h-4 w-4" />

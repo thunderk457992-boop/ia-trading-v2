@@ -54,11 +54,11 @@ export function WhyNowCard(props: WhyNowCardProps) {
   const btcDominance = props.marketGlobal?.btcDominance
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="surface-card p-4">
       <div className="flex items-center gap-2">
         <TrendingUp className="h-4 w-4 text-slate-500" />
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Pourquoi maintenant ?</p>
+          <p className="eyebrow">Pourquoi maintenant ?</p>
           <h3 className="text-[15px] font-semibold text-slate-950">Contexte marche utilise par l&apos;IA</h3>
         </div>
       </div>
@@ -66,19 +66,19 @@ export function WhyNowCard(props: WhyNowCardProps) {
       <p className="mt-3 text-[13px] leading-6 text-slate-600">{copy}</p>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div className="surface-soft px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">BTC dominance</p>
           <p className="mt-1 text-sm font-semibold text-slate-900">
             {btcDominance !== undefined && btcDominance !== null ? `${btcDominance.toFixed(1)}%` : "Indisponible"}
           </p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div className="surface-soft px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Largeur marche</p>
           <p className="mt-1 text-sm font-semibold text-slate-900">
             {props.positiveAssets} en hausse / {props.negativeAssets} en baisse
           </p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div className="surface-soft px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Volatilite</p>
           <p className="mt-1 text-sm font-semibold text-slate-900">
             {props.marketVolatility !== null ? `${props.marketVolatility.toFixed(1)}%` : "Indisponible"}

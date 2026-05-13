@@ -303,7 +303,7 @@ function normalizeAnalysis(raw: any): Analysis {
 // ── Score Gauge SVG ───────────────────────────────────────────────────────────
 function ScoreGauge({ score }: { score: number }) {
   const size = 140
-  const sw = 10
+  const sw = 8
   const r = (size - sw) / 2
   const cx = size / 2
   const cy = size / 2 + 10
@@ -325,8 +325,7 @@ function ScoreGauge({ score }: { score: number }) {
   const bgArc  = `M ${s.x} ${s.y} A ${r} ${r} 0 0 1 ${e.x} ${e.y}`
   const fillArc = `M ${s.x} ${s.y} A ${r} ${r} 0 ${pct > 0.5 ? "0" : "0"} 1 ${f.x} ${f.y}`
 
-  const color = score >= 85 ? "#34d399" : score >= 70 ? "#f59e0b" : "#f87171"
-  const glow  = score >= 85 ? "score-glow-green" : score >= 70 ? "score-glow-gold" : "score-glow-red"
+  const color = score >= 85 ? "#3f8f78" : score >= 70 ? "#b69357" : "#a35f68"
   const label = score >= 85 ? "Excellent" : score >= 70 ? "Solide" : "À affiner"
 
   return (
@@ -334,21 +333,21 @@ function ScoreGauge({ score }: { score: number }) {
       <div className="relative" style={{ width: size, height: size / 2 + 20 }}>
         <svg width={size} height={size / 2 + 20} viewBox={`0 0 ${size} ${size / 2 + 20}`} overflow="visible">
           {/* Track */}
-          <path d={bgArc} fill="none" stroke="#e2e8f0" strokeWidth={sw} strokeLinecap="round" />
+          <path d={bgArc} fill="none" stroke="#e5e7eb" strokeWidth={sw} strokeLinecap="round" />
           {/* Fill */}
           {pct > 0.01 && (
             <path d={fillArc} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round"
-              style={{ filter: `drop-shadow(0 0 6px ${color}50)` }} />
+              opacity={0.95} />
           )}
           {/* Needle dot */}
-          <circle cx={f.x} cy={f.y} r={4} fill={color} style={{ filter: `drop-shadow(0 0 4px ${color})` }} />
+          <circle cx={f.x} cy={f.y} r={3.5} fill={color} />
         </svg>
         <div className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-0.5">
-          <span className={cn("text-4xl font-black tabular-nums leading-none", glow)} style={{ color }}>{score}</span>
-          <span className="text-xs text-muted-foreground mt-0.5">/100</span>
+          <span className="text-4xl font-semibold tabular-nums leading-none tracking-tight" style={{ color }}>{score}</span>
+          <span className="mt-0.5 text-xs text-muted-foreground">/100</span>
         </div>
       </div>
-      <span className="text-sm font-bold text-foreground mt-1">{label}</span>
+      <span className="mt-1 text-sm font-semibold text-foreground">{label}</span>
     </div>
   )
 }
@@ -524,13 +523,13 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
     return (
       <div className="flex items-center justify-center min-h-[65vh] px-4">
         <div className="text-center max-w-xs w-full">
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-card border border-border flex items-center justify-center relative">
+          <div className="relative mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card">
             <Brain className="w-8 h-8 text-foreground" />
             <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-foreground flex items-center justify-center">
               <span className="w-1.5 h-1.5 rounded-full bg-background animate-pulse" />
             </span>
           </div>
-          <h2 className="text-2xl font-black text-foreground mb-1">Analyse en cours</h2>
+          <h2 className="mb-1 text-2xl font-semibold tracking-tight text-foreground">Analyse en cours</h2>
           <p className="text-muted-foreground text-sm mb-8">
             {plan === "premium" ? "Claude Opus · analyse approfondie" : plan === "pro" ? "Claude Sonnet · analyse détaillée" : "Claude Haiku · analyse de base"}
           </p>
@@ -576,7 +575,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
       {showUpgradeModal && <UpgradeModal plan={plan} onClose={() => setShowUpgradeModal(false)} />}
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-black text-foreground tracking-tight mb-1">Conseiller IA</h1>
+          <h1 className="mb-1 text-3xl font-semibold tracking-tight text-foreground">Conseiller IA</h1>
           <p className="text-muted-foreground text-sm">
             {plan === "premium" ? "Claude Opus · stratégie institutionnelle" : plan === "pro" ? "Claude Sonnet · analyse détaillée" : "Claude Haiku · analyse de base"}
             {" · "}analyse complète en 60-90 s selon la charge
@@ -584,34 +583,34 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
         </div>
 
         {limitReached ? (
-          <div className="mb-6 p-5 rounded-xl bg-secondary border border-border flex items-start gap-3">
+          <div className="surface-soft mb-6 flex items-start gap-3 p-5">
             <div className="w-8 h-8 rounded-lg bg-background border border-border flex items-center justify-center shrink-0">
               <Lock className="w-4 h-4 text-muted-foreground" />
             </div>
             <div className="flex-1">
-              <p className="font-bold text-foreground mb-0.5 text-sm">Accès temporairement bloqué</p>
+              <p className="mb-0.5 text-sm font-semibold text-foreground">Accès temporairement bloqué</p>
               <p className="text-sm text-muted-foreground mb-3">
                 {plan === "pro"
                   ? "Vos 20 analyses Pro du mois sont déjà utilisées. Passez au Premium pour continuer sans limite."
                   : "Votre analyse gratuite du mois est déjà utilisée. Passez au Pro pour continuer."}
               </p>
-              <Link href="/pricing" className="inline-flex items-center gap-2 px-4 py-2 bg-foreground hover:bg-foreground/90 text-background text-sm font-bold rounded-lg transition-all">
+              <Link href="/pricing" className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold">
                 Comparer les plans <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </div>
         ) : plan === "free" ? (
-          <div className="mb-6 px-4 py-3 rounded-xl bg-secondary border border-border flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="surface-soft mb-6 flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
             <Clock className="w-3.5 h-3.5 shrink-0" />
             1 analyse incluse ce mois · <Link href="/pricing" className="font-bold text-foreground underline underline-offset-2 hover:opacity-75 transition-opacity">Passer au Pro pour 20 analyses</Link>
           </div>
         ) : null}
 
-        <div className="mb-5 rounded-xl border border-border bg-card p-4">
+        <div className="surface-card mb-5 p-4">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Plan actif</p>
-              <p className="text-sm font-bold text-foreground">{planAccess.label}</p>
+              <p className="eyebrow">Plan actif</p>
+              <p className="text-sm font-semibold text-foreground">{planAccess.label}</p>
             </div>
             <Link href="/pricing" className="text-xs font-semibold text-foreground underline underline-offset-2 hover:opacity-75">
               Comprendre les limites
@@ -640,9 +639,9 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
         </div>
 
         <div className="space-y-2.5">
-          <div className="p-4 rounded-2xl bg-card border border-border">
+          <div className="surface-card p-4">
             <div className="flex items-center justify-between gap-3 mb-3">
-              <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+              <span className="eyebrow">
                 Question {formStep + 1}/{formSteps.length}
               </span>
               <span className="text-xs font-semibold text-foreground">{formSteps[formStep]}</span>
@@ -654,10 +653,10 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
               />
             </div>
           </div>
-          <div className="rounded-2xl border border-border bg-card/80 px-4 py-3">
+          <div className="surface-soft px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <p className="eyebrow">
                   Ce que l&apos;IA calibre ici
                 </p>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -961,12 +960,12 @@ function FormSection({ number, title, icon, optional, helper, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="p-5 rounded-2xl bg-card border border-border">
+    <div className="surface-card p-5">
       <div className="flex items-center gap-3 mb-4">
-        <span className="text-[10px] font-black text-muted-foreground/50 tabular-nums w-5 shrink-0">0{number}</span>
+        <span className="w-5 shrink-0 text-[10px] font-semibold tabular-nums text-muted-foreground/50">0{number}</span>
         <div className="w-px h-3.5 bg-border shrink-0" />
         <div>
-          <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
             {icon}{title}
             {optional && <span className="text-muted-foreground font-normal text-xs ml-1">(optionnel)</span>}
           </h3>
@@ -992,11 +991,11 @@ function ResultSection({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-3xl border border-border bg-card shadow-card-xs">
+    <section className="surface-card">
       <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
         <div>
           {eyebrow ? (
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{eyebrow}</p>
+            <p className="eyebrow">{eyebrow}</p>
           ) : null}
           <h2 className="mt-1 text-base font-semibold text-foreground">{title}</h2>
         </div>
@@ -1017,8 +1016,7 @@ function LockedProInsight({
   upgrade: string
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-secondary/60 p-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-background/10 via-transparent to-background/0" />
+    <div className="surface-soft relative overflow-hidden p-4">
       <div className="relative">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -1056,7 +1054,7 @@ function AdvisorNextStepCard({
   return (
     <Link
       href={href}
-      className="group rounded-2xl border border-border bg-card px-4 py-4 transition-colors hover:bg-secondary"
+      className="surface-card group px-4 py-4 transition-colors hover:bg-secondary"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-secondary transition-colors group-hover:bg-background">
@@ -1244,10 +1242,10 @@ ${advancedBlock}
     <div className="mx-auto max-w-3xl animate-slide-up pb-10">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="eyebrow">
             Analyse terminee
           </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">Votre plan crypto</h1>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">Note d&apos;investissement</h1>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {plan === "premium" ? "Claude Opus 4.7" : plan === "pro" ? "Claude Sonnet 4.6" : "Claude Haiku 4.5"} ·
             {" "}lecture du profil, du risque et des donnees marche disponibles
@@ -1255,7 +1253,7 @@ ${advancedBlock}
         </div>
         <button
           onClick={onNew}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+          className="btn-secondary inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold"
         >
           <RefreshCw className="h-4 w-4" />
           Nouvelle analyse
@@ -1263,10 +1261,10 @@ ${advancedBlock}
       </div>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-[0.82fr_1.18fr]">
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-card-xs">
+        <div className="surface-card p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="eyebrow">
                 Resume du plan
               </p>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">{experienceGuide.tone}</p>
@@ -1283,20 +1281,20 @@ ${advancedBlock}
           </div>
         </div>
 
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-card-xs">
+        <div className="surface-card p-6">
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-border bg-secondary/60 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Niveau de risque</p>
+            <div className="surface-soft p-4">
+              <p className="eyebrow">Niveau de risque</p>
               <p className="mt-2 text-base font-semibold text-foreground">{risk.label}</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">Lecture du portefeuille au regard de votre profil.</p>
             </div>
-            <div className="rounded-2xl border border-border bg-secondary/60 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Mode de lecture</p>
+            <div className="surface-soft p-4">
+              <p className="eyebrow">Mode de lecture</p>
               <p className="mt-2 text-base font-semibold text-foreground">{experienceGuide.label}</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">Niveau de detail adapte a votre experience crypto.</p>
             </div>
-            <div className="rounded-2xl border border-border bg-secondary/60 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Signal marche</p>
+            <div className="surface-soft p-4">
+              <p className="eyebrow">Signal marche</p>
               <p className="mt-2 text-base font-semibold text-foreground">{signalInfo?.label ?? "Version Pro"}</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 {signalInfo ? "Lecture du contexte actuel incluse dans votre plan." : "Le contexte detaille se debloque avec le signal marche Pro."}
@@ -1304,13 +1302,13 @@ ${advancedBlock}
             </div>
           </div>
           <div className="mt-4 rounded-2xl border border-border bg-background px-4 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Resume du plan</p>
+            <p className="eyebrow">Resume du plan</p>
             <p className="mt-2 text-sm leading-7 text-foreground">{analysis.explanation}</p>
             {analysis.marketSignal ? (
-              <div className="mt-4 flex items-start gap-2 rounded-2xl border border-border bg-secondary px-3 py-3">
+              <div className="surface-soft mt-4 flex items-start gap-2 px-3 py-3">
                 <Activity className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Contexte marche</p>
+                  <p className="eyebrow">Contexte marche</p>
                   <p className="mt-1 text-sm leading-6 text-foreground">{analysis.marketSignal}</p>
                 </div>
               </div>

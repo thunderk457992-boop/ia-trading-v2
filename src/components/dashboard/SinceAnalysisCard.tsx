@@ -102,11 +102,11 @@ export function SinceAnalysisCard({
 
   if (!lastAnalysisDate) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="surface-card p-4">
         <div className="flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-slate-500" />
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Depuis ton analyse</p>
+            <p className="eyebrow">Depuis ton analyse</p>
             <h3 className="text-[15px] font-semibold text-slate-950">Aucune analyse recente</h3>
           </div>
         </div>
@@ -131,37 +131,37 @@ export function SinceAnalysisCard({
     : "Le contexte a peu change depuis ton analyse. La discipline compte plus qu'un ajustement precipite."
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="surface-card p-4">
       <div className="flex items-center gap-2">
         <CalendarClock className="h-4 w-4 text-slate-500" />
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Depuis ton analyse</p>
+          <p className="eyebrow">Depuis ton analyse</p>
           <h3 className="text-[15px] font-semibold text-slate-950">{formatAnalysisDate(lastAnalysisDate)}</h3>
         </div>
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div className="surface-soft px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Portefeuille</p>
           <p className="mt-1 text-sm font-semibold text-slate-900">{formatPercent(portfolioChange?.percent ?? null)}</p>
           <p className="mt-1 text-[11px] text-slate-500">{formatEuro(portfolioChange?.euro ?? null)}</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div className="surface-soft px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">BTC depuis analyse</p>
           <p className="mt-1 text-sm font-semibold text-slate-900">{formatPercent(btcChange)}</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div className="surface-soft px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">ETH depuis analyse</p>
           <p className="mt-1 text-sm font-semibold text-slate-900">{formatPercent(ethChange)}</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div className="surface-soft px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Barometre marche</p>
           <p className="mt-1 text-sm font-semibold text-slate-900">{formatPercent(marketProxy)}</p>
           <p className="mt-1 text-[11px] text-slate-500">Proxy large cap BTC + ETH</p>
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+      <div className="mt-4 rounded-xl border border-border bg-background px-3.5 py-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-slate-500" />
           <p className="text-[12px] font-semibold text-slate-900">Lecture rapide</p>

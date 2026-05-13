@@ -35,19 +35,19 @@ export function ChatDcaCard({ plan }: { plan: DcaPlan }) {
   const freq = FREQUENCY_LABELS[plan.frequency] ?? { label: plan.frequency, sub: "" }
 
   return (
-    <div className="mt-3 overflow-hidden rounded-3xl border border-border bg-card shadow-card">
+    <div className="surface-card mt-3 overflow-hidden">
       {/* Header */}
       <div className="border-b border-border px-4 py-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Ton plan DCA
         </p>
       </div>
 
       <div className="p-4">
         {/* Frequency block */}
-        <div className="mb-4 flex items-center gap-3 rounded-2xl bg-secondary px-4 py-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-foreground">
-            <Repeat className="h-5 w-5 text-background" />
+        <div className="surface-soft mb-4 flex items-center gap-3 px-4 py-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-background">
+            <Repeat className="h-5 w-5 text-foreground" />
           </div>
           <div>
             <p className="text-base font-bold text-foreground">{plan.total}€ {freq.label.toLowerCase()}</p>
@@ -60,7 +60,7 @@ export function ChatDcaCard({ plan }: { plan: DcaPlan }) {
           {plan.breakdown.map((item) => (
             <div
               key={item.symbol}
-              className="flex items-center justify-between rounded-xl bg-secondary/60 px-3.5 py-2.5"
+              className="flex items-center justify-between rounded-xl border border-border bg-background px-3.5 py-2.5"
             >
               <div className="flex items-center gap-2.5">
                 <span className={`h-2.5 w-2.5 rounded-full ${dotColor(item.symbol)}`} />

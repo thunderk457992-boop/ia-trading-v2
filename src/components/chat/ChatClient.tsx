@@ -238,7 +238,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_288px] xl:grid-cols-[minmax(0,1fr)_308px] xl:gap-5">
 
         {/* ── Chat window ──────────────────────────────────── */}
-        <section className="overflow-hidden rounded-[28px] border border-border bg-card shadow-card sm:rounded-3xl">
+        <section className="surface-card overflow-hidden sm:rounded-3xl">
 
           {/* Conversation header */}
           <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6">
@@ -370,7 +370,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
 
           {/* User memory — shown only when we have learned something */}
           {userMemory.firstProfile && (
-            <div className="rounded-3xl border border-border bg-card p-4 shadow-card">
+            <div className="surface-card p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Brain className="h-3.5 w-3.5 text-muted-foreground" />
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Ce que je retiens</p>
@@ -409,7 +409,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
           )}
 
           {/* Plan features */}
-          <div className="rounded-3xl border border-border bg-card p-4 shadow-card">
+          <div className="surface-card p-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Ton plan</p>
             <ul className="mt-3 space-y-2">
               {planConfig.features.map((f) => (
@@ -423,7 +423,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
 
           {/* Locked features */}
           {planConfig.locked.length > 0 && (
-            <div className="rounded-3xl border border-border bg-card p-4 shadow-card">
+            <div className="surface-card p-4">
               <div className="flex items-center gap-1.5 mb-3">
                 <Lock className="h-3 w-3 text-muted-foreground" />
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Non inclus</p>
@@ -445,7 +445,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
           )}
 
           {/* Context */}
-          <div className="rounded-3xl border border-border bg-card p-4 shadow-card">
+          <div className="surface-card p-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Mon contexte</p>
             <div className="mt-3 space-y-2 text-sm text-muted-foreground">
               <p>{latestAnalysisAt ? `Dernière analyse : ${formatDate(latestAnalysisAt)}` : "Pas encore d'analyse."}</p>
@@ -459,7 +459,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
           </div>
 
           {/* Market signal */}
-          <div className="rounded-3xl border border-border bg-card p-4 shadow-card">
+          <div className="surface-card p-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Signal marché</p>
             {marketDecision ? (
               <div className="mt-3 space-y-2.5">

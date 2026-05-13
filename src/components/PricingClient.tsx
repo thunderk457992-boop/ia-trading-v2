@@ -18,6 +18,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Analytics } from "@/lib/analytics"
+import { PremiumBadge } from "@/components/ui/PremiumBadge"
+import { SectionHeader } from "@/components/ui/SectionHeader"
+import { TrustBar } from "@/components/ui/TrustBar"
 
 interface PricingClientProps {
   currentPlan: string
@@ -482,7 +485,7 @@ export function PricingClient({
               body: "Plus de profondeur, plus de scénarios et plus de contexte pour suivre votre portefeuille dans la durée.",
             },
           ].map((item) => (
-            <div key={item.title} className="rounded-3xl border border-border bg-card p-5 text-left shadow-card-xs">
+            <div key={item.title} className="surface-card p-5 text-left">
               <h2 className="text-base font-semibold text-foreground">{item.title}</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.body}</p>
             </div>
@@ -555,7 +558,7 @@ export function PricingClient({
         </div>
       )}
 
-      <div className="mx-auto mb-8 max-w-3xl rounded-3xl border border-border bg-card p-4 shadow-card-xs sm:p-5">
+      <div className="surface-card mx-auto mb-8 max-w-3xl p-4 sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -806,22 +809,44 @@ export function PricingClient({
         })}
       </div>
 
-      <div className="mb-12 grid gap-4 rounded-3xl border border-border bg-card p-6 shadow-card sm:grid-cols-3">
-        {TRUST_SIGNALS.map(({ icon: Icon, text }) => (
-          <div key={text} className="flex items-center gap-3 rounded-2xl border border-border bg-secondary px-4 py-3">
-            <Icon className="h-4 w-4 shrink-0 text-foreground" />
-            <span className="text-sm text-muted-foreground">{text}</span>
+      <div className="mb-12 space-y-6">
+        <TrustBar items={TRUST_SIGNALS.map(({ icon, text }) => ({ icon, text }))} />
+
+        <div className="surface-card p-6">
+          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <PremiumBadge tone="accent" size="sm">Pourquoi payer ?</PremiumBadge>
+              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
+                Un mauvais timing d&apos;achat peut couter plus que plusieurs mois d&apos;abonnement.
+              </h2>
+              <p className="mt-4 text-sm leading-7 text-muted-foreground">
+                La valeur d&apos;Axiom n&apos;est pas de promettre un gain. Elle est de t&apos;aider a clarifier ton plan,
+                a mieux lire le risque et a eviter des decisions couteuses prises sous pression.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                "Free te laisse verifier si la methode te convient, sans carte bancaire.",
+                "Pro ajoute plus de contexte marche et un historique enfin exploitable.",
+                "Premium sert a suivre, comparer des scenarios et garder plus de profondeur.",
+                "Chaque plan garde la meme promesse: clarifier, structurer et expliquer.",
+              ].map((item) => (
+                <div key={item} className="surface-soft px-4 py-4">
+                  <p className="text-sm leading-6 text-muted-foreground">{item}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6 shadow-card">
-        <div className="mb-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">FAQ pricing</p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Les questions qui reviennent avant de payer
-          </h2>
-        </div>
+      <div className="surface-card p-6">
+        <SectionHeader
+          eyebrow="FAQ pricing"
+          title="Les questions qui reviennent avant de payer"
+          align="center"
+          className="mb-8"
+        />
 
         <div className="grid gap-4 md:grid-cols-2">
           {PRICING_FAQ.map((item) => (

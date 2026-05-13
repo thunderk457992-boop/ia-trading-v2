@@ -34,18 +34,18 @@ export function DisciplineCard({ lastAnalysisDate, snapshotCount }: DisciplineCa
   const message = buildDisciplineMessage(lastAnalysisDate, snapshotCount)
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="surface-card p-4">
       <div className="flex items-center gap-2">
         <Gauge className="h-4 w-4 text-slate-500" />
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Discipline</p>
+          <p className="eyebrow">Discipline</p>
           <h3 className="text-[15px] font-semibold text-slate-950">Rester rationnel</h3>
         </div>
       </div>
 
       <p className="mt-3 text-[13px] leading-6 text-slate-600">{message}</p>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+      <div className="surface-soft mt-4 px-3 py-2.5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Repere coach</p>
         <p className="mt-1 text-[11px] leading-5 text-slate-500">
           {snapshotCount} snapshot{snapshotCount > 1 ? "s" : ""} disponible{snapshotCount > 1 ? "s" : ""} pour nourrir le suivi. Le but n&apos;est pas de reagir a chaque mouvement, mais de garder un plan coherent avec ton horizon.

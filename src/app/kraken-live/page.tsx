@@ -206,7 +206,7 @@ export default function KrakenLivePage() {
         </Link>
 
         {/* ── Header card ── */}
-        <div className="mb-8 rounded-[28px] border border-border bg-card p-5 shadow-card sm:p-6">
+        <div className="surface-card mb-8 p-5 sm:p-6">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -214,7 +214,7 @@ export default function KrakenLivePage() {
                 Marché live
               </div>
               <div>
-                <h1 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl">Kraken Live</h1>
+                <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Kraken Live</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                   Kraken est la source prioritaire pour les prix spot. CoinGecko prend le relais pour les actifs
                   non couverts. Si les deux manquent, l&apos;actif est retiré plutôt que simulé.
@@ -224,27 +224,27 @@ export default function KrakenLivePage() {
 
             {/* Summary grid */}
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[40rem] xl:grid-cols-4">
-              <div className="rounded-2xl border border-border bg-secondary px-4 py-3">
+              <div className="surface-soft px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Actifs suivis</p>
-                <p className="mt-2 text-2xl font-black tabular-nums text-foreground">
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
                   {loading ? "—" : (summary?.trackedAssets ?? assets.length)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-border bg-secondary px-4 py-3">
+              <div className="surface-soft px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">BTC Dominance</p>
-                <p className="mt-2 text-2xl font-black tabular-nums text-foreground">
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
                   {loading ? "—" : (global ? formatPct(global.btcDominance) : "—")}
                 </p>
               </div>
-              <div className="rounded-2xl border border-border bg-secondary px-4 py-3">
+              <div className="surface-soft px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Market cap total</p>
-                <p className="mt-2 text-2xl font-black tabular-nums text-foreground">
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
                   {loading ? "—" : (global ? formatCompact(global.totalMarketCapUsd) : "—")}
                 </p>
               </div>
-              <div className="rounded-2xl border border-border bg-secondary px-4 py-3">
+              <div className="surface-soft px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Source principale</p>
-                <p className="mt-2 text-base font-black text-foreground">
+                <p className="mt-2 text-base font-semibold text-foreground">
                   {loading ? "—" : (summary?.primarySource ?? data?.source ?? "CoinGecko")}
                 </p>
               </div>
