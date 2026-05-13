@@ -154,6 +154,25 @@ function fmtPortfolioEuroDelta(value: number | null | undefined) {
   return `${value > 0 ? "+" : ""}${formatted}€`
 }
 
+function formatRealHistoryLabel(ageMs: number) {
+  if (ageMs < DAY_MS) {
+    const hours = Math.max(1, Math.round(ageMs / HOUR_MS))
+    return `${hours}h de donnees reelles`
+  }
+
+  const days = Math.max(1, Math.round(ageMs / DAY_MS))
+  return `${days}j de donnees reelles`
+}
+
+function formatSnapshotStartLabel(timestamp: number) {
+  return new Date(timestamp).toLocaleDateString(DISPLAY_LOCALE, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: DISPLAY_TIME_ZONE,
+  })
+}
+
 function AxiomIcon({ className }: { className?: string }) {
   return <AxiomGlyph className={className} />
 }
@@ -676,8 +695,10 @@ export function DashboardOverview({
     [portfolioSnapshots]
   )
   const useSnapshotHistory = normalizedPortfolioSnapshots.length > 0
+  const firstSnapshot = normalizedPortfolioSnapshots[0] ?? null
   const latestSnapshot = normalizedPortfolioSnapshots[normalizedPortfolioSnapshots.length - 1] ?? null
   const timeframeAnchorMs = latestSnapshot?.timestamp ?? marketFetchedAt ?? 0
+  const realHistoryAgeMs = firstSnapshot && latestSnapshot ? Math.max(0, latestSnapshot.timestamp - firstSnapshot.timestamp) : 0
   const marketUpdatedLabel = useMemo(() => {
     if (!marketFetchedAt) return null
     return new Date(marketFetchedAt).toLocaleTimeString(DISPLAY_LOCALE, {
@@ -697,6 +718,9 @@ export function DashboardOverview({
       timeZone: DISPLAY_TIME_ZONE,
     })
   }, [latestSnapshot])
+  const realHistoryLabel = firstSnapshot ? formatRealHistoryLabel(realHistoryAgeMs) : null
+  const realHistoryStartLabel = firstSnapshot ? formatSnapshotStartLabel(firstSnapshot.timestamp) : null
+  const snapshotCountLabel = `${normalizedPortfolioSnapshots.length} snapshot${normalizedPortfolioSnapshots.length > 1 ? "s" : ""} reel${normalizedPortfolioSnapshots.length > 1 ? "s" : ""}`
   const oneDayUsesRecentFallback = useMemo(() => (
     usesRecentOneDayFallback(normalizedPortfolioSnapshots, timeframeAnchorMs)
   ), [normalizedPortfolioSnapshots, timeframeAnchorMs])
@@ -885,7 +909,7 @@ export function DashboardOverview({
             <p className="mt-0.5 text-[13px] text-muted-foreground">
               Bonjour, {firstName}.
               {marketUpdatedLabel
-                ? <span className="ml-1">Prix mis à jour à <span className="font-medium text-foreground tabular-nums">{marketUpdatedLabel}</span>.</span>
+                ? <span className="ml-1">Live a <span className="font-medium text-foreground tabular-nums">{marketUpdatedLabel}</span>.</span>
                 : <span className="ml-1 text-muted-foreground/50">Chargement des prix…</span>
               }
             </p>
@@ -899,16 +923,27 @@ export function DashboardOverview({
           </Link>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-[11px] text-emerald-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-dot shrink-0" />
+            <span className="font-semibold">Live</span>
+            <span>{marketUpdatedLabel ? `Mis a jour a ${marketUpdatedLabel}` : "Connexion des flux..."}</span>
+          </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-500 shrink-0" />
             <span className="font-semibold text-foreground">Courbe</span>
-            <span>{useSnapshotHistory ? "snapshots réels" : "aucune donnée"}</span>
+            <span>{useSnapshotHistory ? snapshotCountLabel : "aucune donnee portefeuille"}</span>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
             <span className="font-semibold text-foreground">Prix</span>
             <span>Kraken + CoinGecko</span>
           </div>
+          {realHistoryLabel && (
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">Historique reel</span>
+              <span>{realHistoryStartLabel ? `depuis ${realHistoryStartLabel}` : realHistoryLabel}</span>
+            </div>
+          )}
           {lastSnapshotLabel && (
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
               <span className="font-semibold text-foreground">Dernier snapshot</span>
@@ -922,19 +957,19 @@ export function DashboardOverview({
             </div>
           )}
         </div>
-        <div className="mt-3 rounded-xl border border-border bg-card px-4 py-3 text-[12px] leading-5 text-muted-foreground">
-          Les cryptomonnaies comportent un risque de perte en capital. Ceci n&apos;est pas un conseil financier.
+        <div className="mt-3 rounded-2xl border border-border bg-card/90 px-4 py-3 text-[12px] leading-5 text-muted-foreground shadow-sm">
+          Les cryptomonnaies comportent un risque de perte en capital. Axiom structure un plan et n&apos;emet pas de conseil financier.
         </div>
       </div>
 
       {/* Summary cards — 4 top */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-4">
         {/* Capital */}
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-md animate-fade-in">
           <div className="flex items-start justify-between">
             <div className="space-y-0.5 flex-1">
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Capital investi</p>
-              <p data-testid="capital-value" className="text-xl font-bold tracking-tight text-foreground">
+              <p data-testid="capital-value" className="text-2xl font-semibold tracking-tight text-foreground">
                 {capital > 0 ? `${capital.toLocaleString("fr-FR")}€` : "—"}
               </p>
               {portfolioChange24h !== null && portfolioValueChange !== null ? (
@@ -960,36 +995,44 @@ export function DashboardOverview({
                 </p>
               )}
             </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-muted-foreground shrink-0">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-muted-foreground shrink-0">
               <Wallet className="h-4 w-4" />
             </div>
+          </div>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {useSnapshotHistory
+              ? `${realHistoryLabel ?? "Historique reel demarre"} · ${snapshotCountLabel}`
+              : "Pas encore d'historique portefeuille. Le suivi commencera apres la premiere analyse."}
           </div>
         </div>
 
         {/* Score IA */}
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-md animate-fade-in" style={{ animationDelay: "40ms" }}>
           <div className="flex items-start justify-between">
             <div className="space-y-0.5 flex-1">
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Score IA</p>
-              <p className="text-xl font-bold tracking-tight text-foreground">{avgScore ? `${avgScore}/100` : "—"}</p>
+              <p className="text-2xl font-semibold tracking-tight text-foreground">{avgScore ? `${avgScore}/100` : "—"}</p>
               <p className="text-[11px] text-muted-foreground">
                 {avgScore
                   ? avgScore >= 80 ? "Signal d'achat fort" : avgScore >= 60 ? "Signal modéré" : "Signal faible"
                   : "Aucune analyse"}
               </p>
             </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-muted-foreground shrink-0">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-muted-foreground shrink-0">
               <Brain className="h-4 w-4" />
             </div>
+          </div>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {lastAnalysis ? `Derniere analyse ${new Date(lastAnalysis.created_at).toLocaleDateString(DISPLAY_LOCALE, { day: "2-digit", month: "short", timeZone: DISPLAY_TIME_ZONE })}` : "Le score apparait apres la premiere analyse reelle."}
           </div>
         </div>
 
         {/* Analyses ce mois */}
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-md animate-fade-in" style={{ animationDelay: "80ms" }}>
           <div className="flex items-start justify-between">
             <div className="space-y-0.5 flex-1">
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Analyses / mois</p>
-              <p className="text-xl font-bold tracking-tight text-foreground">{monthlyCount}</p>
+              <p className="text-2xl font-semibold tracking-tight text-foreground">{monthlyCount}</p>
               <p className="text-[11px] text-muted-foreground">
                 {analysesRemaining === null
                   ? "Illimitées"
@@ -998,25 +1041,35 @@ export function DashboardOverview({
                   : `${analysesRemaining} restante${analysesRemaining > 1 ? "s" : ""}`}
               </p>
             </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-muted-foreground shrink-0">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-muted-foreground shrink-0">
               <Activity className="h-4 w-4" />
             </div>
+          </div>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {analysesRemaining === null ? "Cadence libre pour iterer sur ta strategie." : `${planLabel} te laisse ${analysesRemaining} analyse${analysesRemaining > 1 ? "s" : ""} avant le reset mensuel.`}
           </div>
         </div>
 
         {/* Plan */}
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-md animate-fade-in" style={{ animationDelay: "120ms" }}>
           <div className="flex items-start justify-between">
             <div className="space-y-0.5 flex-1">
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Votre plan</p>
-              <p className="text-xl font-bold tracking-tight text-foreground">{planLabel}</p>
+              <p className="text-2xl font-semibold tracking-tight text-foreground">{planLabel}</p>
               <p className="text-[11px] text-muted-foreground">
                 {plan === "free" ? "Gratuit" : subscription?.status === "active" ? "Actif" : "Abonnement"}
               </p>
             </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-muted-foreground shrink-0">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-muted-foreground shrink-0">
               <Percent className="h-4 w-4" />
             </div>
+          </div>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {plan === "free"
+              ? "Teste le produit, les donnees marche et la logique d'allocation avant d'aller plus loin."
+              : subscription?.status === "active"
+              ? "Acces actif aux fonctions de suivi et d'analyse de ton plan."
+              : "Ton plan reste visible, mais certaines fonctions peuvent etre limitees."}
           </div>
         </div>
       </div>

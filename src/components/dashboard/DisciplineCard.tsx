@@ -16,11 +16,11 @@ function buildDisciplineMessage(lastAnalysisDate: string | null, snapshotCount: 
   const hoursSinceAnalysis = Math.max(0, Math.round((Date.now() - analysisTimestamp) / (60 * 60 * 1000)))
 
   if (hoursSinceAnalysis < 24) {
-    return "Ton plan a ete cree il y a moins de 24h. Il est encore trop tot pour juger sa performance."
+    return "Ton plan reste tres recent. Laisse-lui un peu de temps avant d'en tirer une conclusion."
   }
 
   if (hoursSinceAnalysis < 72 || snapshotCount < 3) {
-    return "Evite de changer de strategie trop vite. Quelques snapshots ne suffisent pas encore pour conclure."
+    return "Quelques snapshots ne suffisent pas encore pour conclure. Evite de changer de strategie a chaud."
   }
 
   if (hoursSinceAnalysis < 14 * 24) {
@@ -45,8 +45,11 @@ export function DisciplineCard({ lastAnalysisDate, snapshotCount }: DisciplineCa
 
       <p className="mt-3 text-[13px] leading-6 text-slate-600">{message}</p>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] text-slate-500">
-        {snapshotCount} snapshot{snapshotCount > 1 ? "s" : ""} disponible{snapshotCount > 1 ? "s" : ""} pour nourrir le suivi.
+      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Repere coach</p>
+        <p className="mt-1 text-[11px] leading-5 text-slate-500">
+          {snapshotCount} snapshot{snapshotCount > 1 ? "s" : ""} disponible{snapshotCount > 1 ? "s" : ""} pour nourrir le suivi. Le but n&apos;est pas de reagir a chaque mouvement, mais de garder un plan coherent avec ton horizon.
+        </p>
       </div>
     </div>
   )

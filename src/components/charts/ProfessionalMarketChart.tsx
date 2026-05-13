@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Activity, ArrowRight, Clock3, Info, Radar } from "lucide-react"
+import { Activity, ArrowRight, Info, Radar } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CryptoPrice, MarketSeriesPoint } from "@/lib/coingecko"
 import {
@@ -199,6 +199,33 @@ function buildHistoryStartLabel(timestamp: number) {
     year: "numeric",
     timeZone: DISPLAY_TIME_ZONE,
   })
+}
+
+function buildTimelineLabel(startTimestamp: number, endTimestamp: number) {
+  const start = new Date(startTimestamp)
+  const end = new Date(endTimestamp)
+  const sameDay =
+    start.getUTCFullYear() === end.getUTCFullYear()
+    && start.getUTCMonth() === end.getUTCMonth()
+    && start.getUTCDate() === end.getUTCDate()
+
+  const startLabel = start.toLocaleDateString(DISPLAY_LOCALE, {
+    day: "2-digit",
+    month: "short",
+    timeZone: DISPLAY_TIME_ZONE,
+  })
+
+  if (sameDay) {
+    return `${startLabel} -> aujourd'hui`
+  }
+
+  const endLabel = end.toLocaleDateString(DISPLAY_LOCALE, {
+    day: "2-digit",
+    month: "short",
+    timeZone: DISPLAY_TIME_ZONE,
+  })
+
+  return `${startLabel} -> ${endLabel}`
 }
 
 function getCoverageMs(points: Array<{ timestamp: number }>) {
@@ -582,6 +609,14 @@ export function ProfessionalMarketChart({
   const historyAgeLabel = firstSnapshot ? formatHistoryAge(historyAgeMs) : null
   const partialBadge = mode === "portfolio" && period === "24H" && portfolioSeries.partial24h
   const periodLabel = PERIODS.find((candidate) => candidate.id === period)?.label ?? period
+  const timelineLabel =
+    activeSeries.length >= 1
+      ? buildTimelineLabel(activeSeries[0].timestamp, activeSeries[activeSeries.length - 1].timestamp)
+      : null
+  const seriesCoverageLabel =
+    activeSeries.length >= 2
+      ? formatHistoryAge(activeSeries[activeSeries.length - 1].timestamp - activeSeries[0].timestamp)
+      : historyAgeLabel
   const yPaddingBase =
     seriesMin !== null && seriesMax !== null
       ? Math.max((seriesMax - seriesMin) * 0.24, Math.max(seriesMax, 1) * 0.025)
@@ -615,9 +650,9 @@ export function ProfessionalMarketChart({
                 </span>
               )}
               {marketUpdatedLabel && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-500">
-                  <Clock3 className="h-3 w-3" />
-                  Derniere mise a jour {marketUpdatedLabel}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-dot" />
+                  Live · Mis a jour a {marketUpdatedLabel}
                 </span>
               )}
               {partialBadge && (
@@ -638,7 +673,22 @@ export function ProfessionalMarketChart({
               </h2>
             </div>
 
-            <p className="max-w-2xl text-[12px] leading-6 text-slate-500">{CHART_EXPLANATION}</p>
+            <div className="space-y-2">
+              <p className="max-w-2xl text-[12px] leading-6 text-slate-500">{CHART_EXPLANATION}</p>
+              {(timelineLabel || seriesCoverageLabel || historyStartLabel) && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                  {timelineLabel && <span className="font-medium text-slate-700">{timelineLabel}</span>}
+                  {timelineLabel && (seriesCoverageLabel || historyStartLabel) && <span className="text-slate-300">·</span>}
+                  {seriesCoverageLabel && <span>{seriesCoverageLabel}</span>}
+                  {historyStartLabel && (
+                    <>
+                      {(timelineLabel || seriesCoverageLabel) && <span className="text-slate-300">·</span>}
+                      <span>{mode === "portfolio" ? "Depuis le premier snapshot" : "Serie marche disponible"}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col items-start gap-2 xl:items-end">
@@ -884,8 +934,8 @@ export function ProfessionalMarketChart({
                 <>
                   <div className="px-3 pb-4 pt-3 sm:px-4">
                     <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-[#fcfcfb] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                      <div
-                        className={cn("w-full", showAdvancedLayers ? "h-[280px] sm:h-[330px]" : "h-[220px] sm:h-[260px]")}
+                  <div
+                        className={cn("w-full", showAdvancedLayers ? "h-[280px] sm:h-[330px]" : "h-[205px] sm:h-[230px]")}
                         data-testid="professional-market-chart"
                       >
                         <ResponsiveContainer width="100%" height="100%">
