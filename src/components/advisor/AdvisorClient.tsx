@@ -10,6 +10,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Analytics } from "@/lib/analytics"
 import { PortfolioChart } from "./PortfolioChart"
+import { UpgradeModal, useUpgradeModal } from "@/components/upgrade/UpgradeModal"
 
 interface Props {
   userId: string
@@ -183,16 +184,19 @@ const LOCKED_INSIGHT_CARDS = {
       title: "Signal marche detaille",
       body: "Lecture du regime marche, dominance BTC et pression sur les altcoins.",
       upgrade: "Pro",
+      featureId: "market_signal",
     },
     {
       title: "Reequilibrage guide",
       body: "Seuils simples pour ajuster le plan si le marche accelere ou corrige.",
       upgrade: "Pro",
+      featureId: "rebalancing",
     },
     {
       title: "Scenarios alternatifs",
       body: "Lecture defensive, equilibree et dynamique selon le contexte du moment.",
       upgrade: "Premium",
+      featureId: "scenarios",
     },
   ],
   pro: [
@@ -200,16 +204,19 @@ const LOCKED_INSIGHT_CARDS = {
       title: "Scenarios alternatifs",
       body: "Plans defensif, equilibre et offensif selon la phase de marche.",
       upgrade: "Premium",
+      featureId: "scenarios",
     },
     {
       title: "Alertes de risque",
       body: "Points de vigilance supplementaires sur volatilite, concentration et timing.",
       upgrade: "Premium",
+      featureId: "risk_alerts",
     },
     {
       title: "Strategie avancee",
       body: "Reequilibrage et execution plus fins pour un suivi plus exigeant.",
       upgrade: "Premium",
+      featureId: "advanced_strategy",
     },
   ],
   premium: [],
@@ -352,7 +359,7 @@ function ScoreGauge({ score }: { score: number }) {
   )
 }
 
-function UpgradeModal({ onClose, plan }: { onClose: () => void; plan: string }) {
+function PlanLimitModal({ onClose, plan }: { onClose: () => void; plan: string }) {
   const upgradePlan = plan === "pro" ? "Premium" : "Pro"
   const title = plan === "pro" ? "Quota Pro atteint" : "Analyse du mois déjà utilisée"
   const body = plan === "pro"
@@ -572,7 +579,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
 
   return (
     <>
-      {showUpgradeModal && <UpgradeModal plan={plan} onClose={() => setShowUpgradeModal(false)} />}
+      {showUpgradeModal && <PlanLimitModal plan={plan} onClose={() => setShowUpgradeModal(false)} />}
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <h1 className="mb-1 text-3xl font-semibold tracking-tight text-foreground">Conseiller IA</h1>
@@ -1010,13 +1017,19 @@ function LockedProInsight({
   title,
   body,
   upgrade,
+  onClick,
 }: {
   title: string
   body: string
   upgrade: string
+  onClick?: () => void
 }) {
   return (
-    <div className="surface-soft relative overflow-hidden p-4">
+    <button
+      type="button"
+      onClick={onClick}
+      className="surface-soft relative w-full overflow-hidden p-4 text-left transition-colors hover:bg-secondary/80 cursor-pointer"
+    >
       <div className="relative">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -1029,12 +1042,12 @@ function LockedProInsight({
             </div>
           </div>
           <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Verrouille
+            Débloquer →
           </span>
         </div>
         <p className="text-sm leading-6 text-muted-foreground">{body}</p>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -1088,6 +1101,7 @@ function AnalysisResult({
   const canExport = plan === "pro" || plan === "premium"
   const isPro     = plan === "pro" || plan === "premium"
   const [exportError, setExportError] = useState("")
+  const upgradeModal = useUpgradeModal()
   const primaryAction = analysis.executionNow?.[0] ?? null
   const strategy = analysis.entryStrategy?.trim() ? analysis.entryStrategy.trim() : null
   const avoidItems = (analysis.errorsToAvoid ?? []).map((item) => item.trim()).filter(Boolean).slice(0, 4)
@@ -1463,18 +1477,33 @@ ${advancedBlock}
             title="Ce que vous pouvez debloquer ensuite"
             action={
               <Link href="/pricing" className="text-xs font-semibold text-foreground underline underline-offset-4">
-                Debloquer Pro
+                Voir les offres
               </Link>
             }
           >
             <div className="grid gap-3 md:grid-cols-3">
               {lockedInsights.map((item) => (
-                <LockedProInsight key={item.title} title={item.title} body={item.body} upgrade={item.upgrade} />
+                <LockedProInsight
+                  key={item.title}
+                  title={item.title}
+                  body={item.body}
+                  upgrade={item.upgrade}
+                  onClick={item.featureId ? () => upgradeModal.open(item.featureId!) : undefined}
+                />
               ))}
             </div>
           </ResultSection>
         </div>
       ) : null}
+
+      {/* Upgrade modal */}
+      {upgradeModal.feature && (
+        <UpgradeModal
+          feature={upgradeModal.feature}
+          open={upgradeModal.isOpen}
+          onClose={upgradeModal.close}
+        />
+      )}
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <AdvisorNextStepCard

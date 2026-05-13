@@ -1482,6 +1482,7 @@ export function DashboardOverview({
           <DisciplineCard
             lastAnalysisDate={lastAnalysis?.created_at ?? null}
             snapshotCount={normalizedPortfolioSnapshots.length}
+            analysisCount={analyses.length}
           />
         </div>
       </div>

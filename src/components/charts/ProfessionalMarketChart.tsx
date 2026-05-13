@@ -483,6 +483,8 @@ export function ProfessionalMarketChart({
 }: ProfessionalMarketChartProps) {
   const [period, setPeriod] = useState<ChartPeriod>("24H")
   const [showDetails, setShowDetails] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+  useEffect(() => { setIsMounted(true) }, [])
 
   const normalizedSnapshots = useMemo(
     () => normalizePortfolioSnapshots(portfolioSnapshots),
@@ -938,7 +940,7 @@ export function ProfessionalMarketChart({
                         className={cn("w-full", showAdvancedLayers ? "h-[280px] sm:h-[330px]" : "h-[205px] sm:h-[230px]")}
                         data-testid="professional-market-chart"
                       >
-                        <ResponsiveContainer width="100%" height="100%">
+                        {isMounted && <ResponsiveContainer width="100%" height="100%">
                           <ComposedChart data={renderData} margin={{ top: 8, right: 14, bottom: 4, left: 0 }}>
                             {showAdvancedLayers && zones && (
                               <>
@@ -1017,7 +1019,7 @@ export function ProfessionalMarketChart({
                               />
                             )}
                           </ComposedChart>
-                        </ResponsiveContainer>
+                        </ResponsiveContainer>}
                       </div>
 
                       {showScenario && scenario.length > 0 && (
@@ -1046,7 +1048,7 @@ export function ProfessionalMarketChart({
                       </div>
                       {hasVolume ? (
                         <div className="h-24 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-2">
-                          <ResponsiveContainer width="100%" height="100%">
+                          {isMounted && <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={renderData.filter((point) => point.value !== null)} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                               <CartesianGrid stroke="rgba(148,163,184,0.14)" strokeDasharray="3 7" vertical={false} />
                               <XAxis
@@ -1081,7 +1083,7 @@ export function ProfessionalMarketChart({
                               />
                               <Bar dataKey="volume" fill="rgba(57,91,154,0.26)" radius={[4, 4, 0, 0]} />
                             </BarChart>
-                          </ResponsiveContainer>
+                          </ResponsiveContainer>}
                         </div>
                       ) : (
                         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-[12px] text-slate-500">

@@ -18,6 +18,7 @@ import { useEffect, useState } from "react"
 import { AxiomGlyph } from "@/components/branding/AxiomLogo"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { NotificationBell } from "@/components/ui/NotificationBell"
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", mobileLabel: "Dashboard" },
@@ -249,15 +250,18 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
                 {planBadge.label}
               </span>
             </div>
-            <button
-              onClick={handleLogout}
-              aria-label="Deconnexion"
-              className="shrink-0 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-              title="Deconnexion"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="text-[12px] font-medium">Deconnexion</span>
-            </button>
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <button
+                onClick={handleLogout}
+                aria-label="Deconnexion"
+                className="shrink-0 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                title="Deconnexion"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="text-[12px] font-medium">Déconnexion</span>
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -270,6 +274,7 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
           <span className="font-semibold tracking-tight text-foreground">Axiom</span>
         </Link>
         <div className="flex items-center gap-1.5">
+          <NotificationBell />
           <span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold", planBadge.cls)}>
             {planBadge.label}
           </span>

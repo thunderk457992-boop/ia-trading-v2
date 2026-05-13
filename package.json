@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",
-    "render:video": "node scripts/render-video.mjs"
+    "render:video": "node scripts/render-video.mjs",
+    "lighthouse:mobile": "npx lighthouse https://axiom-trade.dev --preset=perf --emulated-form-factor=mobile --output=html --output-path=./lighthouse-mobile.html --chrome-flags=\"--headless\"",
+    "lighthouse:desktop": "npx lighthouse https://axiom-trade.dev --preset=perf --emulated-form-factor=desktop --output=html --output-path=./lighthouse-desktop.html --chrome-flags=\"--headless\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
