@@ -45,7 +45,9 @@
       "Bash(npm install *)",
       "Bash(npx lighthouse *)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); cats=d['categories']; [print\\(f'{k}: {round\\(v[\\\\\"score\\\\\"]*100\\)}'\\) for k,v in cats.items\\(\\)]\")",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "Bash(npx --yes eslint \"C:\\\\Users\\\\oller\\\\Desktop\\\\ia-trading-v2\\\\src\" --ext .ts,.tsx)",
+      "Bash(npx *)"
     ]
   },
   "enableAllProjectMcpServers": true

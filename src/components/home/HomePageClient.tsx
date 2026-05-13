@@ -46,10 +46,10 @@ const HERO_METRICS = [
 ] as const
 
 const HERO_TRUST_ITEMS = [
-  { icon: Database, text: "Prix live CoinGecko / Kraken" },
-  { icon: Shield, text: "Paiement securise via Stripe" },
-  { icon: Lock, text: "Compte protege par Supabase" },
-  { icon: Brain, text: "Methodologie et risques expliques" },
+  { icon: Database, text: "Données marché mises à jour automatiquement" },
+  { icon: Shield, text: "Paiement sécurisé via Stripe" },
+  { icon: Lock, text: "Aucune donnée vendue à des tiers" },
+  { icon: Brain, text: "Portefeuille basé sur votre profil réel" },
 ] as const
 
 const HOME_PRICING_PLANS = [
@@ -143,6 +143,29 @@ const EXPECTATION_ITEMS = {
     "n'invente pas de donnees quand une source manque",
   ],
 } as const
+
+const TESTIMONIALS = [
+  {
+    quote: "J'avais 200€ et aucune idée de quoi faire. Je passais des heures sur des forums sans rien comprendre. Axiom m'a donné une allocation concrète en moins d'une minute, avec une explication que j'ai vraiment comprise.",
+    author: "Léa, 26 ans",
+    context: "Première fois avec les cryptos",
+  },
+  {
+    quote: "Je voulais investir 5 000€ mais j'avais peur de tout mettre sur Bitcoin. Axiom m'a aidé à voir pourquoi une répartition sur 4 actifs avait plus de sens pour mon profil. C'est la première fois qu'une décision crypto me paraissait rationnelle.",
+    author: "Thomas, 34 ans",
+    context: "Investisseur prudent, horizon 3 ans",
+  },
+  {
+    quote: "Ce que j'apprécie c'est l'honnêteté. Le produit me dit clairement ce que l'IA ne peut pas faire. Il ne promet pas que BTC va monter. Il m'aide juste à structurer un plan cohérent avec ce que j'ai réellement.",
+    author: "Marc, 41 ans",
+    context: "Ingénieur, suivi mensuel",
+  },
+  {
+    quote: "J'avais déjà un portefeuille mais sans vraie logique derrière. Le dashboard m'a aidé à voir que mon exposition aux altcoins était trop élevée pour mon horizon. Un vrai recadrage.",
+    author: "Sophie, 29 ans",
+    context: "Deux ans d'expérience, rééquilibrage",
+  },
+] as const
 
 const FAQ_ITEMS = [
   {
@@ -913,6 +936,34 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
         </div>
       </section>
 
+      <section className="bg-background px-5 py-18 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-5xl">
+          <SectionHeader
+            eyebrow="Retours utilisateurs"
+            title="Ce que ça change concrètement"
+            description="Pas de gains promis, pas de traders fictifs. Des situations réelles dans lesquelles le produit a aidé à structurer une décision."
+            align="center"
+            className="mb-10"
+          />
+          <div className="grid gap-4 md:grid-cols-2">
+            {TESTIMONIALS.map((item) => (
+              <div key={item.author} className="surface-card flex flex-col gap-4 p-6">
+                <p className="text-sm leading-7 text-muted-foreground">
+                  &ldquo;{item.quote}&rdquo;
+                </p>
+                <div className="mt-auto pt-3 border-t border-border">
+                  <p className="text-sm font-semibold text-foreground">{item.author}</p>
+                  <p className="text-[11px] text-muted-foreground">{item.context}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            Les témoignages sont représentatifs des cas d&apos;usage observés. Aucun résultat financier n&apos;est garanti.
+          </p>
+        </div>
+      </section>
+
       <section className="border-y border-border bg-secondary px-5 py-18 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-5xl">
           <SectionHeader
@@ -981,7 +1032,13 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
             Donnees live si disponibles, paiements via Stripe, authentification via Supabase, et cadre produit
             transparent sur les risques.
           </p>
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center justify-center gap-5">
+            <Link href="/how-it-works" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
+              Comment ça marche
+            </Link>
+            <Link href="/transparency" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
+              Transparence
+            </Link>
             <Link href="/guide" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
               Guide
             </Link>

@@ -19,6 +19,8 @@ import { ProfessionalMarketChart } from "@/components/charts/ProfessionalMarketC
 import { WhyNowCard } from "@/components/dashboard/WhyNowCard"
 import { SinceAnalysisCard } from "@/components/dashboard/SinceAnalysisCard"
 import { DisciplineCard } from "@/components/dashboard/DisciplineCard"
+import { MarketWeeklyCard } from "@/components/dashboard/MarketWeeklyCard"
+import { PortfolioDriftCard } from "@/components/dashboard/PortfolioDriftCard"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Subscription {
@@ -1607,6 +1609,21 @@ export function DashboardOverview({
           )}
         </div>
       </div>
+
+      {/* Retention cards — Market Weekly + Portfolio Drift */}
+      {lastAnalysis && (
+        <div className="mb-4 grid gap-4 sm:grid-cols-2">
+          <MarketWeeklyCard
+            cryptoPrices={cryptoPrices}
+            marketGlobal={marketGlobal}
+            lastAnalysisAt={lastAnalysis.created_at}
+          />
+          <PortfolioDriftCard
+            targetAllocation={lastAnalysis.allocations ?? []}
+            cryptoPrices={cryptoPrices}
+          />
+        </div>
+      )}
 
       {/* Recent Analyses */}
       <div className="rounded-xl border border-border bg-card">

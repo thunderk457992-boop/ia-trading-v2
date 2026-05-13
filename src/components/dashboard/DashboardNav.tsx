@@ -187,7 +187,15 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
               </Link>
               <Link href="/guide" className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
                 <BookOpen className="h-3.5 w-3.5" />
-                <span>Guide d&apos;utilisation</span>
+                <span>Guide méthodologie</span>
+              </Link>
+              <Link href="/how-it-works" className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>Comment ça marche</span>
+              </Link>
+              <Link href="/transparency" className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>Transparence</span>
               </Link>
               <button
                 type="button"

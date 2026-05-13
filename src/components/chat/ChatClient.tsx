@@ -38,11 +38,12 @@ interface UserMemory {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const QUICK_ACTIONS = [
-  { label: "Investir 50€", message: "Je veux commencer à investir 50€ en crypto. Par où commencer ?" },
-  { label: "Limiter le risque", message: "Comment limiter mes risques en crypto ? Je débute." },
-  { label: "BTC vs ETH", message: "Explique-moi simplement la différence entre Bitcoin et Ethereum." },
-  { label: "Plan DCA", message: "Fais-moi un plan DCA simple pour débuter avec un petit budget." },
-  { label: "Plus simple", message: "Explique ta dernière réponse plus simplement." },
+  { label: "Explique mon allocation", message: "Peux-tu m'expliquer simplement pourquoi cette allocation a été choisie pour mon profil ?" },
+  { label: "Pourquoi autant de BTC ?", message: "Pourquoi BTC a une aussi grande part dans mon allocation ? C'est vraiment nécessaire ?" },
+  { label: "Si le marché baisse", message: "Que faire si le marché crypto baisse de 20% dans les prochaines semaines ?" },
+  { label: "Premier investissement", message: "Je veux commencer à investir en crypto. Par où commencer avec un budget limité ?" },
+  { label: "DCA vs lump-sum", message: "Vaut-il mieux investir tout d'un coup ou progressivement en DCA ?" },
+  { label: "Risque altcoins", message: "Pourquoi les altcoins sont-ils plus risqués que Bitcoin ou Ethereum ?" },
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────────────
