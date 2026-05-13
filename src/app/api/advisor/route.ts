@@ -246,6 +246,7 @@ function buildPrompt(
     cleanGoals: string; cleanPreciseObjective: string; cleanExcluded: string
     cleanExperience: string; cleanStrategy: string
     cleanExpLevel: string; lossToleranceLabel: string; investmentFrequencyLabel: string
+    liquidityNeedLabel: string; portfolioPreferenceLabel: string; currentHoldingsLabel: string
   },
   marketCtx: string,
   krakenCtx: string,
@@ -257,6 +258,7 @@ function buildPrompt(
     riskLabel, horizonLabel, cleanCapital, cleanMonthly, cleanMonthlyIncome,
     cleanGoals, cleanPreciseObjective, cleanExcluded, cleanExperience,
     cleanStrategy, cleanExpLevel, lossToleranceLabel, investmentFrequencyLabel,
+    liquidityNeedLabel, portfolioPreferenceLabel, currentHoldingsLabel,
   } = p
 
   const pedagogyInstruction = cleanExpLevel === "beginner"
@@ -275,8 +277,11 @@ function buildPrompt(
     `- Revenu mensuel: ${cleanMonthlyIncome}€`,
     cleanMonthly ? `- Apport mensuel: ${cleanMonthly}€` : "",
     `- Tolérance à la perte: ${lossToleranceLabel}`,
+    `- Besoin de liquidite: ${liquidityNeedLabel}`,
+    `- Preference principale: ${portfolioPreferenceLabel}`,
     `- Objectif précis: ${cleanPreciseObjective}`,
     `- Fréquence d'investissement: ${investmentFrequencyLabel}`,
+    currentHoldingsLabel ? `- Actifs deja detenus: ${currentHoldingsLabel}` : "",
   ].filter(Boolean).join("\n")
 
   const planFeatureRules = plan === "free"
@@ -290,6 +295,7 @@ function buildPrompt(
     : "DONNÉES LIVE PARTIELLES OU ABSENTES: dis-le clairement, n'invente aucun prix, aucune variation ni aucun signal live."
 
   const assetSelectionRules = "UNIVERS D'ACTIFS: rester sur les actifs du top 50 fournis. Justifier chaque selection par la liquidite, la dominance, la volatilite, la diversification ou la categorie de l'actif. Les memecoins ne peuvent etre que des satellites minoritaires, jamais le coeur du portefeuille."
+  const answerStructureRule = "STRUCTURE DE FOND: ton resultat doit rester sobre, rationnel et professionnel. Pas de ton marketing, pas de promesse implicite, pas de formule hype."
 
   if (plan === "free") {
     return `Tu es un analyste crypto. Génère une allocation concise et directement utilisable.
@@ -311,6 +317,7 @@ ${MARKET_LOGIC}
 ${planFeatureRules}
 ${marketAvailabilityRule}
 ${assetSelectionRules}
+${answerStructureRule}
 
 MOTEUR DE DÉCISION STRUCTURÉ:
 ${marketDecisionJson}
@@ -396,6 +403,7 @@ ${MARKET_LOGIC}
 ${planFeatureRules}
 ${marketAvailabilityRule}
 ${assetSelectionRules}
+${answerStructureRule}
 
 MOTEUR DE DÉCISION STRUCTURÉ:
 ${marketDecisionJson}
@@ -484,6 +492,7 @@ ${MARKET_LOGIC}
 ${planFeatureRules}
 ${marketAvailabilityRule}
 ${assetSelectionRules}
+${answerStructureRule}
 
 MOTEUR DE DÉCISION STRUCTURÉ:
 ${marketDecisionJson}
@@ -734,40 +743,50 @@ export async function POST(request: Request) {
       riskTolerance, horizon, capital, monthlyIncome, monthlyContribution,
       lossTolerance, preciseObjective, investmentFrequency,
       goals, excludedCryptos, experience, buyStrategy,
+      liquidityNeed, portfolioPreference, currentHoldings,
     } = body
 
     if (!riskTolerance || !horizon || !capital || !monthlyIncome || !preciseObjective || !Array.isArray(goals) || goals.length === 0) {
-      return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 })
+      return NextResponse.json({ error: "Parametres manquants" }, { status: 400 })
     }
 
-    if (!["low", "medium", "high"].includes(lossTolerance) || !["once", "weekly", "monthly", "opportunistic"].includes(investmentFrequency)) {
-      return NextResponse.json({ error: "Paramètres invalides" }, { status: 400 })
+    if (!['low', 'medium', 'high'].includes(lossTolerance) || !['once', 'weekly', 'monthly', 'opportunistic'].includes(investmentFrequency)) {
+      return NextResponse.json({ error: "Parametres invalides" }, { status: 400 })
     }
 
-    const cleanCapital    = sanitize(capital, 20)
+    if (!['low', 'medium', 'high'].includes(liquidityNeed) || !['security', 'balance', 'growth'].includes(portfolioPreference)) {
+      return NextResponse.json({ error: "Parametres invalides" }, { status: 400 })
+    }
+
+    const cleanCapital = sanitize(capital, 20)
     const cleanMonthlyIncome = sanitize(monthlyIncome, 20)
-    const cleanMonthly    = sanitize(monthlyContribution, 20)
+    const cleanMonthly = sanitize(monthlyContribution, 20)
     const cleanPreciseObjective = sanitize(preciseObjective, 160)
-    const cleanExcluded   = sanitize(excludedCryptos, 100)
-    const cleanGoals      = (goals as unknown[]).map((g) => sanitize(g, 50)).join(", ")
+    const cleanExcluded = sanitize(excludedCryptos, 100)
+    const cleanCurrentHoldings = sanitize(currentHoldings, 140)
+    const cleanGoals = (goals as unknown[]).map((g) => sanitize(g, 50)).join(', ')
 
     if (!cleanMonthlyIncome || !cleanPreciseObjective) {
-      return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 })
+      return NextResponse.json({ error: "Parametres manquants" }, { status: 400 })
     }
 
-    const cleanRisk       = ["conservative", "moderate", "aggressive"].includes(riskTolerance) ? riskTolerance : "moderate"
-    const cleanHorizon    = ["short", "medium", "long"].includes(horizon) ? horizon : "medium"
-    const cleanExpLevel   = ["beginner", "intermediate", "expert"].includes(experience) ? experience : "intermediate"
-    const cleanBuyStrat   = ["lumpsum", "dca-monthly", "dca-weekly"].includes(buyStrategy) ? buyStrategy : "lumpsum"
-    const cleanLossTolerance = lossTolerance as "low" | "medium" | "high"
-    const cleanInvestmentFrequency = investmentFrequency as "once" | "weekly" | "monthly" | "opportunistic"
+    const cleanRisk = ['conservative', 'moderate', 'aggressive'].includes(riskTolerance) ? riskTolerance : 'moderate'
+    const cleanHorizon = ['short', 'medium', 'long'].includes(horizon) ? horizon : 'medium'
+    const cleanExpLevel = ['beginner', 'intermediate', 'expert'].includes(experience) ? experience : 'intermediate'
+    const cleanBuyStrat = ['lumpsum', 'dca-monthly', 'dca-weekly'].includes(buyStrategy) ? buyStrategy : 'lumpsum'
+    const cleanLossTolerance = lossTolerance as 'low' | 'medium' | 'high'
+    const cleanInvestmentFrequency = investmentFrequency as 'once' | 'weekly' | 'monthly' | 'opportunistic'
+    const cleanLiquidityNeed = liquidityNeed as 'low' | 'medium' | 'high'
+    const cleanPortfolioPreference = portfolioPreference as 'security' | 'balance' | 'growth'
 
-    const riskLabel       = cleanRisk === "conservative" ? "conservateur" : cleanRisk === "moderate" ? "modéré" : "agressif"
-    const horizonLabel    = cleanHorizon === "short" ? "court terme (< 1 an)" : cleanHorizon === "medium" ? "moyen terme (1-3 ans)" : "long terme (> 3 ans)"
-    const cleanExperience = cleanExpLevel === "beginner" ? "débutant (< 1 an)" : cleanExpLevel === "expert" ? "expert (> 3 ans)" : "intermédiaire (1-3 ans)"
-    const cleanStrategy   = cleanBuyStrat === "lumpsum" ? "investissement unique (lump-sum)" : cleanBuyStrat === "dca-monthly" ? "DCA mensuel" : "DCA hebdomadaire"
-    const lossToleranceLabel = cleanLossTolerance === "low" ? "faible (perte acceptable autour de 10%)" : cleanLossTolerance === "medium" ? "moyenne (perte acceptable autour de 25%)" : "forte (perte acceptable de 40% ou plus)"
-    const investmentFrequencyLabel = cleanInvestmentFrequency === "once" ? "une fois" : cleanInvestmentFrequency === "weekly" ? "chaque semaine" : cleanInvestmentFrequency === "monthly" ? "chaque mois" : "opportuniste"
+    const riskLabel = cleanRisk === 'conservative' ? 'conservateur' : cleanRisk === 'moderate' ? 'modere' : 'agressif'
+    const horizonLabel = cleanHorizon === 'short' ? 'court terme (< 1 an)' : cleanHorizon === 'medium' ? 'moyen terme (1-3 ans)' : 'long terme (> 3 ans)'
+    const cleanExperience = cleanExpLevel === 'beginner' ? 'debutant (< 1 an)' : cleanExpLevel === 'expert' ? 'avance (> 3 ans)' : 'intermediaire (1-3 ans)'
+    const cleanStrategy = cleanBuyStrat === 'lumpsum' ? 'investissement unique (lump-sum)' : cleanBuyStrat === 'dca-monthly' ? 'DCA mensuel' : 'DCA hebdomadaire'
+    const lossToleranceLabel = cleanLossTolerance === 'low' ? 'faible (perte acceptable autour de 10%)' : cleanLossTolerance === 'medium' ? 'moyenne (perte acceptable autour de 25%)' : 'forte (perte acceptable de 40% ou plus)'
+    const investmentFrequencyLabel = cleanInvestmentFrequency === 'once' ? 'une fois' : cleanInvestmentFrequency === 'weekly' ? 'chaque semaine' : cleanInvestmentFrequency === 'monthly' ? 'chaque mois' : 'opportuniste'
+    const liquidityNeedLabel = cleanLiquidityNeed === 'low' ? 'faible (capital peu mobilisable a court terme)' : cleanLiquidityNeed === 'medium' ? 'modere (un peu de souplesse utile)' : 'eleve (besoin de liquidite plus rapide)'
+    const portfolioPreferenceLabel = cleanPortfolioPreference === 'security' ? 'securite' : cleanPortfolioPreference === 'balance' ? 'equilibre' : 'croissance'
 
     // Fetch live market data (cached server-side)
     const [{ prices, global: globalData }, krakenTickers] = await Promise.all([
@@ -809,6 +828,7 @@ export async function POST(request: Request) {
         riskLabel, horizonLabel, cleanCapital, cleanMonthly, cleanMonthlyIncome,
         cleanGoals, cleanPreciseObjective, cleanExcluded, cleanExperience,
         cleanStrategy, cleanExpLevel, lossToleranceLabel, investmentFrequencyLabel,
+        liquidityNeedLabel, portfolioPreferenceLabel, currentHoldingsLabel: cleanCurrentHoldings,
       },
       marketCtx,
       krakenCtx,
@@ -1012,10 +1032,13 @@ export async function POST(request: Request) {
           monthlyIncome: cleanMonthlyIncome,
           monthlyContribution: cleanMonthly,
           lossTolerance: cleanLossTolerance,
+          liquidityNeed: cleanLiquidityNeed,
+          portfolioPreference: cleanPortfolioPreference,
           preciseObjective: cleanPreciseObjective,
           investmentFrequency: cleanInvestmentFrequency,
           goals,
           excludedCryptos: cleanExcluded,
+          currentHoldings: cleanCurrentHoldings,
           experience: cleanExpLevel,
           buyStrategy: cleanBuyStrat,
           advisorOutput: {
@@ -1120,3 +1143,6 @@ export async function POST(request: Request) {
     )
   }
 }
+
+
+

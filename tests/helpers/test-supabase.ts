@@ -192,7 +192,7 @@ export async function cleanupTempUser(admin: SupabaseClient, userId: string) {
   await admin.auth.admin.deleteUser(userId)
 }
 
-export async function loginAsUser(page: Page, user: TestUser) {
+export async function loginAsUser(page: Page, user: TestUser, expectedUrl: RegExp = /(dashboard|advisor)/) {
   await page.goto("http://localhost:3000/login")
   await page.getByRole("textbox").first().fill(user.email)
   await page.locator('input[type="password"]').fill(user.password)
@@ -200,7 +200,7 @@ export async function loginAsUser(page: Page, user: TestUser) {
 
   const loginError = page.locator("text=/incorrect|confirmez|trop de tentatives|invalide/i").first()
   try {
-    await expect(page).toHaveURL(/dashboard/, { timeout: 15000 })
+    await expect(page).toHaveURL(expectedUrl, { timeout: 15000 })
   } catch (error) {
     const errorText = await loginError.textContent().catch(() => null)
     throw new Error(`Login failed for temp user${errorText ? `: ${errorText}` : ""}`, { cause: error })

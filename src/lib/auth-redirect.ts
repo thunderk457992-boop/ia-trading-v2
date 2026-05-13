@@ -1,5 +1,5 @@
 export function normalizeNextPath(nextPath?: string | null) {
-  if (!nextPath || !nextPath.trim()) return "/dashboard"
+  if (!nextPath || !nextPath.trim()) return "/auth/post-login"
   return nextPath.startsWith("/") ? nextPath : `/${nextPath}`
 }
 

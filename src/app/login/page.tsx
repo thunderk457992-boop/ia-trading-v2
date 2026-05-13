@@ -20,7 +20,7 @@ function LoginForm() {
   const [info, setInfo] = useState("")
   const [resetLoading, setResetLoading] = useState(false)
   const [resetSent, setResetSent] = useState(false)
-  const nextPath = searchParams.get("next") || "/dashboard"
+  const nextPath = searchParams.get("next") || "/auth/post-login"
 
   useEffect(() => {
     const errorParam = searchParams.get("error")

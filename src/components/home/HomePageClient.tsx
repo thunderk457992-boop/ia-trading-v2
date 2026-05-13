@@ -716,11 +716,11 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
               Exemple d&apos;analyse
             </p>
             <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Un plan lisible avant les prix
+              Voila ce que tu obtiens en 90 secondes
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Avant de payer, vous devez comprendre ce que le produit livre vraiment: une allocation, un plan
-              d&apos;entree, une logique de risque et une facon concrete de suivre le portefeuille.
+              Exemple d&apos;analyse fictif, non personalise. Il montre la structure reelle du resultat:
+              une allocation, un niveau de risque, une action recommande et la logique marche utilisee.
             </p>
           </div>
 
@@ -728,7 +728,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
             <div className="flex flex-col gap-3 border-b border-border bg-background px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div className="flex items-center gap-3">
                 <AxiomLogo />
-                <span className="text-sm font-medium text-muted-foreground">Exemple produit</span>
+                <span className="text-sm font-medium text-muted-foreground">Exemple d&apos;analyse</span>
               </div>
               <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                 <span className="rounded-full border border-border bg-secondary px-3 py-1">Profil modere</span>
@@ -745,7 +745,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                     <div>
                       <div className="font-bold text-foreground">Score de strategie solide</div>
                       <div className="mt-1 text-xs leading-5 text-muted-foreground">
-                        Diversification correcte, risque modere, plan d&apos;entree compatible avec un investisseur patient.
+                        Diversification lisible, risque modere et plan d&apos;entree progressif compatible avec un investisseur patient.
                       </div>
                       <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5">
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
@@ -804,6 +804,15 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                     BTC et ETH jouent le role de socle liquide. Les satellites restent minoritaires pour garder
                     de l&apos;upside sans transformer le portefeuille en pari. Le plan d&apos;entree progressif sert a
                     limiter les achats impulsifs pendant les pics de volatilite.
+                  </p>
+                </div>
+                <div className="mt-4 rounded-3xl border border-border bg-background p-4">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    <Database className="h-3.5 w-3.5" />
+                    Donnees marche utilisees
+                  </div>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Prix live, variation 24 h, contexte de volatilite, liquidite disponible et regime BTC/ETH vs altcoins.
                   </p>
                 </div>
               </div>

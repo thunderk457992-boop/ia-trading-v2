@@ -7,9 +7,9 @@ const ALLOWED_OTP_TYPES = new Set<EmailOtpType>([
 ])
 
 function safeNextPath(raw: string | null): string {
-  if (!raw) return "/dashboard"
+  if (!raw) return "/auth/post-login"
   // Prevent open-redirect: only allow absolute paths
-  return raw.startsWith("/") ? raw : "/dashboard"
+  return raw.startsWith("/") ? raw : "/auth/post-login"
 }
 
 // Build a Supabase server client whose session cookies are written

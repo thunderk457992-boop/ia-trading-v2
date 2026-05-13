@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from "react"
 import {
   Brain, ArrowRight, TrendingUp, Shield, Zap, AlertTriangle, AlertCircle, CheckCircle,
-  RefreshCw, Target, X, Lock, Clock, Download, Activity, TrendingDown,
-  Sparkles, BarChart3, Gauge
+  RefreshCw, Target, X, Lock, Clock, Activity, TrendingDown,
+  BarChart3, MessageSquare
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -24,6 +24,8 @@ type Experience = "beginner" | "intermediate" | "expert"
 type BuyStrategy = "" | "lumpsum" | "dca-monthly" | "dca-weekly"
 type LossTolerance = "" | "low" | "medium" | "high"
 type InvestmentFrequency = "" | "once" | "weekly" | "monthly" | "opportunistic"
+type LiquidityNeed = "" | "low" | "medium" | "high"
+type PortfolioPreference = "" | "security" | "balance" | "growth"
 
 interface InvestorForm {
   riskTolerance: RiskLevel
@@ -38,6 +40,9 @@ interface InvestorForm {
   excludedCryptos: string
   experience: Experience
   buyStrategy: BuyStrategy
+  liquidityNeed: LiquidityNeed
+  portfolioPreference: PortfolioPreference
+  currentHoldings: string
 }
 
 interface Analysis {
@@ -63,12 +68,6 @@ interface Analysis {
   disclaimer: string
 }
 
-const VERDICT_CONFIG = {
-  favorable: { emoji: "🟢", label: "Favorable",          color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", action: "Entrer progressivement" },
-  neutre:    { emoji: "🟡", label: "Neutre",              color: "text-amber-700",   bg: "bg-amber-50",   border: "border-amber-200",   action: "Attendre" },
-  risqué:    { emoji: "🔴", label: "Risqué",              color: "text-red-700",     bg: "bg-red-50",     border: "border-red-200",     action: "Réduire l'exposition" },
-} as const
-
 const EXPERIENCE_OPTIONS = [
   { value: "beginner" as const,     label: "Debutant",      desc: "Explications simples, vocabulaire guide" },
   { value: "intermediate" as const, label: "Intermediaire", desc: "Bon equilibre entre pedagogie et details" },
@@ -82,9 +81,9 @@ const BUY_STRATEGY_OPTIONS = [
 ]
 
 const LOSS_TOLERANCE_OPTIONS = [
-  { value: "low" as const,    label: "Faible",  desc: "Je veux limiter la perte a ~10%" },
-  { value: "medium" as const, label: "Moyenne", desc: "J'accepte une baisse de ~25%" },
-  { value: "high" as const,   label: "Forte",   desc: "Je peux supporter -40% ou plus" },
+  { value: "low" as const,    label: "Faible",  desc: "Je veux limiter la perte a environ 10%" },
+  { value: "medium" as const, label: "Moyenne", desc: "J'accepte une baisse proche de 25%" },
+  { value: "high" as const,   label: "Forte",   desc: "Je peux supporter une forte volatilite" },
 ]
 
 const INVESTMENT_FREQUENCY_OPTIONS = [
@@ -104,15 +103,39 @@ const GOALS = [
 ]
 
 const RISK_OPTIONS = [
-  { value: "conservative" as const, label: "Conservateur", desc: "Priorité sécurité" },
-  { value: "moderate" as const,     label: "Modéré",       desc: "Équilibre risque/gain" },
-  { value: "aggressive" as const,   label: "Agressif",     desc: "Maximiser les gains" },
+  {
+    value: "conservative" as const,
+    label: "Je reduis le risque",
+    desc: "Je prefere proteger mon capital si la baisse devient inconfortable.",
+  },
+  {
+    value: "moderate" as const,
+    label: "J'attends sans paniquer",
+    desc: "Je peux tenir une baisse si le plan reste coherent avec mon horizon.",
+  },
+  {
+    value: "aggressive" as const,
+    label: "Je peux accepter la baisse",
+    desc: "Je vise plus long terme et j'assume une volatilite plus forte.",
+  },
 ]
 
 const HORIZON_OPTIONS = [
   { value: "short" as const,  label: "Court terme", desc: "Moins d'1 an" },
   { value: "medium" as const, label: "Moyen terme", desc: "1 à 3 ans" },
   { value: "long" as const,   label: "Long terme",  desc: "Plus de 3 ans" },
+]
+
+const LIQUIDITY_OPTIONS = [
+  { value: "low" as const, label: "Peu de besoin", desc: "Je peux laisser ce capital travailler longtemps." },
+  { value: "medium" as const, label: "Besoin modere", desc: "Je veux garder une marge de manoeuvre raisonnable." },
+  { value: "high" as const, label: "Besoin eleve", desc: "Je peux avoir besoin de liquidite assez vite." },
+]
+
+const PORTFOLIO_PREFERENCE_OPTIONS = [
+  { value: "security" as const, label: "Securite", desc: "Priorite a la stabilite relative et a la lisibilite." },
+  { value: "balance" as const, label: "Equilibre", desc: "Je cherche un compromis entre defense et croissance." },
+  { value: "growth" as const, label: "Croissance", desc: "J'accepte plus de volatilite pour plus de potentiel." },
 ]
 
 const RISK_CONFIG = {
@@ -126,13 +149,6 @@ const ASSET_BAR: Record<string, string> = {
   BNB: "bg-yellow-500", XRP: "bg-sky-500", ADA: "bg-blue-600",
   AVAX: "bg-red-500", DOT: "bg-pink-500", LINK: "bg-blue-700",
   NEAR: "bg-green-500", MATIC: "bg-violet-500", POL: "bg-violet-500",
-}
-
-const ASSET_TEXT: Record<string, string> = {
-  BTC: "text-amber-600", ETH: "text-blue-600", SOL: "text-purple-600",
-  BNB: "text-yellow-600", XRP: "text-sky-600", ADA: "text-blue-600",
-  AVAX: "text-red-600", DOT: "text-pink-600", LINK: "text-blue-700",
-  NEAR: "text-green-600", MATIC: "text-violet-600", POL: "text-violet-600",
 }
 
 const LOADING_STEPS = [
@@ -161,15 +177,53 @@ const PLAN_ACCESS: Record<string, { label: string; included: string[]; locked: s
   },
 }
 
+const LOCKED_INSIGHT_CARDS = {
+  free: [
+    {
+      title: "Signal marche detaille",
+      body: "Lecture du regime marche, dominance BTC et pression sur les altcoins.",
+      upgrade: "Pro",
+    },
+    {
+      title: "Reequilibrage guide",
+      body: "Seuils simples pour ajuster le plan si le marche accelere ou corrige.",
+      upgrade: "Pro",
+    },
+    {
+      title: "Scenarios alternatifs",
+      body: "Lecture defensive, equilibree et dynamique selon le contexte du moment.",
+      upgrade: "Premium",
+    },
+  ],
+  pro: [
+    {
+      title: "Scenarios alternatifs",
+      body: "Plans defensif, equilibre et offensif selon la phase de marche.",
+      upgrade: "Premium",
+    },
+    {
+      title: "Alertes de risque",
+      body: "Points de vigilance supplementaires sur volatilite, concentration et timing.",
+      upgrade: "Premium",
+    },
+    {
+      title: "Strategie avancee",
+      body: "Reequilibrage et execution plus fins pour un suivi plus exigeant.",
+      upgrade: "Premium",
+    },
+  ],
+  premium: [],
+} as const
+
 const FORM_STEP_GUIDANCE = [
-  "Le niveau de risque sert a calibrer la part du portefeuille exposee aux actifs les plus volatils.",
-  "Cette question evite de proposer une allocation que vous abandonneriez a la premiere correction serieuse.",
-  "L'horizon influence le poids des actifs coeur, la patience necessaire et le rythme de reequilibrage.",
-  "Le budget et les apports servent a distinguer le capital deja engage de ce que vous ajouterez ensuite.",
-  "Les objectifs clarifient si vous cherchez croissance, diversification, discipline ou preservation du capital.",
-  "Le mode Debutant, Intermediaire ou Avance adapte le niveau de detail et le vocabulaire de l'analyse.",
-  "Le rythme d'investissement et le mode d'execution servent a construire un plan d'achat realiste.",
-  "Les exclusions servent a retirer les actifs que vous ne voulez pas voir apparaitre dans l'allocation.",
+  "Cette question mesure votre reaction face a une vraie baisse de marche, pas une tolerance au risque abstraite.",
+  "On calibre ici la perte supportable pour eviter un plan que vous abandonneriez au premier choc.",
+  "L'horizon et le besoin de liquidite indiquent si le plan peut viser la patience ou doit rester plus defensif.",
+  "Le capital actuel et les apports servent a distinguer ce que vous pouvez deployer maintenant de ce que vous ajouterez ensuite.",
+  "Vos objectifs et votre preference securite, equilibre ou croissance orientent la structure du portefeuille.",
+  "Le niveau crypto adapte le vocabulaire, la densite de l'explication et le type de guidance.",
+  "Le rythme d'investissement et le mode d'execution transforment une allocation theorique en plan faisable.",
+  "Les actifs deja detenus et les exclusions evitent une analyse deconnectee de votre situation reelle.",
 ] as const
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -356,6 +410,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
     capital: "", monthlyIncome: "", monthlyContribution: "", goals: [],
     lossTolerance: "", preciseObjective: "", investmentFrequency: "",
     excludedCryptos: "", experience: "intermediate", buyStrategy: "",
+    liquidityNeed: "", portfolioPreference: "", currentHoldings: "",
   })
   const [formStep, setFormStep]             = useState(0)
   const [analysis, setAnalysis]             = useState<Analysis | null>(null)
@@ -391,14 +446,14 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
   }, [step])
 
   const formSteps = [
-    "Risque",
+    "Reaction au risque",
     "Perte acceptable",
-    "Horizon",
+    "Horizon et liquidite",
     "Capital",
-    "Objectif",
-    "Mode",
+    "Objectif et style",
+    "Niveau crypto",
     "Execution",
-    "Exclusions",
+    "Portefeuille actuel",
   ]
   const lastFormStep = formSteps.length - 1
   const progressPct = Math.round(((formStep + 1) / formSteps.length) * 100)
@@ -410,6 +465,9 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
     if (formStep === 1 && !form.lossTolerance) {
       return "Choisissez la perte que vous pouvez accepter."
     }
+    if (formStep === 2 && !form.liquidityNeed) {
+      return "Precisez votre besoin de liquidite."
+    }
     if (formStep === 3) {
       if (!form.capital) return "Ajoutez votre capital de départ."
       if (!form.monthlyIncome) return "Ajoutez votre revenu mensuel."
@@ -417,6 +475,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
     if (formStep === 4) {
       if (form.goals.length === 0) return "Choisissez au moins un objectif."
       if (!form.preciseObjective.trim()) return "Précisez votre objectif principal."
+      if (!form.portfolioPreference) return "Indiquez si vous cherchez surtout de la securite, un equilibre ou de la croissance."
     }
     if (formStep === 6 && (!form.investmentFrequency || !form.buyStrategy)) {
       return "Choisissez une option dans chaque section pour continuer."
@@ -434,10 +493,12 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
   const handleAnalyze = async () => {
     if (limitReached) { setShowUpgradeModal(true); return }
     if (!form.lossTolerance) { setError("Choisissez la perte que vous pouvez accepter."); setFormStep(1); return }
+    if (!form.liquidityNeed) { setError("Precisez votre besoin de liquidite."); setFormStep(2); return }
     if (!form.capital) { setError("Ajoutez votre capital de départ."); return }
     if (!form.monthlyIncome) { setError("Ajoutez votre revenu mensuel."); setFormStep(3); return }
     if (form.goals.length === 0) { setError("Choisissez au moins un objectif."); setFormStep(4); return }
     if (!form.preciseObjective.trim()) { setError("Précisez votre objectif principal."); setFormStep(4); return }
+    if (!form.portfolioPreference) { setError("Indiquez si vous cherchez surtout de la securite, un equilibre ou de la croissance."); setFormStep(4); return }
     if (!form.investmentFrequency || !form.buyStrategy) { setError("Choisissez une option dans chaque section pour continuer."); setFormStep(6); return }
     setError(""); setStep("loading")
     Analytics.advisorStarted(plan)
@@ -611,9 +672,9 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           {formStep === 0 && (
           <FormSection
             number={1}
-            title="Tolérance au risque"
+            title="Si ton portefeuille baisse de 20%, tu fais quoi ?"
             icon={<Shield className="w-3.5 h-3.5 text-muted-foreground" />}
-            helper="On cherche le niveau d'exposition que vous pouvez tenir sans paniquer au premier mouvement brutal."
+            helper="On cherche la reaction que vous pourrez vraiment tenir quand le marche bouge, pas une tolerance abstraite."
           >
             <div className="grid grid-cols-3 gap-2">
               {RISK_OPTIONS.map((opt) => (
@@ -649,9 +710,9 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           {formStep === 2 && (
           <FormSection
             number={3}
-            title="Horizon d'investissement"
+            title="Combien de temps peux-tu laisser ce plan travailler ?"
             icon={<TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />}
-            helper="Plus l'horizon est long, plus on peut accepter des actifs volatils et des points d'entree etales."
+            helper="L'horizon et le besoin de liquidite servent a distinguer un plan patient d'un plan qui doit rester plus defensif."
           >
             <div className="grid grid-cols-3 gap-2">
               {HORIZON_OPTIONS.map((opt) => (
@@ -661,6 +722,21 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
                   <div className={cn("text-xs mt-0.5", form.horizon === opt.value ? "text-foreground/60" : "text-muted-foreground")}>{opt.desc}</div>
                 </button>
               ))}
+            </div>
+            <div className="mt-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Besoin de liquidite</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {LIQUIDITY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setForm((p) => ({ ...p, liquidityNeed: opt.value }))}
+                    className={cn("p-3 rounded-lg border text-left transition-all", form.liquidityNeed === opt.value ? selBtn : defBtn)}
+                  >
+                    <div className="text-sm font-bold">{opt.label}</div>
+                    <div className={cn("text-xs mt-0.5", form.liquidityNeed === opt.value ? "text-foreground/60" : "text-muted-foreground")}>{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
             </div>
           </FormSection>
           )}
@@ -727,13 +803,28 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
                 placeholder="ex : acheter un logement dans 3 ans"
                 className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/10 text-sm transition-all" />
             </div>
+            <div className="mt-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tu recherches surtout...</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {PORTFOLIO_PREFERENCE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setForm((p) => ({ ...p, portfolioPreference: opt.value }))}
+                    className={cn("p-3 rounded-lg border text-left transition-all", form.portfolioPreference === opt.value ? selBtn : defBtn)}
+                  >
+                    <div className="text-sm font-bold">{opt.label}</div>
+                    <div className={cn("text-xs mt-0.5", form.portfolioPreference === opt.value ? "text-foreground/60" : "text-muted-foreground")}>{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </FormSection>
           )}
 
           {formStep === 5 && (
           <FormSection
             number={6}
-            title="Experience crypto"
+            title="Niveau crypto"
             helper="Choisissez le niveau de vocabulaire et de densite d'analyse qui vous aide vraiment a agir."
           >
             <div className="grid grid-cols-3 gap-2">
@@ -790,14 +881,33 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           {formStep === 7 && (
           <FormSection
             number={8}
-            title="Actifs a exclure"
+            title="Portefeuille actuel"
             optional
-            helper="Si vous voulez eviter certains actifs, l'allocation les retirera completement au lieu de les surpondérer par defaut."
+            helper="Si vous detenez deja certains actifs ou si vous refusez d'en voir apparaitre, l'analyse doit en tenir compte."
           >
-            <input type="text" value={form.excludedCryptos}
-              onChange={(e) => setForm((p) => ({ ...p, excludedCryptos: e.target.value }))}
-              placeholder="Ex : XRP, DOGE, SHIB — séparés par des virgules"
-              className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/10 text-sm transition-all" />
+            <div className="grid gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Actifs deja detenus <span className="text-muted-foreground/50 font-normal">optionnel</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.currentHoldings}
+                  onChange={(e) => setForm((p) => ({ ...p, currentHoldings: e.target.value }))}
+                  placeholder="Ex : BTC, ETH, SOL"
+                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/10 text-sm transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Actifs a exclure <span className="text-muted-foreground/50 font-normal">optionnel</span>
+                </label>
+                <input type="text" value={form.excludedCryptos}
+                  onChange={(e) => setForm((p) => ({ ...p, excludedCryptos: e.target.value }))}
+                  placeholder="Ex : XRP, DOGE, SHIB — separes par des virgules"
+                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/10 text-sm transition-all" />
+              </div>
+            </div>
           </FormSection>
           )}
 
@@ -870,6 +980,101 @@ function FormSection({ number, title, icon, optional, helper, children }: {
   )
 }
 
+function ResultSection({
+  eyebrow,
+  title,
+  action,
+  children,
+}: {
+  eyebrow?: string
+  title: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section className="rounded-3xl border border-border bg-card shadow-card-xs">
+      <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+        <div>
+          {eyebrow ? (
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{eyebrow}</p>
+          ) : null}
+          <h2 className="mt-1 text-base font-semibold text-foreground">{title}</h2>
+        </div>
+        {action}
+      </div>
+      <div className="px-5 py-5">{children}</div>
+    </section>
+  )
+}
+
+function LockedProInsight({
+  title,
+  body,
+  upgrade,
+}: {
+  title: string
+  body: string
+  upgrade: string
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-border bg-secondary/60 p-4">
+      <div className="absolute inset-0 bg-gradient-to-br from-background/10 via-transparent to-background/0" />
+      <div className="relative">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-background">
+              <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">{title}</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{upgrade}</p>
+            </div>
+          </div>
+          <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Verrouille
+          </span>
+        </div>
+        <p className="text-sm leading-6 text-muted-foreground">{body}</p>
+      </div>
+    </div>
+  )
+}
+
+function AdvisorNextStepCard({
+  href,
+  title,
+  body,
+  label,
+  icon,
+}: {
+  href: string
+  title: string
+  body: string
+  label: string
+  icon: React.ReactNode
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-2xl border border-border bg-card px-4 py-4 transition-colors hover:bg-secondary"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-secondary transition-colors group-hover:bg-background">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">{body}</p>
+          <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            {label}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </p>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
 // ── Analysis Result ───────────────────────────────────────────────────────────
 function AnalysisResult({
   analysis,
@@ -883,9 +1088,7 @@ function AnalysisResult({
   onNew: () => void
 }) {
   const canExport = plan === "pro" || plan === "premium"
-  const isPremium = plan === "premium"
   const isPro     = plan === "pro" || plan === "premium"
-  const planAccess = PLAN_ACCESS[plan] ?? PLAN_ACCESS.free
   const [exportError, setExportError] = useState("")
   const primaryAction = analysis.executionNow?.[0] ?? null
   const strategy = analysis.entryStrategy?.trim() ? analysis.entryStrategy.trim() : null
@@ -914,22 +1117,8 @@ function AnalysisResult({
     return { label: "Neutre", short: "NEUTRAL", color: "text-muted-foreground", bg: "bg-secondary", border: "border-border", Icon: Activity }
   }, [isPro, analysis.marketSignal, analysis.marketVerdict, analysis.marketVerdictNote, analysis.marketInsight])
 
-  const momentum = analysis.score >= 85
-    ? { label: "Fort",   color: "text-emerald-600", bar: "bg-emerald-500", w: "100%" }
-    : analysis.score >= 70
-    ? { label: "Modéré", color: "text-amber-600",   bar: "bg-amber-500",   w: "65%" }
-    : { label: "Faible", color: "text-red-600",      bar: "bg-red-500",     w: "30%" }
-
   const risk       = RISK_CONFIG[analysis.risk] ?? RISK_CONFIG["modéré"]
-  const scoreLabel = analysis.score >= 85 ? "Excellent profil" : analysis.score >= 70 ? "Profil solide" : "Profil à affiner"
-
-  const opportunities = analysis.allocation.slice(0, 3)
-  const riskItems = [
-    analysis.risk === "élevé" ? "Exposition élevée — volatilité importante attendue" : null,
-    analysis.score < 70 ? "Profil non optimisé — affinez vos paramètres" : null,
-    "Risque systémique cryptomonnaies (corrélation en crise)",
-    "Liquidité variable selon les actifs secondaires",
-  ].filter(Boolean).slice(0, 3) as string[]
+  const scoreLabel = analysis.score >= 85 ? "Plan tres coherent" : analysis.score >= 70 ? "Plan solide" : "Plan a affiner"
   const experienceGuide = {
     beginner: {
       label: "Mode debutant",
@@ -959,6 +1148,21 @@ function AnalysisResult({
       ],
     },
   }[experience]
+  const risksToWatch = (
+    avoidItems.length > 0
+      ? avoidItems
+      : [
+          analysis.risk === "élevé" ? "L'exposition aux actifs satellites reste la première source de volatilité." : null,
+          analysis.score < 70 ? "Le plan merite encore un cadrage plus fin sur le risque et l'objectif." : null,
+          "Le marche crypto reste corrélé en cas de choc brutal.",
+          "Les actifs secondaires bougent plus vite que BTC et ETH.",
+        ]
+  ).filter(Boolean).slice(0, 4) as string[]
+  const whyPlanItems = [
+    analysis.marketInsight,
+    analysis.marketVerdictNote,
+    analysis.pedagogy,
+  ].filter((item): item is string => Boolean(item && item.trim()))
   const nextActions = [
     primaryAction
       ? `Executer l'action principale: ${primaryAction.crypto}${primaryAction.amount ? ` pour ${primaryAction.amount}` : ""}.`
@@ -966,6 +1170,10 @@ function AnalysisResult({
     strategy ? strategy : null,
     analysis.nextReview ? `Revenir sur votre allocation: ${analysis.nextReview}.` : null,
   ].filter(Boolean).slice(0, 3) as string[]
+  const lockedInsights =
+    plan === "premium"
+      ? []
+      : [...LOCKED_INSIGHT_CARDS[plan as "free" | "pro"]]
 
   const handleExport = () => {
     setExportError("")
@@ -1033,701 +1241,298 @@ ${advancedBlock}
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-10 animate-slide-up">
-
-      {/* Header */}
-        <div className="flex items-center justify-between gap-3 mb-6">
+    <div className="mx-auto max-w-3xl animate-slide-up pb-10">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight">Votre analyse</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {plan === "premium" ? "Claude Opus 4.7" : plan === "pro" ? "Claude Sonnet 4.6" : "Claude Haiku 4.5"} · données marché temps réel
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            Analyse terminee
+          </p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">Votre plan crypto</h1>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            {plan === "premium" ? "Claude Opus 4.7" : plan === "pro" ? "Claude Sonnet 4.6" : "Claude Haiku 4.5"} ·
+            {" "}lecture du profil, du risque et des donnees marche disponibles
           </p>
         </div>
-        <button onClick={onNew} className="flex items-center gap-1.5 px-3 py-2 bg-secondary border border-border text-xs text-muted-foreground hover:text-foreground rounded-lg transition-all font-medium">
-          <RefreshCw className="w-3 h-3" /> Nouvelle analyse
+        <button
+          onClick={onNew}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Nouvelle analyse
         </button>
       </div>
 
-      <div className="mb-4 rounded-2xl border border-border bg-card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              {experienceGuide.label}
-            </p>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{experienceGuide.tone}</p>
-          </div>
-          <div className={cn("rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide", risk.bg, risk.border, risk.text)}>
-            {risk.label}
-          </div>
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          {experienceGuide.takeaways.map((item) => (
-            <div key={item} className="rounded-xl border border-border bg-secondary/50 px-3 py-3 text-[12px] leading-relaxed text-muted-foreground">
-              {item}
+      <div className="mb-4 grid gap-4 lg:grid-cols-[0.82fr_1.18fr]">
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-card-xs">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Resume du plan
+              </p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">{experienceGuide.tone}</p>
             </div>
-          ))}
+            <div className={cn("rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide", risk.bg, risk.border, risk.text)}>
+              {risk.label}
+            </div>
+          </div>
+          <div className="mt-6 flex justify-center">
+            <div className="shrink-0">
+              <ScoreGauge score={analysis.score} />
+              <p className="mt-1 text-center text-xs text-muted-foreground">{scoreLabel}</p>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {planAccess.locked.length > 0 && (
-        <div className="mb-4 rounded-2xl border border-border bg-card px-5 py-4">
-          <div className="flex items-center gap-2 mb-2">
-              <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Non inclus sur {planAccess.label}
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-card-xs">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-secondary/60 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Niveau de risque</p>
+              <p className="mt-2 text-base font-semibold text-foreground">{risk.label}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">Lecture du portefeuille au regard de votre profil.</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-secondary/60 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Mode de lecture</p>
+              <p className="mt-2 text-base font-semibold text-foreground">{experienceGuide.label}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">Niveau de detail adapte a votre experience crypto.</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-secondary/60 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Signal marche</p>
+              <p className="mt-2 text-base font-semibold text-foreground">{signalInfo?.label ?? "Version Pro"}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {signalInfo ? "Lecture du contexte actuel incluse dans votre plan." : "Le contexte detaille se debloque avec le signal marche Pro."}
               </p>
             </div>
-          <div className="flex flex-wrap gap-2">
-            {planAccess.locked.map((item) => (
-              <span key={item} className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
-                {item}
-              </span>
-            ))}
           </div>
-        </div>
-      )}
-
-      {/* Verdict + Insight banner */}
-      {isPro && (analysis.marketVerdict || analysis.marketInsight) && (() => {
-        const verdict = analysis.marketVerdict ? VERDICT_CONFIG[analysis.marketVerdict] : null
-        return (
-          <div className={cn(
-            "rounded-2xl p-5 mb-4 border shadow-card-xs",
-            verdict ? `${verdict.bg} ${verdict.border}` : "bg-secondary border-border"
-          )}>
-            {verdict && (
-              <div className="flex items-center gap-3 mb-2">
-                <div className={cn(
-                  "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border",
-                  verdict.bg, verdict.border
-                )}>
-                  <span className="text-lg leading-none">{verdict.emoji}</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={cn("font-black text-sm", verdict.color)}>
-                      Signal marché · {verdict.label}
-                    </span>
-                    <span className={cn(
-                      "text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase tracking-wider",
-                      verdict.color, verdict.border, verdict.bg
-                    )}>
-                      {verdict.action}
-                    </span>
-                  </div>
-                  {analysis.marketVerdictNote && (
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{analysis.marketVerdictNote}</p>
-                  )}
-                </div>
-              </div>
-            )}
-            {analysis.marketInsight && (
-              <div className={cn("flex items-start gap-2.5", verdict ? "border-t border-black/5 pt-3 mt-1" : "")}>
-                <span className="text-sm leading-none shrink-0 mt-0.5">⚡</span>
-                <p className="text-sm font-semibold text-foreground leading-relaxed">{analysis.marketInsight}</p>
-              </div>
-            )}
-          </div>
-        )
-      })()}
-
-      {/* Bloc Confiance */}
-      <div className="bg-card border border-border rounded-2xl p-5 mb-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-base leading-none">📈</span>
-          <h2 className="font-bold text-foreground text-sm">Pourquoi cette stratégie est solide</h2>
-        </div>
-        <ul className="space-y-2.5 mb-4">
-          {[
-            "Basée sur les données actuelles du marché",
-            "Répartition pensée pour limiter le risque",
-            "Adaptée à ton profil et ton capital",
-            "Stratégie utilisée par des profils similaires au tien",
-          ].map((point) => (
-            <li key={point} className="flex items-center gap-2.5">
-              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span className="text-sm text-muted-foreground">{point}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl">
-          <span className="text-sm leading-none shrink-0">👉</span>
-          <p className="text-sm font-semibold text-emerald-700">Tu suis une logique claire, pas un hasard</p>
-        </div>
-      </div>
-
-      {nextActions.length > 0 && (
-        <div className="bg-card border border-border rounded-2xl p-5 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Target className="w-4 h-4 text-foreground" />
-            <h2 className="font-bold text-foreground text-sm">Ce que vous devez faire maintenant</h2>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {nextActions.map((item, index) => (
-              <div key={`${item}-${index}`} className="rounded-2xl border border-border bg-secondary/60 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Etape {index + 1}
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-foreground">{item}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Exécution immédiate */}
-      {showAiRecommendations && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden mb-4 shadow-card">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center shrink-0">
-              <Brain className="w-4 h-4 text-foreground" />
-            </div>
-            <div>
-              <h2 className="font-bold text-foreground text-sm leading-none">Recommandations de l&apos;IA</h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{"Les prochaines actions concr\u00e8tes \u00e0 suivre"}</p>
-            </div>
-          </div>
-          <div className="grid gap-3 p-4 sm:grid-cols-2">
-            {primaryAction && (
-              <div className="rounded-2xl border border-border bg-secondary/60 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Action principale</p>
-                </div>
-                <p className="text-sm font-semibold text-foreground leading-relaxed">
-                  Acheter <span className={cn("font-bold", ASSET_TEXT[primaryAction.crypto] ?? "text-foreground")}>{primaryAction.crypto}</span>
-                  {primaryAction.amount ? ` - ${primaryAction.amount}` : ""}
-                </p>
-                {analysis.executionNow && analysis.executionNow.length > 1 && (
-                  <p className="text-[11px] text-muted-foreground mt-2">+ {analysis.executionNow.length - 1} autre(s) action(s) déjà listée(s)</p>
-                )}
-              </div>
-            )}
-
-            {strategy && (
-              <div className="rounded-2xl border border-border bg-secondary/60 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target className="w-4 h-4 text-foreground shrink-0" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{"Strat\u00e9gie"}</p>
-                </div>
-                <p className="text-sm text-foreground leading-relaxed">{strategy}</p>
-              </div>
-            )}
-
-            {analysis.nextReview && (
-              <div className="rounded-2xl border border-border bg-secondary/60 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{"Prochaine \u00e9tape"}</p>
-                </div>
-                <p className="text-sm text-foreground leading-relaxed">{analysis.nextReview}</p>
-              </div>
-            )}
-
-            {avoidItems.length > 0 && (
-              <div className="rounded-2xl border border-border bg-secondary/60 p-4 sm:col-span-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{"\u00c0 \u00e9viter"}</p>
-                </div>
-                <ul className="space-y-2">
-                  {avoidItems.map((item, index) => (
-                    <li key={`${item}-${index}`} className="flex items-start gap-2 text-sm text-muted-foreground leading-relaxed">
-                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-red-300 shrink-0" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {((analysis.executionNow && analysis.executionNow.length > 0) ||
-        (analysis.executionLater && analysis.executionLater.length > 0)) && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden mb-4 shadow-card">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center shrink-0">
-              <span className="text-base leading-none">🚀</span>
-            </div>
-            <div>
-              <h2 className="font-bold text-foreground text-sm leading-none">Exécution immédiate</h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Ce que tu dois faire maintenant</p>
-            </div>
-          </div>
-          <div className="divide-y divide-border">
-            {analysis.executionNow && analysis.executionNow.length > 0 && (
-              <div className="px-6 py-5">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
-                  À faire maintenant
-                </p>
-                <ul className="space-y-3.5">
-                  {analysis.executionNow.map((item, i) => (
-                    <li key={i} className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-[18px] h-[18px] rounded-md border-2 border-border bg-background shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)] shrink-0" />
-                        <span className="text-sm font-semibold text-foreground">
-                          Acheter{" "}
-                          <span className={cn("font-bold", ASSET_TEXT[item.crypto] ?? "text-foreground")}>
-                            {item.crypto}
-                          </span>
-                        </span>
-                      </div>
-                      <span className="text-sm font-bold text-foreground tabular-nums shrink-0 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
-                        {item.amount}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {analysis.executionLater && analysis.executionLater.length > 0 && (
-              <div className="px-6 py-4">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-                  À surveiller
-                </p>
-                <ul className="space-y-2.5">
-                  {analysis.executionLater.map((item, i) => (
-                    <li key={i} className="flex items-center gap-3">
-                      <div className="w-[18px] h-[18px] rounded-md border-2 border-slate-200 bg-white shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] shrink-0" />
-                      <span className="text-sm text-muted-foreground leading-relaxed">
-                        <span className={cn("font-semibold", ASSET_TEXT[item.crypto] ?? "text-foreground")}>
-                          {item.crypto}
-                        </span>
-                        {item.condition ? ` — ${item.condition}` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {analysis.nextReview && (
-              <div className="px-6 py-3.5 flex items-center gap-3 bg-slate-50/60">
-                <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <span className="text-sm text-muted-foreground">
-                  Prochaine révision :{" "}
-                  <span className="font-semibold text-foreground">{analysis.nextReview}</span>
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Score + Metrics hero */}
-      <div className="bg-card border border-border rounded-2xl p-6 mb-4 shadow-card">
-        <div className="flex flex-col sm:flex-row items-center gap-6">
-          {/* Gauge */}
-          <div className="shrink-0">
-            <ScoreGauge score={analysis.score} />
-            <p className="text-center text-xs text-muted-foreground mt-1">{scoreLabel}</p>
-          </div>
-
-          {/* Metrics */}
-          <div className="flex-1 grid grid-cols-1 gap-3 w-full">
-            {/* Signal */}
-            {isPro && signalInfo ? (
-              <div className={cn("flex items-center gap-3 px-4 py-3 rounded-xl border", signalInfo.bg, signalInfo.border)}>
-                <signalInfo.Icon className={cn("w-4 h-4 shrink-0", signalInfo.color)} />
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">Signal marché</p>
-                  <p className={cn("text-sm font-bold", signalInfo.color)}>{signalInfo.label}</p>
-                </div>
-                <span className={cn("text-xs font-black px-2 py-0.5 rounded-md border", signalInfo.color, signalInfo.border, signalInfo.bg)}>
-                  {signalInfo.short}
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-secondary/60">
-                <Lock className="w-4 h-4 shrink-0 text-muted-foreground" />
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">Signal marché</p>
-                  <p className="text-sm font-bold text-foreground">Signal marché détaillé disponible en Pro</p>
-                </div>
-                <span className="text-xs font-black px-2 py-0.5 rounded-md border border-border bg-card text-muted-foreground">
-                  PRO
-                </span>
-              </div>
-            )}
-
-            {/* Risk + Momentum */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className={cn("flex items-center gap-2.5 px-3 py-3 rounded-xl border", risk.bg, risk.border)}>
-                <Shield className={cn("w-4 h-4 shrink-0", risk.text)} />
+          <div className="mt-4 rounded-2xl border border-border bg-background px-4 py-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Resume du plan</p>
+            <p className="mt-2 text-sm leading-7 text-foreground">{analysis.explanation}</p>
+            {analysis.marketSignal ? (
+              <div className="mt-4 flex items-start gap-2 rounded-2xl border border-border bg-secondary px-3 py-3">
+                <Activity className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold leading-none mb-0.5">Risque</p>
-                  <p className={cn("text-sm font-bold", risk.text)}>{risk.label}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Contexte marche</p>
+                  <p className="mt-1 text-sm leading-6 text-foreground">{analysis.marketSignal}</p>
                 </div>
               </div>
-              <div className="px-3 py-3 rounded-xl border border-border bg-secondary">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold leading-none">Momentum</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
-                    <div className={cn("h-1 rounded-full transition-all", momentum.bar)} style={{ width: momentum.w }} />
-                  </div>
-                  <span className={cn("text-xs font-bold shrink-0", momentum.color)}>{momentum.label}</span>
-                </div>
-              </div>
-            </div>
+            ) : null}
           </div>
         </div>
       </div>
 
-      {/* Allocation */}
-      <div className="bg-card border border-border rounded-2xl overflow-hidden mb-4">
-        <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-muted-foreground" />
-          <h2 className="font-bold text-foreground text-sm">Répartition recommandée</h2>
-          <span className="text-xs text-muted-foreground ml-auto tabular-nums">{analysis.allocation.length} actifs</span>
-        </div>
-        <div className="grid md:grid-cols-2 gap-0">
-          <div className="px-6 py-5 space-y-4">
+      <ResultSection
+        eyebrow="Allocation"
+        title="Repartition proposee"
+        action={<span className="text-xs font-semibold text-muted-foreground">{analysis.allocation.length} actifs</span>}
+      >
+        <div className="grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
+          <div className="space-y-4">
             {analysis.allocation.map((alloc) => (
               <div key={alloc.asset}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className={cn("w-2 h-2 rounded-full shrink-0", ASSET_BAR[alloc.asset] ?? "bg-slate-400")} />
-                    <span className="text-sm font-bold text-foreground tracking-tight">{alloc.asset}</span>
-                    {isPro && alloc.note && (
-                      <span className="text-[11px] text-muted-foreground leading-tight truncate max-w-[90px]">{alloc.note}</span>
-                    )}
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <div className={cn("h-2 w-2 shrink-0 rounded-full", ASSET_BAR[alloc.asset] ?? "bg-slate-400")} />
+                    <span className="text-sm font-semibold text-foreground">{alloc.asset}</span>
+                    {alloc.note ? (
+                      <span className="truncate text-[11px] text-muted-foreground">{alloc.note}</span>
+                    ) : null}
                   </div>
-                  <span className="text-sm font-bold text-foreground tabular-nums">{alloc.percentage}%</span>
+                  <span className="text-sm font-semibold tabular-nums text-foreground">{alloc.percentage}%</span>
                 </div>
-                <div className="w-full bg-slate-100 rounded-full h-[5px] overflow-hidden">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                   <div
-                    className={cn("h-[5px] rounded-full transition-all duration-700", ASSET_BAR[alloc.asset] ?? "bg-slate-400")}
+                    className={cn("h-1.5 rounded-full transition-all duration-700", ASSET_BAR[alloc.asset] ?? "bg-slate-400")}
                     style={{ width: `${alloc.percentage}%` }}
                   />
                 </div>
               </div>
             ))}
           </div>
-          <div className="p-4 border-t border-border md:border-t-0 md:border-l flex items-center justify-center">
-            <div className="w-full h-44">
+          <div className="rounded-3xl border border-border bg-secondary/40 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Vue d&apos;ensemble</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">Repartition coeur, satellites et reserve</p>
+              </div>
+            </div>
+            <div className="mt-4 h-44">
               <PortfolioChart allocations={analysis.allocation} />
             </div>
           </div>
         </div>
+      </ResultSection>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <ResultSection eyebrow="Lecture" title="Pourquoi ce plan">
+          <div className="space-y-3">
+            <p className="text-sm leading-7 text-muted-foreground">{analysis.explanation}</p>
+            {whyPlanItems.length > 0 ? (
+              <div className="grid gap-3">
+                {whyPlanItems.slice(0, 2).map((item) => (
+                  <div key={item} className="rounded-2xl border border-border bg-secondary/60 px-4 py-3">
+                    <p className="text-sm leading-6 text-foreground">{item}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </ResultSection>
+
+        <ResultSection eyebrow="Vigilance" title="Risques a surveiller">
+          <div className="space-y-3">
+            {risksToWatch.map((item, index) => (
+              <div key={`${item}-${index}`} className="flex items-start gap-3 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <p className="text-sm leading-6 text-muted-foreground">{item}</p>
+              </div>
+            ))}
+          </div>
+        </ResultSection>
       </div>
 
-      {/* Opportunités / Risques / Timing — 3 col */}
-      <div className="grid sm:grid-cols-3 gap-3 mb-4">
-        {/* Opportunités */}
-        <div className="bg-card border border-emerald-100 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-            <h3 className="text-[10px] font-bold text-emerald-700 uppercase tracking-[0.1em]">Opportunités</h3>
-          </div>
-          <ul className="space-y-2.5">
-            {opportunities.map((o) => (
-              <li key={o.asset} className="flex items-center gap-2">
-                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", ASSET_BAR[o.asset] ?? "bg-muted-foreground")} />
-                <span className={cn("text-xs font-bold", ASSET_TEXT[o.asset] ?? "text-muted-foreground")}>{o.asset}</span>
-                <span className="text-xs text-muted-foreground ml-auto tabular-nums">{o.percentage}%</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Risques */}
-        <div className="bg-card border border-red-100 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-            <h3 className="text-[10px] font-bold text-red-600 uppercase tracking-[0.1em]">Risques</h3>
-          </div>
-          <ul className="space-y-2">
-            {riskItems.map((r, i) => (
-              <li key={i} className="flex items-start gap-1.5">
-                <div className="w-1 h-1 rounded-full bg-red-300 shrink-0 mt-1.5" />
-                <span className="text-xs text-muted-foreground leading-relaxed">{r}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Timing */}
-        <div className="bg-card border border-border rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em]">Timing</h3>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {analysis.entryStrategy
-              ? analysis.entryStrategy.slice(0, 120) + (analysis.entryStrategy.length > 120 ? "…" : "")
-              : signalInfo?.label === "Haussier"
-              ? "Conditions favorables. Entrée progressive recommandée."
-              : signalInfo?.label === "Baissier"
-              ? "Marché sous pression. Favoriser le DCA pour lisser l'entrée."
-              : isPro
-              ? "Marché neutre. Entrée en deux fois espacées de 2-4 semaines."
-              : "Passez au Pro pour obtenir un timing guidé par le signal marché."}
-          </p>
-        </div>
-      </div>
-
-      {/* Market signal (Pro+) */}
-      {isPro && analysis.marketSignal && (
-        <div className="flex items-start gap-3 px-5 py-4 bg-secondary border border-border rounded-2xl mb-4">
-          <Activity className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-          <div>
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em]">Signal complet</span>
-            <p className="text-sm text-foreground font-semibold mt-1 leading-relaxed">{analysis.marketSignal}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Analysis */}
-      {analysis.explanation && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden mb-4">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-            <Activity className="w-3.5 h-3.5 text-muted-foreground" />
-            <h2 className="font-bold text-foreground text-sm">Analyse de marché</h2>
-          </div>
-          <div className="px-6 py-5">
-            <p className="text-sm text-muted-foreground leading-[1.75] font-[430]">{analysis.explanation}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Lecture IA */}
-      {isPremium && analysis.aiSignature && (
-        <div className="flex items-start gap-3.5 px-5 py-4 bg-secondary border border-border rounded-2xl mb-4">
-          <span className="text-base leading-none shrink-0 mt-0.5">🧠</span>
-          <div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Lecture IA</p>
-            <p className="text-sm font-semibold text-foreground leading-relaxed">{analysis.aiSignature}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Plan — timeline */}
-      {Array.isArray(analysis.plan) && analysis.plan.length > 0 && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden mb-4">
-          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Target className="w-3.5 h-3.5 text-muted-foreground" />
-              <h2 className="font-bold text-foreground text-sm">Plan d&apos;action</h2>
-            </div>
-            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest tabular-nums">{analysis.plan.length} étape{analysis.plan.length > 1 ? "s" : ""}</span>
-          </div>
-          <div className="px-6 py-5">
-            <ol className="space-y-4">
-              {analysis.plan.map((action, i) => (
-                <li key={i} className="flex items-start gap-4">
-                  <div className={cn(
-                    "w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-[10px] font-black tabular-nums border",
-                    i === 0
-                      ? "bg-foreground text-background border-foreground"
-                      : "bg-secondary text-muted-foreground border-border"
-                  )}>
-                    {i + 1}
-                  </div>
-                  <div className="pt-0.5 flex-1">
-                    <p className="text-sm text-muted-foreground leading-[1.7]">{String(action)}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </div>
-      )}
-
-      {/* Plan dans le temps */}
-      {isPro && analysis.timePlan && analysis.timePlan.length > 0 && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden mb-4">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-            <span className="text-base leading-none">📅</span>
-            <h2 className="font-bold text-foreground text-sm">Plan dans le temps</h2>
-          </div>
-          <div className="px-6 py-5">
-            <div className="space-y-0">
-              {analysis.timePlan.map((item, i) => (
-                <div key={i} className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className={cn(
-                      "w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black border",
-                      i === 0
-                        ? "bg-foreground text-background border-foreground"
-                        : "bg-secondary text-muted-foreground border-border"
-                    )}>
-                      {i + 1}
+      {(analysis.plan.length > 0 || showAiRecommendations || (isPro && analysis.timePlan && analysis.timePlan.length > 0)) && (
+        <ResultSection eyebrow="Execution" title="Prochaine action">
+          <div className="grid gap-4 lg:grid-cols-[1.02fr_0.98fr]">
+            <div className="space-y-4">
+              {nextActions.length > 0 ? (
+                <div className="grid gap-3">
+                  {nextActions.map((item, index) => (
+                    <div key={`${item}-${index}`} className="rounded-2xl border border-border bg-secondary/60 px-4 py-4">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Action {index + 1}</p>
+                      <p className="mt-2 text-sm leading-6 text-foreground">{item}</p>
                     </div>
-                    {i < analysis.timePlan!.length - 1 && (
-                      <div className="w-px flex-1 bg-border my-1" />
-                    )}
-                  </div>
-                  <div className={cn("pb-4 flex-1", i === analysis.timePlan!.length - 1 ? "" : "")}>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">
-                      {item.period}
-                    </p>
-                    <p className="text-sm text-foreground leading-relaxed">{item.action}</p>
+                  ))}
+                </div>
+              ) : null}
+              {analysis.executionNow && analysis.executionNow.length > 0 ? (
+                <div className="rounded-2xl border border-border bg-background px-4 py-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Execution immediate</p>
+                  <div className="mt-3 space-y-3">
+                    {analysis.executionNow.map((item, index) => (
+                      <div key={`${item.crypto}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/60 px-3 py-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{item.crypto}</p>
+                          <p className="text-xs text-muted-foreground">Action prioritaire</p>
+                        </div>
+                        <span className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground">
+                          {item.amount}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-4">
+              {analysis.plan.length > 0 ? (
+                <div className="rounded-2xl border border-border bg-secondary/40 px-4 py-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Plan d&apos;action</p>
+                  <ol className="mt-3 space-y-3">
+                    {analysis.plan.slice(0, 5).map((item, index) => (
+                      <li key={`${item}-${index}`} className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-background text-[11px] font-bold text-foreground">
+                          {index + 1}
+                        </div>
+                        <p className="text-sm leading-6 text-muted-foreground">{item}</p>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ) : null}
+
+              {isPro && analysis.timePlan && analysis.timePlan.length > 0 ? (
+                <div className="rounded-2xl border border-border bg-background px-4 py-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Plan dans le temps</p>
+                  <div className="mt-3 space-y-3">
+                    {analysis.timePlan.slice(0, 4).map((item, index) => (
+                      <div key={`${item.period}-${index}`} className="rounded-2xl border border-border bg-secondary/60 px-3 py-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{item.period}</p>
+                        <p className="mt-1 text-sm leading-6 text-foreground">{item.action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </ResultSection>
+      )}
+
+      {lockedInsights.length > 0 ? (
+        <div className="mt-4" data-testid="advisor-locked-pro-insights">
+          <ResultSection
+            eyebrow="Pro et Premium"
+            title="Ce que vous pouvez debloquer ensuite"
+            action={
+              <Link href="/pricing" className="text-xs font-semibold text-foreground underline underline-offset-4">
+                Debloquer Pro
+              </Link>
+            }
+          >
+            <div className="grid gap-3 md:grid-cols-3">
+              {lockedInsights.map((item) => (
+                <LockedProInsight key={item.title} title={item.title} body={item.body} upgrade={item.upgrade} />
               ))}
             </div>
-          </div>
+          </ResultSection>
         </div>
-      )}
+      ) : null}
 
-      {/* Erreurs à éviter */}
-      {isPremium && analysis.errorsToAvoid && analysis.errorsToAvoid.length > 0 && (
-        <div className="bg-red-50 border border-red-100 rounded-2xl overflow-hidden mb-4">
-          <div className="px-6 py-4 border-b border-red-100 flex items-center gap-2">
-            <span className="text-base leading-none">❌</span>
-            <h2 className="font-bold text-red-700 text-sm">Alertes de risque Premium</h2>
-          </div>
-          <div className="px-6 py-5">
-            <ul className="space-y-3">
-              {analysis.errorsToAvoid.map((err, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <div className="w-4 h-4 rounded-full bg-red-100 border border-red-200 flex items-center justify-center shrink-0 mt-0.5">
-                    <div className="w-1.5 h-0.5 rounded-full bg-red-500" />
-                  </div>
-                  <p className="text-sm text-red-800 leading-relaxed">{err}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {/* Projection */}
-      {isPremium && analysis.projection && analysis.projection.length > 0 && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden mb-4">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-            <span className="text-base leading-none">📊</span>
-            <h2 className="font-bold text-foreground text-sm">Projection selon les marchés</h2>
-          </div>
-          <div className="divide-y divide-border">
-            {analysis.projection.map((proj, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "px-6 py-4 flex items-start gap-3.5",
-                  i === 1 ? "bg-emerald-50/50" : i === 2 ? "bg-red-50/30" : "bg-amber-50/30"
-                )}
-              >
-                <span className="text-base leading-none shrink-0 mt-0.5">
-                  {i === 0 ? "🟡" : i === 1 ? "🟢" : "🔴"}
-                </span>
-                <div>
-                  <p className={cn(
-                    "text-[10px] font-bold uppercase tracking-widest mb-1",
-                    i === 1 ? "text-emerald-600" : i === 2 ? "text-red-500" : "text-amber-600"
-                  )}>
-                    {proj.scenario}
-                  </p>
-                  <p className="text-sm text-foreground/80 leading-relaxed">{proj.outcome}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Pedagogy — Comprendre simplement */}
-      {analysis.pedagogy && (
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl overflow-hidden mb-4">
-          <div className="px-6 py-4 border-b border-blue-100 flex items-center gap-2">
-            <span className="text-base leading-none">📘</span>
-            <h2 className="font-bold text-blue-700 text-sm">Comprendre simplement</h2>
-          </div>
-          <div className="px-6 py-5">
-            <p className="text-sm text-blue-900 leading-[1.75]">{analysis.pedagogy}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Premium advanced */}
-      {isPremium && (analysis.entryStrategy || analysis.rebalanceNote) && (
-        <div className="rounded-2xl overflow-hidden mb-4 card-premium-light">
-          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Target className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-bold text-foreground text-sm">Stratégie avancée</span>
-            </div>
-            <span className="badge-premium">Premium</span>
-          </div>
-          <div className="divide-y divide-border">
-            {analysis.entryStrategy && (
-              <div className="px-5 py-4">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] mb-2">Stratégie d&apos;entrée</p>
-                <p className="text-sm text-foreground/80 leading-relaxed">{analysis.entryStrategy}</p>
-              </div>
-            )}
-            {analysis.rebalanceNote && (
-              <div className="px-5 py-4">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] mb-2">Rééquilibrage</p>
-                <p className="text-sm text-foreground/80 leading-relaxed">{analysis.rebalanceNote}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Prochaine étape */}
-      <div className="rounded-2xl mb-4 overflow-hidden border border-border bg-card shadow-card-xs">
-        <div className="px-5 pt-5 pb-4">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-foreground flex items-center justify-center shrink-0">
-              <Zap className="w-3.5 h-3.5 text-background" />
-            </div>
-            <h2 className="font-black text-foreground text-sm tracking-tight">Prochaine étape</h2>
-          </div>
-          <ul className="space-y-3">
-            <li className="flex items-start gap-3">
-              <div className="w-5 h-5 rounded-full bg-foreground flex items-center justify-center shrink-0 mt-0.5">
-                <ArrowRight className="w-3 h-3 text-background" />
-              </div>
-              <span className="text-sm font-semibold text-foreground leading-relaxed">Exécute les actions maintenant</span>
-            </li>
-            {analysis.nextReview && (
-              <li className="flex items-start gap-3">
-                <div className="w-5 h-5 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0 mt-0.5">
-                  <Clock className="w-2.5 h-2.5 text-muted-foreground" />
-                </div>
-                <span className="text-sm font-semibold text-foreground leading-relaxed">
-                  Reviens dans{" "}<span className="font-black">{analysis.nextReview}</span>
-                </span>
-              </li>
-            )}
-          </ul>
-        </div>
-        <div className="px-5 py-3 bg-secondary border-t border-border">
-          <p className="text-xs font-bold text-muted-foreground text-center tracking-wide">
-            Ne pas agir = perdre l&apos;avantage du plan
-          </p>
-        </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <AdvisorNextStepCard
+          href="/dashboard"
+          title="Voir mon dashboard"
+          body="Retrouver l&apos;analyse, le portefeuille et les donnees reelles au meme endroit."
+          label="Ouvrir"
+          icon={<BarChart3 className="h-4 w-4 text-foreground" />}
+        />
+        <AdvisorNextStepCard
+          href="/chat"
+          title="Poser une question a l'IA"
+          body="Demander une explication plus simple, un point de risque ou un plan d&apos;entree."
+          label="Continuer"
+          icon={<MessageSquare className="h-4 w-4 text-foreground" />}
+        />
+        <AdvisorNextStepCard
+          href="/pricing"
+          title={plan === "premium" ? "Comparer les offres" : "Debloquer le suivi Pro"}
+          body={plan === "premium"
+            ? "Verifier ce qui distingue encore les autres offres."
+            : "Ajouter le signal marche detaille, le suivi avance et les scenarios."
+          }
+          label={plan === "premium" ? "Voir les offres" : "Debloquer"}
+          icon={<Zap className="h-4 w-4 text-foreground" />}
+        />
       </div>
 
-      {/* Disclaimer */}
-      <div className="flex items-start gap-2.5 px-4 py-3.5 bg-secondary border border-border rounded-2xl mb-4">
-        <AlertTriangle className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
-        <p className="text-xs text-muted-foreground leading-relaxed">{analysis.disclaimer}</p>
+      <div className="mt-4 rounded-2xl border border-border bg-secondary/40 px-4 py-4">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Discipline</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Un bon plan se juge sur sa coherence avec votre horizon et votre discipline, pas sur un seul mouvement de marche.
+        </p>
       </div>
 
-      {/* CTAs */}
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <button onClick={onNew}
-            className="flex-1 py-3.5 bg-secondary border border-border hover:border-foreground/20 text-muted-foreground hover:text-foreground font-bold rounded-2xl text-sm transition-all flex items-center justify-center gap-2">
-            <RefreshCw className="w-3.5 h-3.5" /> Revoir mes réponses
+      <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-border bg-card px-4 py-3.5">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <p className="text-xs leading-relaxed text-muted-foreground">{analysis.disclaimer}</p>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
+        <button onClick={onNew}
+          className="flex-1 rounded-2xl border border-border bg-secondary px-4 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/80">
+          Revoir mes reponses
+        </button>
+        {canExport ? (
+          <button onClick={handleExport}
+            className="flex-1 rounded-2xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary">
+            Telecharger le PDF
           </button>
-          {canExport && (
-            <button onClick={handleExport}
-              className="flex-1 py-3.5 bg-secondary border border-border hover:border-foreground/20 text-muted-foreground hover:text-foreground font-bold rounded-2xl text-sm transition-all flex items-center justify-center gap-2">
-              <Download className="w-3.5 h-3.5" /> Télécharger le PDF
-            </button>
-          )}
-          <Link href="/dashboard"
-            className="flex-1 py-3.5 bg-foreground hover:bg-foreground/90 text-background font-black rounded-2xl text-sm text-center transition-all flex items-center justify-center gap-2">
-            Voir le dashboard <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
+        ) : null}
+        <Link href="/dashboard"
+          className="flex-1 rounded-2xl bg-foreground px-4 py-3.5 text-center text-sm font-semibold text-background transition-colors hover:bg-foreground/92">
+          Voir mon dashboard
+        </Link>
+      </div>
       {exportError && (
         <div className="mt-3 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1736,8 +1541,11 @@ ${advancedBlock}
       )}
 
       {!canExport && (
-        <p className="text-center text-[11px] text-muted-foreground/50 mt-3">
-          <Link href="/pricing" className="text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors">Plan Pro</Link> pour exporter vos analyses en PDF
+        <p className="mt-3 text-center text-[11px] text-muted-foreground/70">
+          <Link href="/pricing" className="font-semibold text-foreground underline underline-offset-2 transition-colors hover:opacity-75">
+            Debloquer Pro
+          </Link>{" "}
+          pour exporter l&apos;analyse, suivre le signal marche detaille et comparer des scenarios.
         </p>
       )}
     </div>

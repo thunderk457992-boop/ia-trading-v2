@@ -38,7 +38,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
-  const [confirmationNextPath, setConfirmationNextPath] = useState("/dashboard")
+  const [confirmationNextPath, setConfirmationNextPath] = useState("/auth/post-login")
 
   const passwordStrength = (() => {
     if (password.length === 0) return 0
@@ -66,8 +66,8 @@ export default function RegisterPage() {
 
     try {
       const nextPath = typeof window === "undefined"
-        ? "/dashboard"
-        : new URLSearchParams(window.location.search).get("next") || "/dashboard"
+        ? "/auth/post-login"
+        : new URLSearchParams(window.location.search).get("next") || "/auth/post-login"
 
       const supabase = createClient()
       const { data, error: signUpError } = await supabase.auth.signUp({
