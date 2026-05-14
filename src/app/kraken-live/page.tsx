@@ -224,30 +224,37 @@ export default function KrakenLivePage() {
 
             {/* Summary grid */}
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[40rem] xl:grid-cols-4">
-              <div className="surface-soft px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Actifs suivis</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
-                  {loading ? "—" : (summary?.trackedAssets ?? assets.length)}
-                </p>
-              </div>
-              <div className="surface-soft px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">BTC Dominance</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
-                  {loading ? "—" : (global ? formatPct(global.btcDominance) : "—")}
-                </p>
-              </div>
-              <div className="surface-soft px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Market cap total</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
-                  {loading ? "—" : (global ? formatCompact(global.totalMarketCapUsd) : "—")}
-                </p>
-              </div>
-              <div className="surface-soft px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Source principale</p>
-                <p className="mt-2 text-base font-semibold text-foreground">
-                  {loading ? "—" : (summary?.primarySource ?? data?.source ?? "CoinGecko")}
-                </p>
-              </div>
+              {[
+                {
+                  label: "Actifs suivis",
+                  value: loading ? null : (summary?.trackedAssets ?? assets.length),
+                  display: loading ? null : String(summary?.trackedAssets ?? assets.length),
+                },
+                {
+                  label: "BTC Dominance",
+                  value: loading ? null : (global?.btcDominance ?? null),
+                  display: loading ? null : (global ? formatPct(global.btcDominance) : "Chargement…"),
+                },
+                {
+                  label: "Market cap total",
+                  value: loading ? null : (global?.totalMarketCapUsd ?? null),
+                  display: loading ? null : (global ? formatCompact(global.totalMarketCapUsd) : "Chargement…"),
+                },
+                {
+                  label: "Source principale",
+                  value: 1,
+                  display: loading ? null : (summary?.primarySource ?? data?.source ?? "CoinGecko"),
+                },
+              ].map(({ label, display }) => (
+                <div key={label} className="surface-soft px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+                  {display === null ? (
+                    <div className="mt-2 h-7 w-20 rounded-lg bg-slate-100 animate-pulse" />
+                  ) : (
+                    <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{display}</p>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -285,7 +292,23 @@ export default function KrakenLivePage() {
           <div className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-3">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-56 animate-pulse rounded-3xl border border-border bg-card" />
+                <div key={i} className="rounded-3xl border border-border bg-card p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="h-4 w-24 rounded-lg bg-slate-100 animate-pulse" />
+                    <div className="h-4 w-16 rounded-lg bg-slate-100 animate-pulse" />
+                  </div>
+                  <div className="space-y-2.5">
+                    {[0, 1, 2].map((j) => (
+                      <div key={j} className="flex items-center justify-between rounded-2xl border border-border bg-secondary/40 px-3 py-3">
+                        <div className="space-y-1.5">
+                          <div className="h-4 w-16 rounded bg-slate-100 animate-pulse" />
+                          <div className="h-3 w-24 rounded bg-slate-100 animate-pulse" />
+                        </div>
+                        <div className="h-5 w-14 rounded-full bg-slate-100 animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

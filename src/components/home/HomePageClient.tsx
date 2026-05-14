@@ -24,6 +24,7 @@ import { MetricCard } from "@/components/ui/MetricCard"
 import { PremiumBadge } from "@/components/ui/PremiumBadge"
 import { SectionHeader } from "@/components/ui/SectionHeader"
 import { TrustBar } from "@/components/ui/TrustBar"
+import { SocialProofStrip } from "@/components/home/SocialProofStrip"
 
 const PRODUCT_ALLOCATION = [
   { asset: "BTC", pct: 42, label: "Bitcoin", tone: "bg-amber-400" },
@@ -611,6 +612,13 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
           </div>
         </div>
       </section>
+
+      <SocialProofStrip
+        btcPrice={marketSnapshot?.prices.find((p) => p.symbol === "BTC")?.price}
+        btcChange24h={marketSnapshot?.prices.find((p) => p.symbol === "BTC")?.change24h}
+        marketCapT={marketSnapshot?.global ? marketSnapshot.global.totalMarketCapUsd / 1e12 : undefined}
+        btcDominance={marketSnapshot?.global?.btcDominance}
+      />
 
       <section id="product" className="border-y border-border bg-secondary px-5 py-18 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-6xl">

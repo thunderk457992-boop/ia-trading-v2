@@ -374,6 +374,11 @@ Réponds UNIQUEMENT avec ce JSON valide, sans texte autour:
     { "period": "Semaine 3", "action": "<action concrète>" }
   ],
   "aiSignature": "<1 phrase max, format: [indicateur marché observé] → [implication capital] → [décision stratégique]. Ex: BTC domine à 58% → capitaux risk-off → BTC/ETH prioritaires.>",
+  "overview": "<résumé exécutif: 1-2 phrases sobres et directes. Citer les actifs principaux et la raison principale de l'allocation — pas de jargon, pas de formule vague, style mémo financier pédagogique.>",
+  "watchList": [
+    "<signal ou condition concret à surveiller dans les 2-3 prochaines semaines — ex: si BTC passe sous $X, réévaluer>",
+    "<second indicateur précis à suivre — dominance, variation ou événement marché>"
+  ],
   "projection": [
     { "scenario": "Marché stable", "outcome": "<ce qui se passe avec cette allocation — 1 phrase courte et claire>" },
     { "scenario": "Marché haussier", "outcome": "<ce qui se passe — 1 phrase courte>" },
@@ -463,6 +468,11 @@ Réponds UNIQUEMENT avec ce JSON valide, sans texte autour:
     { "period": "Mois 2+",  "action": "<stratégie long terme ou rééquilibrage>" }
   ],
   "aiSignature": "<1 phrase technique, format [indicateur] → [implication] → [décision]. Citer un prix ou une dominance observée.>",
+  "overview": "<résumé exécutif: 1-2 phrases sobres, directes. Citer les actifs principaux et la raison principale de l'allocation — style mémo financier, pas de jargon, zéro formule générique.>",
+  "watchList": [
+    "<signal précis à monitorer: ex: BTC dominance < 48% = signal rotation altcoins — ajuster en conséquence>",
+    "<second indicateur précis à suivre — prix, variation % ou événement marché daté>"
+  ],
   "projection": [
     { "scenario": "Marché stable", "outcome": "<progression attendue avec cette allocation — 1 phrase>" },
     { "scenario": "Marché haussier", "outcome": "<performance probable — 1 phrase avec estimation>" },
@@ -558,6 +568,12 @@ Réponds UNIQUEMENT avec ce JSON valide, sans texte autour:
     { "period": "Mois 3+",   "action": "<stratégie de sortie ou consolidation>" }
   ],
   "aiSignature": "<1 phrase analytique max, format condensé expert: [indicateur précis avec valeur] → [implication capital] → [biais stratégique].>",
+  "overview": "<résumé exécutif: 1-2 phrases sobres, directes, citant les actifs principaux et la raison clé de l'allocation — style mémo financier, pas de jargon, zéro formule générique.>",
+  "watchList": [
+    "<signal précis à monitorer: ex: BTC dominance < 48% = signal rotation altcoins, ajuster en conséquence>",
+    "<second indicateur: volatilité 24h, variation d'un actif, événement macro ou calendrier précis>",
+    "<troisième point optionnel: condition de rééquilibrage ou d'entrée différée>"
+  ],
   "projection": [
     { "scenario": "Marché stable", "outcome": "<comportement attendu de ce portefeuille — 1 phrase chiffrée si possible>" },
     { "scenario": "Marché haussier", "outcome": "<upside potentiel — 1 phrase avec estimation réaliste>" },

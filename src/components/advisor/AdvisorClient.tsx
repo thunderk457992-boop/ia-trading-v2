@@ -52,6 +52,8 @@ interface Analysis {
   allocation: Array<{ asset: string; percentage: number; note?: string }>
   plan: string[]
   explanation: string
+  overview?: string
+  watchList?: string[]
   marketSignal?: string
   entryStrategy?: string
   rebalanceNote?: string
@@ -1129,8 +1131,7 @@ function AnalysisResult({
     return { label: "Neutre", short: "NEUTRAL", color: "text-muted-foreground", bg: "bg-secondary", border: "border-border", Icon: Activity }
   }, [isPro, analysis.marketSignal, analysis.marketVerdict, analysis.marketVerdictNote, analysis.marketInsight])
 
-  const risk       = RISK_CONFIG[analysis.risk] ?? RISK_CONFIG["modéré"]
-  const scoreLabel = analysis.score >= 85 ? "Plan tres coherent" : analysis.score >= 70 ? "Plan solide" : "Plan a affiner"
+  const risk = RISK_CONFIG[analysis.risk] ?? RISK_CONFIG["modéré"]
   const experienceGuide = {
     beginner: {
       label: "Mode debutant",
@@ -1254,79 +1255,64 @@ ${advancedBlock}
 
   return (
     <div className="mx-auto max-w-3xl animate-slide-up pb-10">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="eyebrow">
-            Analyse terminee
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">Note d&apos;investissement</h1>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            {plan === "premium" ? "Claude Opus 4.7" : plan === "pro" ? "Claude Sonnet 4.6" : "Claude Haiku 4.5"} ·
-            {" "}lecture du profil, du risque et des donnees marche disponibles
-          </p>
+          <p className="eyebrow">Analyse terminee · {plan === "premium" ? "Claude Opus 4.7" : plan === "pro" ? "Claude Sonnet 4.6" : "Claude Haiku 4.5"}</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Note d&apos;investissement</h1>
         </div>
         <button
           onClick={onNew}
-          className="btn-secondary inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold"
+          className="btn-secondary inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold"
         >
           <RefreshCw className="h-4 w-4" />
           Nouvelle analyse
         </button>
       </div>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-[0.82fr_1.18fr]">
-        <div className="surface-card p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="eyebrow">
-                Resume du plan
-              </p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{experienceGuide.tone}</p>
+      {/* ── 1. Résumé exécutif ──────────────────────────────────────────────── */}
+      <div className="surface-card mb-4 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            <div className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide", risk.bg, risk.border, risk.text)}>
+              Risque {risk.label}
             </div>
-            <div className={cn("rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide", risk.bg, risk.border, risk.text)}>
-              {risk.label}
+            {signalInfo && (
+              <div className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold", signalInfo.bg, signalInfo.border, signalInfo.color)}>
+                {signalInfo.label}
+              </div>
+            )}
+            <div className="rounded-full border border-border bg-secondary px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+              Score {analysis.score}/100
             </div>
           </div>
-          <div className="mt-6 flex justify-center">
-            <div className="shrink-0">
-              <ScoreGauge score={analysis.score} />
-              <p className="mt-1 text-center text-xs text-muted-foreground">{scoreLabel}</p>
-            </div>
+          <div className="shrink-0">
+            <ScoreGauge score={analysis.score} />
           </div>
         </div>
 
-        <div className="surface-card p-6">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="surface-soft p-4">
-              <p className="eyebrow">Niveau de risque</p>
-              <p className="mt-2 text-base font-semibold text-foreground">{risk.label}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">Lecture du portefeuille au regard de votre profil.</p>
-            </div>
-            <div className="surface-soft p-4">
-              <p className="eyebrow">Mode de lecture</p>
-              <p className="mt-2 text-base font-semibold text-foreground">{experienceGuide.label}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">Niveau de detail adapte a votre experience crypto.</p>
-            </div>
-            <div className="surface-soft p-4">
-              <p className="eyebrow">Signal marche</p>
-              <p className="mt-2 text-base font-semibold text-foreground">{signalInfo?.label ?? "Version Pro"}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {signalInfo ? "Lecture du contexte actuel incluse dans votre plan." : "Le contexte detaille se debloque avec le signal marche Pro."}
-              </p>
-            </div>
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="text-sm font-semibold leading-7 text-foreground">
+            {analysis.overview ?? analysis.explanation}
+          </p>
+          {analysis.aiSignature && (
+            <p className="mt-2 text-[12px] leading-6 text-muted-foreground italic">{analysis.aiSignature}</p>
+          )}
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="surface-soft px-3 py-2.5">
+            <p className="eyebrow">Risque</p>
+            <p className="mt-1.5 text-sm font-semibold text-foreground">{risk.label}</p>
           </div>
-          <div className="mt-4 rounded-2xl border border-border bg-background px-4 py-4">
-            <p className="eyebrow">Resume du plan</p>
-            <p className="mt-2 text-sm leading-7 text-foreground">{analysis.explanation}</p>
-            {analysis.marketSignal ? (
-              <div className="surface-soft mt-4 flex items-start gap-2 px-3 py-3">
-                <Activity className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <p className="eyebrow">Contexte marche</p>
-                  <p className="mt-1 text-sm leading-6 text-foreground">{analysis.marketSignal}</p>
-                </div>
-              </div>
-            ) : null}
+          <div className="surface-soft px-3 py-2.5">
+            <p className="eyebrow">Mode</p>
+            <p className="mt-1.5 text-sm font-semibold text-foreground">{experienceGuide.label}</p>
+          </div>
+          <div className="surface-soft px-3 py-2.5">
+            <p className="eyebrow">Révision</p>
+            <p className="mt-1.5 text-sm font-semibold text-foreground">{analysis.nextReview ?? "—"}</p>
           </div>
         </div>
       </div>
@@ -1469,6 +1455,43 @@ ${advancedBlock}
           </div>
         </ResultSection>
       )}
+
+      {/* ── 6. Ce qu'on surveille ─────────────────────────────────────────── */}
+      {(analysis.watchList && analysis.watchList.length > 0) && (
+        <ResultSection eyebrow="Vigilance" title="Ce qu&apos;on surveille actuellement">
+          <div className="space-y-2.5">
+            {analysis.watchList.filter(Boolean).slice(0, 3).map((item, idx) => (
+              <div key={`watch-${idx}`} className="flex items-start gap-3 rounded-2xl border border-border bg-secondary/40 px-4 py-3">
+                <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-foreground/40" />
+                <p className="text-sm leading-6 text-muted-foreground">{item}</p>
+              </div>
+            ))}
+          </div>
+        </ResultSection>
+      )}
+
+      {/* ── 7. Discipline et horizon ─────────────────────────────────────── */}
+      <ResultSection eyebrow="Discipline" title="Horizon et cadre de suivi">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-border bg-secondary/40 px-4 py-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Prochaine révision</p>
+            <p className="mt-2 text-sm font-semibold text-foreground">{analysis.nextReview ?? "À définir selon le contexte"}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-secondary/40 px-4 py-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Approche</p>
+            <p className="mt-2 text-sm font-semibold text-foreground">{experienceGuide.label}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{experienceGuide.tone}</p>
+          </div>
+        </div>
+        <div className="mt-3 space-y-2">
+          {experienceGuide.takeaways.map((item, idx) => (
+            <div key={`takeaway-${idx}`} className="flex items-start gap-3">
+              <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-foreground/30" />
+              <p className="text-sm leading-6 text-muted-foreground">{item}</p>
+            </div>
+          ))}
+        </div>
+      </ResultSection>
 
       {lockedInsights.length > 0 ? (
         <div className="mt-4" data-testid="advisor-locked-pro-insights">
