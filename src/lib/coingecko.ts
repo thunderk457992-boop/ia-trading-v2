@@ -8,6 +8,11 @@ import {
 import { recordMarketEvent } from "@/lib/market-observability"
 import { fetchKrakenTickers, type KrakenTicker } from "@/lib/kraken"
 import { readSharedStale, writeSharedStale } from "@/lib/shared-market-cache"
+import {
+  fetchCoinPaprikaTickers,
+  fetchCoinPaprikaGlobal,
+  type CoinPaprikaMetrics,
+} from "@/lib/coinpaprika"
 
 export interface CryptoPrice {
   id: string
@@ -23,6 +28,7 @@ export interface CryptoPrice {
   sparkline7d: number[]
   categories?: string[]
   source?: "Kraken" | "CoinGecko" | "fallback"
+  metricsSource?: "CoinGecko" | "CoinPaprika"
   pair?: string | null
 }
 
@@ -249,9 +255,24 @@ function resolveCoinForAsset(
     ?? null
 }
 
+// Pick the best finite positive metric value — CoinGecko first, CoinPaprika fallback.
+function bestPositiveMetric(cg: number | undefined, cp: number | undefined): number {
+  if (Number.isFinite(cg) && (cg as number) > 0) return cg as number
+  if (Number.isFinite(cp) && (cp as number) > 0) return cp as number
+  return Number.NaN
+}
+
+// Pick the best finite change value (can be 0 or negative) — CoinGecko first.
+function bestChange(cg: number | undefined, cp: number | undefined): number {
+  if (Number.isFinite(cg)) return cg as number
+  if (Number.isFinite(cp)) return cp as number
+  return Number.NaN
+}
+
 function buildTrackedMarketPrices(
   coinGeckoPrices: CryptoPrice[],
-  krakenTickers: KrakenTicker[]
+  krakenTickers: KrakenTicker[],
+  coinPaprikaBySymbol: Map<string, CoinPaprikaMetrics>
 ) {
   const universe = getTrackedCryptoUniverse()
   const { byId, bySymbol } = mergePriceMaps(coinGeckoPrices, [])
@@ -265,13 +286,14 @@ function buildTrackedMarketPrices(
     .map((asset) => {
       const coin = resolveCoinForAsset(asset.symbol, byId, bySymbol)
       const krakenTicker = krakenBySymbol.get(asset.symbol)
+      const cpMetrics = coinPaprikaBySymbol.get(asset.symbol)
 
-      if (!coin && !krakenTicker) {
+      if (!coin && !krakenTicker && !cpMetrics) {
         unavailableAssets.push(asset.symbol)
         return null
       }
 
-      const price = krakenTicker?.price ?? coin?.price ?? null
+      const price = krakenTicker?.price ?? coin?.price ?? cpMetrics?.price ?? null
       if (price === null || !Number.isFinite(price) || price <= 0) {
         unavailableAssets.push(asset.symbol)
         return null
@@ -283,20 +305,37 @@ function buildTrackedMarketPrices(
           ? "fallback"
           : "CoinGecko"
 
+      // Enrich metrics: CoinGecko priority, CoinPaprika fallback
+      const marketCap = bestPositiveMetric(coin?.marketCap, cpMetrics?.marketCap)
+      const volume24h = bestPositiveMetric(coin?.volume24h, cpMetrics?.volume24h)
+      const change24h = bestChange(coin?.change24h, cpMetrics?.change24h)
+      const change7d  = bestChange(coin?.change7d,  cpMetrics?.change7d)
+      const change1h  = Number.isFinite(coin?.change1h) ? (coin?.change1h as number) : Number.NaN
+
+      // Track which source provided the metrics
+      const hasCGMetrics = coin !== null
+      const hasCPFilled  = !hasCGMetrics && cpMetrics !== undefined
+      const metricsSource: CryptoPrice["metricsSource"] = hasCGMetrics
+        ? "CoinGecko"
+        : hasCPFilled
+          ? "CoinPaprika"
+          : undefined
+
       return {
         id: coin?.id ?? asset.coingeckoId,
         symbol: asset.symbol,
-        name: coin?.name ?? asset.name,
+        name: coin?.name ?? cpMetrics?.symbol ?? asset.name,
         price,
-        change1h: coin?.change1h ?? Number.NaN,
-        change24h: coin?.change24h ?? Number.NaN,
-        change7d: coin?.change7d ?? Number.NaN,
-        marketCap: coin?.marketCap ?? Number.NaN,
-        volume24h: coin?.volume24h ?? Number.NaN,
+        change1h,
+        change24h,
+        change7d,
+        marketCap,
+        volume24h,
         image: coin?.image ?? "",
         sparkline7d: coin?.sparkline7d ?? [],
         categories: asset.categories,
         source,
+        metricsSource,
         pair: krakenTicker?.pair ?? null,
       }
     })
@@ -722,14 +761,29 @@ const fetchCoinMarketSeriesCached = unstable_cache(
 
 const fetchMarketSnapshotCached = unstable_cache(
   async () => {
-    const [rankedMarkets, global, krakenTickers] = await Promise.all([
+    // Fetch all sources in parallel — CoinPaprika never blocks the pipeline
+    const [rankedMarkets, cgGlobal, krakenTickers, cpTickers, cpGlobal] = await Promise.all([
       fetchMarketsData(100),
       fetchMarketGlobal(),
       fetchKrakenTickers().catch((error) => {
         console.warn("[Kraken] fetchMarketSnapshot fallback to CoinGecko only", error)
         return [] as KrakenTicker[]
       }),
+      fetchCoinPaprikaTickers().catch((error) => {
+        console.warn("[CoinPaprika] tickers unavailable in snapshot", error)
+        return new Map<string, CoinPaprikaMetrics>()
+      }),
+      fetchCoinPaprikaGlobal().catch((error) => {
+        console.warn("[CoinPaprika] global unavailable in snapshot", error)
+        return null
+      }),
     ])
+
+    // CoinGecko global takes priority; CoinPaprika is the fallback
+    const global = cgGlobal ?? cpGlobal
+    if (!cgGlobal && cpGlobal) {
+      console.info("[market] using CoinPaprika global data (CoinGecko global unavailable)")
+    }
 
     const trackedIds = getTrackedCryptoUniverse().map((asset) => asset.coingeckoId)
     const presentIds = new Set(rankedMarkets.map((coin) => coin.id))
@@ -737,13 +791,20 @@ const fetchMarketSnapshotCached = unstable_cache(
     const specificPrices = missingIds.length > 0
       ? await fetchSpecificCryptoPrices(missingIds)
       : []
+
     const { prices, summary } = buildTrackedMarketPrices(
       [...rankedMarkets, ...specificPrices],
-      krakenTickers
+      krakenTickers,
+      cpTickers
     )
 
     if (!prices.length) {
       throw new Error("Market snapshot unavailable")
+    }
+
+    const cpFilledCount = prices.filter((p) => p.metricsSource === "CoinPaprika").length
+    if (cpFilledCount > 0) {
+      console.info(`[market] CoinPaprika enriched ${cpFilledCount} assets (CoinGecko metrics absent)`)
     }
 
     const snapshot: MarketSnapshot = {
