@@ -40,6 +40,33 @@ const PRODUCT_TIMELINE = [
   "Plan d'entrée progressif et suivi du portefeuille",
 ] as const
 
+const ADVISOR_PREVIEW_FIELDS = [
+  {
+    label: "Budget",
+    value: "1 000 EUR",
+    detail: "Point de depart clair",
+    icon: Wallet,
+  },
+  {
+    label: "Risque",
+    value: "Modere",
+    detail: "Reponse a une baisse de 20%",
+    icon: Shield,
+  },
+  {
+    label: "Objectif",
+    value: "Construire progressivement",
+    detail: "Horizon 3-5 ans",
+    icon: Activity,
+  },
+] as const
+
+const DASHBOARD_PREVIEW_AXIS = [
+  "09 mai",
+  "11 mai",
+  "Aujourd'hui",
+] as const
+
 const HERO_METRICS = [
   { label: "Prix live", value: "CoinGecko + Kraken" },
   { label: "Historique", value: "Snapshots reels" },
@@ -222,6 +249,16 @@ interface HomePageClientProps {
 
 export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [analysesCount, setAnalysesCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetch("/api/public/stats", { next: { revalidate: 60 } })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.analysesCount != null) setAnalysesCount(data.analysesCount)
+      })
+      .catch(() => {})
+  }, [])
   const liveMarketRows = useMemo(
     () => LANDING_LIVE_MARKET_SYMBOLS
       .map((symbol) => marketSnapshot?.prices.find((coin) => coin.symbol === symbol) ?? null)
@@ -295,39 +332,63 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
 
   return (
     <div className="min-h-screen overflow-hidden bg-background">
-      <nav className="fixed left-0 right-0 top-0 z-50 border-b border-border/80 bg-background/92 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <AxiomLogo />
-          <div className="hidden items-center gap-7 md:flex">
-            <Link href="#product" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+      <nav className="fixed left-0 right-0 top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-lg">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <AxiomLogo />
+            <span className="hidden rounded-full border border-border bg-card px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground lg:inline-flex">
+              Plan crypto guide
+            </span>
+          </div>
+          <div className="hidden items-center gap-2 md:flex">
+            <Link
+              href="#product"
+              className="rounded-full px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+            >
               Produit
             </Link>
-            <Link href="#method" className="text-sm text-muted-foreground transition-colors hover:text-foreground"></Link>
-            <Link href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            <Link
+              href="#method"
+              className="rounded-full px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+            >
+              Methode
+            </Link>
+            <Link
+              href="#pricing"
+              className="rounded-full px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+            >
               Tarifs
             </Link>
             <Link
               href={navPrimaryHref}
               data-testid="home-nav-primary"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-full border border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-border hover:bg-card hover:text-foreground"
             >
               {navPrimaryLabel}
             </Link>
             <Link
               href={navSecondaryHref}
               data-testid="home-nav-secondary"
-              className="btn-primary min-h-0 px-4 py-2 text-sm"
+              className="btn-primary min-h-0 rounded-full px-4 py-2 text-sm shadow-card-xs"
             >
               {navSecondaryLabel}
             </Link>
           </div>
-          <Link
-            href={navSecondaryHref}
-            data-testid="home-mobile-primary"
-            className="btn-primary min-h-0 px-4 py-2 text-sm md:hidden"
-          >
-            {isAuthenticated ? "Dashboard" : "Tester"}
-          </Link>
+          <div className="flex items-center gap-2 md:hidden">
+            <Link
+              href={navPrimaryHref}
+              className="rounded-full border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+            >
+              {isAuthenticated ? "Dashboard" : "Login"}
+            </Link>
+            <Link
+              href={navSecondaryHref}
+              data-testid="home-mobile-primary"
+              className="btn-primary min-h-0 rounded-full px-3.5 py-2 text-sm shadow-card-xs"
+            >
+              {isAuthenticated ? "Analyse" : "Tester"}
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -378,6 +439,18 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                   valueClassName="mt-2 text-base font-semibold tracking-normal"
                 />
               ))}
+              {analysesCount !== null && analysesCount > 0 && (
+                <MetricCard
+                  label="Analyses générées"
+                  value={
+                    <span className="text-base font-semibold tracking-normal tabular-nums">
+                      {analysesCount.toLocaleString("fr-FR")}
+                    </span>
+                  }
+                  className="rounded-2xl p-4"
+                  valueClassName="mt-2 text-base font-semibold tracking-normal"
+                />
+              )}
             </div>
 
             <div className="mt-6">
@@ -475,137 +548,191 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
           </div>
 
           <div className="relative">
-            <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.18),transparent_42%)] blur-3xl" />
-            <div className="rounded-[32px] border border-white/10 bg-[#08090d] p-4 shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
-              <div className="rounded-[28px] border border-white/10 bg-gradient-to-b from-white/[0.08] to-white/[0.02] p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <AxiomLogo showBadge={false} />
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">
-                      Produit
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-medium text-white/50">
-                    {liveDataLabel ? `Derniere mise a jour ${liveDataLabel}` : "Derniere mise a jour en cours"}
+            <div className="absolute inset-x-10 inset-y-8 -z-10 rounded-[32px] bg-[radial-gradient(circle_at_top,rgba(182,147,87,0.12),transparent_62%)] blur-3xl" />
+            <div className="surface-card overflow-hidden rounded-[34px] p-4 sm:p-5">
+              <div className="mb-4 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <AxiomLogo showBadge={false} />
+                  <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Apercu produit
                   </span>
                 </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-dot" />
+                    Live
+                  </span>
+                  <span className="rounded-full border border-border bg-background px-2.5 py-1">
+                    {liveDataLabel ? `Mis a jour ${liveDataLabel}` : "Mise a jour en cours"}
+                  </span>
+                </div>
+              </div>
 
-                <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                  <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-                    <div className="mb-3 flex items-center justify-between">
+              <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
+                <div className="space-y-4">
+                  <div className="surface-soft rounded-[28px] p-4">
+                    <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                          Advisor IA
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Advisor preview
                         </p>
-                        <h2 className="mt-1 text-lg font-semibold text-white">Profil, risque, plan</h2>
+                        <h2 className="mt-1 text-lg font-semibold text-foreground">Profil, risque, plan</h2>
                       </div>
-                      <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold text-emerald-300">
+                      <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                         1 min
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {ADVISOR_PREVIEW_FIELDS.map((item) => {
+                        const Icon = item.icon
+                        return (
+                          <div
+                            key={item.label}
+                            className="rounded-2xl border border-border bg-background px-3.5 py-3"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-border bg-secondary">
+                                <Icon className="h-4 w-4 text-foreground" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                  {item.label}
+                                </p>
+                                <p className="mt-1 text-sm font-semibold leading-5 text-foreground">{item.value}</p>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="surface-soft rounded-[28px] p-4">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Allocation preview
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-foreground">Repartition cible et logique d&apos;equilibre</p>
                       </div>
+                      <span className="text-[11px] font-medium text-muted-foreground">Exposition coeur + satellites</span>
                     </div>
 
                     <div className="space-y-3">
-                      {[
-                        { label: "Budget", value: "1 000 EUR" },
-                        { label: "Risque", value: "Modere" },
-                        { label: "Objectif", value: "Construire un portefeuille progressif" },
-                      ].map((item) => (
-                        <div
-                          key={item.label}
-                          className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
-                        >
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-                            {item.label}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-white">{item.value}</p>
+                      {PRODUCT_ALLOCATION.map((item) => (
+                        <div key={item.asset} className="rounded-2xl border border-border bg-background px-3.5 py-3">
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <div className={`h-2 w-2 rounded-full ${item.tone}`} />
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-foreground">{item.asset}</p>
+                                <p className="text-[11px] text-muted-foreground">{item.label}</p>
+                              </div>
+                            </div>
+                            <span className="text-sm font-semibold tabular-nums text-foreground">{item.pct}%</span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                            <div className={`h-1.5 rounded-full ${item.tone}`} style={{ width: `${item.pct}%` }} />
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
+                </div>
 
-                  <div className="space-y-4">
-                    <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                            Dashboard
-                          </p>
-                          <p className="mt-1 text-lg font-semibold text-white">Historique reel</p>
-                        </div>
-                        <div className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold text-amber-200">
-                          Prix live
-                        </div>
+                <div className="space-y-4">
+                  <div className="surface-soft rounded-[28px] p-4">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Dashboard preview
+                        </p>
+                        <p className="mt-1 text-lg font-semibold text-foreground">Historique reel</p>
                       </div>
-
-                      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-                              Capital investi
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold text-white">2 000 EUR</p>
-                          </div>
-                          <div className="rounded-xl bg-emerald-400/10 px-3 py-1.5 text-sm font-semibold text-emerald-300">
-                            +8.4%
-                          </div>
-                        </div>
-
-                        <div className="mt-4 h-28 rounded-2xl border border-white/10 bg-gradient-to-b from-amber-400/10 to-transparent p-3">
-                          <div className="flex h-full items-end gap-2">
-                            {[24, 32, 28, 40, 52, 60, 56, 70, 82].map((height, index) => (
-                              <div key={index} className="flex-1 rounded-full bg-white/5">
-                                <div
-                                  className="w-full rounded-full bg-gradient-to-t from-amber-400 to-blue-400"
-                                  style={{ height: `${height}%` }}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                      <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Prix live
+                      </span>
                     </div>
 
-                    <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                          Allocation
-                        </p>
-                        <span className="text-[11px] font-medium text-white/50">Pourquoi cette allocation ?</span>
+                    <div className="rounded-[24px] border border-border bg-background p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                            Valeur portefeuille
+                          </p>
+                          <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground">28 781 EUR</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">09 mai {"->"} aujourd&apos;hui</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-emerald-700">+4,10%</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">Tendance stable</p>
+                        </div>
                       </div>
 
-                      <div className="space-y-3">
-                        {PRODUCT_ALLOCATION.map((item) => (
-                          <div key={item.asset}>
-                            <div className="mb-1.5 flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className={`h-2 w-2 rounded-full ${item.tone}`} />
-                                <span className="text-sm font-semibold text-white">{item.asset}</span>
-                                <span className="text-xs text-white/45">{item.label}</span>
-                              </div>
-                              <span className="text-sm font-semibold text-white">{item.pct}%</span>
-                            </div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                              <div className={`h-1.5 rounded-full ${item.tone}`} style={{ width: `${item.pct}%` }} />
+                      <div className="mt-4 overflow-hidden rounded-[22px] border border-border bg-[linear-gradient(180deg,#ffffff_0%,#fbfbf8_100%)] px-3 py-3">
+                        <div className="mb-3 grid grid-cols-4 gap-2 text-[10px] text-muted-foreground">
+                          <span>Prix live</span>
+                          <span>Historique reel</span>
+                          <span>Dernier snapshot</span>
+                          <span className="text-right">Kraken / CoinGecko</span>
+                        </div>
+                        <div className="relative h-28">
+                          <div className="absolute inset-0 grid grid-rows-4">
+                            {[0, 1, 2, 3].map((row) => (
+                              <div key={row} className="border-t border-border/70" />
+                            ))}
+                          </div>
+                          <div className="absolute inset-x-0 bottom-4 top-4">
+                            <div className="absolute inset-0">
+                              <svg viewBox="0 0 320 120" className="h-full w-full" preserveAspectRatio="none">
+                                <defs>
+                                  <linearGradient id="axiom-preview-fill" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#b69357" stopOpacity="0.16" />
+                                    <stop offset="100%" stopColor="#b69357" stopOpacity="0" />
+                                  </linearGradient>
+                                </defs>
+                                <path
+                                  d="M 0 90 C 20 78, 30 72, 40 74 C 55 76, 65 86, 80 82 C 95 78, 110 60, 125 54 C 142 47, 160 44, 175 48 C 192 52, 205 67, 220 60 C 238 51, 252 24, 270 18 C 288 12, 304 16, 320 10 L 320 120 L 0 120 Z"
+                                  fill="url(#axiom-preview-fill)"
+                                />
+                                <path
+                                  d="M 0 90 C 20 78, 30 72, 40 74 C 55 76, 65 86, 80 82 C 95 78, 110 60, 125 54 C 142 47, 160 44, 175 48 C 192 52, 205 67, 220 60 C 238 51, 252 24, 270 18 C 288 12, 304 16, 320 10"
+                                  fill="none"
+                                  stroke="#3f5f93"
+                                  strokeWidth="2.25"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                        <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+                          {DASHBOARD_PREVIEW_AXIS.map((label) => (
+                            <span key={label}>{label}</span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  {PRODUCT_TIMELINE.map((item, index) => (
-                    <div
-                      key={item}
-                      className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
-                    >
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-                        Etape 0{index + 1}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-white/85">{item}</p>
-                    </div>
-                  ))}
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {PRODUCT_TIMELINE.map((item, index) => (
+                      <div
+                        key={item}
+                        className="relative rounded-[24px] border border-border bg-card px-4 py-4 shadow-card-xs transition-transform duration-150 hover:-translate-y-0.5"
+                      >
+                        {index < PRODUCT_TIMELINE.length - 1 ? (
+                          <span className="absolute right-[-12px] top-1/2 hidden h-px w-6 -translate-y-1/2 bg-border md:block" />
+                        ) : null}
+                        <div className="mb-3 inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-border bg-secondary px-2 text-[10px] font-semibold text-muted-foreground">
+                          0{index + 1}
+                        </div>
+                        <p className="text-sm leading-6 text-foreground">{item}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1062,4 +1189,3 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
     </div>
   )
 }
-
