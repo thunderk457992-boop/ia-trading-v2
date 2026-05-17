@@ -31,7 +31,7 @@ const ASSET_PALETTE: Record<string, { bg: string; text: string; bar: string; dot
   POL:  { bg: "bg-background", text: "text-foreground", bar: "bg-violet-600", dot: "bg-violet-600" },
   DOGE: { bg: "bg-background", text: "text-foreground", bar: "bg-amber-500", dot: "bg-amber-500" },
   TON:  { bg: "bg-background", text: "text-foreground", bar: "bg-sky-400", dot: "bg-sky-400" },
-  USDC: { bg: "bg-background", text: "text-foreground", bar: "bg-emerald-500", dot: "bg-emerald-500" },
+  USDC: { bg: "bg-background", text: "text-foreground", bar: "bg-success", dot: "bg-success" },
   USDT: { bg: "bg-background", text: "text-foreground", bar: "bg-green-500", dot: "bg-green-500" },
 }
 
@@ -124,7 +124,7 @@ export function ChatPortfolioCard({ plan }: { plan: PortfolioPlan }) {
       {plan.avoid && plan.avoid.length > 0 && (
         <div className="border-t border-border px-4 py-3">
           <div className="mb-2 flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
               À éviter pour l&apos;instant
             </p>
@@ -133,7 +133,7 @@ export function ChatPortfolioCard({ plan }: { plan: PortfolioPlan }) {
             {plan.avoid.map((item) => (
               <span
                 key={item}
-                className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700"
+                className="rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning"
               >
                 {item}
               </span>

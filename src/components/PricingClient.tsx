@@ -552,7 +552,7 @@ export function PricingClient({
       )}
 
       {checkoutError && (
-        <div className="mx-auto mb-8 flex max-w-lg items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-card-xs">
+        <div className="mx-auto mb-8 flex max-w-lg items-start gap-2 rounded-2xl border border-destructive/30 bg-destructive/8 p-4 text-sm text-destructive shadow-card-xs">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{checkoutError}</span>
         </div>

@@ -130,14 +130,14 @@ function LoginForm() {
       </div>
 
       {info ? (
-        <div className="flex items-start gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm">
+        <div className="flex items-start gap-2 px-4 py-3 bg-success/10 border border-success/30 rounded-xl text-success text-sm">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           {info}
         </div>
       ) : null}
 
       {error ? (
-        <div className="flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+        <div className="flex items-start gap-2 px-4 py-3 bg-destructive/8 border border-destructive/30 rounded-xl text-destructive text-sm">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           {error}
         </div>
@@ -153,7 +153,7 @@ function LoginForm() {
       </button>
 
       {resetSent ? (
-        <div className="flex items-center gap-2 text-emerald-700 text-xs bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
+        <div className="flex items-center gap-2 text-success text-xs bg-success/10 px-3 py-2 rounded-lg border border-success/30">
           <Check className="w-3.5 h-3.5 shrink-0" />
           Email envoyé ! Vérifiez votre boite mail.
         </div>

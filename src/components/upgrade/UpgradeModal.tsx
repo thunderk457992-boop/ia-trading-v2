@@ -22,7 +22,7 @@ const TARGET_LABELS: Record<string, { label: string; color: string; icon: React.
   },
   premium: {
     label: "Premium",
-    color: "border-amber-300 bg-amber-50 text-amber-800",
+    color: "border-accent/40 bg-accent/10 text-foreground",
     icon: <Crown className="h-3.5 w-3.5" />,
   },
 }

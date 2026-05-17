@@ -334,7 +334,7 @@ function ScoreGauge({ score }: { score: number }) {
   const bgArc  = `M ${s.x} ${s.y} A ${r} ${r} 0 0 1 ${e.x} ${e.y}`
   const fillArc = `M ${s.x} ${s.y} A ${r} ${r} 0 ${pct > 0.5 ? "0" : "0"} 1 ${f.x} ${f.y}`
 
-  const color = score >= 85 ? "#3f8f78" : score >= 70 ? "#b69357" : "#a35f68"
+  const color = score >= 85 ? "var(--success)" : score >= 70 ? "var(--accent)" : "var(--destructive)"
   const label = score >= 85 ? "Excellent" : score >= 70 ? "Solide" : "À affiner"
 
   return (

@@ -246,7 +246,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
             <p className="text-sm font-medium text-foreground">Conversation</p>
             <span className={cn(
               "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-              isNearQuota ? "border-amber-200 bg-amber-50 text-amber-700" : "border-border bg-secondary text-muted-foreground"
+              isNearQuota ? "border-warning/30 bg-warning/10 text-warning" : "border-border bg-secondary text-muted-foreground"
             )}>
               <Sparkles className="h-3 w-3" />
               {usage.limit === null ? `${usage.used} envoyés` : `${usage.used}/${usage.limit}`}
@@ -303,7 +303,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
           <div className="border-t border-border bg-card/95 px-4 py-4 backdrop-blur-sm sm:px-5 safe-area-bottom">
             {/* Error */}
             {error && (
-              <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="mb-3 rounded-2xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive">
                 <div className="flex items-start gap-2">
                   <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
                   <div>
@@ -415,7 +415,7 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
             <ul className="mt-3 space-y-2">
               {planConfig.features.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-foreground">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
                   {f}
                 </li>
               ))}
@@ -468,8 +468,8 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
                   <p className="text-sm font-semibold text-foreground">{marketDecision.label}</p>
                   <span className={cn(
                     "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                    marketDecision.riskLevel === "prudent"     ? "bg-amber-50 text-amber-700"
-                    : marketDecision.riskLevel === "opportuniste" ? "bg-emerald-50 text-emerald-700"
+                    marketDecision.riskLevel === "prudent"     ? "bg-warning/10 text-warning"
+                    : marketDecision.riskLevel === "opportuniste" ? "bg-success/10 text-success"
                     : "bg-secondary text-foreground"
                   )}>
                     {marketDecision.riskLevel}

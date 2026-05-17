@@ -276,17 +276,17 @@ export default function HowItWorksPage() {
       </section>
 
       {/* Disclaimer */}
-      <section className="mt-6 rounded-[32px] border border-amber-200 bg-amber-50 px-6 py-7 sm:px-8">
+      <section className="mt-6 rounded-[32px] border border-warning/30 bg-warning/8 px-6 py-7 sm:px-8">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
           <div>
             <h2 className="text-lg font-semibold text-foreground">Limite claire du produit</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
               Axiom AI est un outil d&apos;aide à la décision pédagogique. Il ne constitue pas un service de conseil en investissement
               financier agréé. Aucune allocation produite par Axiom ne garantit de performance future. Les marchés crypto
               peuvent subir des baisses sévères et imprévisibles. Vous restez responsable de vos décisions d&apos;investissement.
             </p>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
               Pour en savoir plus sur notre approche de la transparence, consultez{" "}
               <Link href="/transparency" className="font-semibold underline underline-offset-2">
                 la page Transparence

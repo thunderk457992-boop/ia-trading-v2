@@ -31,7 +31,7 @@ const PRODUCT_ALLOCATION = [
   { asset: "ETH", pct: 28, label: "Ethereum", tone: "bg-blue-500" },
   { asset: "SOL", pct: 14, label: "Solana", tone: "bg-violet-500" },
   { asset: "BNB", pct: 9, label: "BNB", tone: "bg-yellow-400" },
-  { asset: "USDC", pct: 7, label: "Reserve", tone: "bg-emerald-500" },
+  { asset: "USDC", pct: 7, label: "Reserve", tone: "bg-success" },
 ] as const
 
 const PRODUCT_TIMELINE = [
@@ -534,7 +534,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {topMover && (
-                      <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700">
+                      <div className="rounded-full border border-success/30 bg-success/10 px-3 py-1.5 text-[11px] font-semibold text-success">
                         Mouvement fort : {topMover.symbol} {topMover.change24h >= 0 ? "+" : ""}{topMover.change24h.toFixed(1)}%
                       </div>
                     )}
@@ -576,7 +576,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                           <p className="mt-1 text-[11px] text-muted-foreground">{coin.name}</p>
                         </div>
                         <div className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                          coin.change24h >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                          coin.change24h >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
                         }`}>
                           {coin.change24h >= 0 ? "+" : ""}{coin.change24h.toFixed(1)}%
                         </div>
@@ -616,7 +616,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-dot" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-dot" />
                     Live
                   </span>
                   <span className="rounded-full border border-border bg-background px-2.5 py-1">
@@ -723,7 +723,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                           <p className="mt-1 text-[11px] text-muted-foreground">09 mai {"->"} aujourd&apos;hui</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold text-emerald-700">+4,10%</p>
+                          <p className="text-sm font-semibold text-success">+4,10%</p>
                           <p className="mt-1 text-[11px] text-muted-foreground">Tendance stable</p>
                         </div>
                       </div>
@@ -902,7 +902,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
               <ul className="mt-5 space-y-3">
                 {EXPECTATION_ITEMS.does.map((item) => (
                   <li key={item} className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                     <span className="text-sm leading-6 text-muted-foreground">{item}</span>
                   </li>
                 ))}
@@ -1008,8 +1008,8 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
               </div>
 
               <div className="border-t border-border p-5 sm:p-6 lg:border-l lg:border-t-0">
-                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                <div className="rounded-3xl border border-success/30 bg-success/10 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-success">
                     Ce que vous devez faire maintenant
                   </p>
                   <ol className="mt-4 space-y-3">
@@ -1019,10 +1019,10 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                       "Garder une reserve pour ne pas transformer la volatilite en panique.",
                     ].map((step, index) => (
                       <li key={step} className="flex items-start gap-3">
-                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-[11px] font-bold text-white">
+                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success text-[11px] font-bold text-white">
                           {index + 1}
                         </div>
-                        <p className="text-sm leading-6 text-slate-700">{step}</p>
+                        <p className="text-sm leading-6 text-muted-foreground">{step}</p>
                       </li>
                     ))}
                   </ol>
@@ -1100,7 +1100,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                         ou {formatHomePrice(plan.price.yearly)} / an
                       </p>
                     ) : (
-                      <p className="mt-2 text-xs font-medium text-emerald-700">Aucune carte requise</p>
+                      <p className="mt-2 text-xs font-medium text-success">Aucune carte requise</p>
                     )}
                   </div>
 

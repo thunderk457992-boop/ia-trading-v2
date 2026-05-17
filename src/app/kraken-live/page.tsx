@@ -118,8 +118,8 @@ function sourceLabel(source: LiveMarketAsset["source"]) {
 }
 
 function sourceClasses(source: LiveMarketAsset["source"]) {
-  if (source === "Kraken") return "border-emerald-200 bg-emerald-50 text-emerald-700"
-  if (source === "fallback") return "border-amber-200 bg-amber-50 text-amber-700"
+  if (source === "Kraken") return "border-success/30 bg-success/10 text-success"
+  if (source === "fallback") return "border-warning/30 bg-warning/10 text-warning"
   return "border-border bg-secondary text-muted-foreground"
 }
 
@@ -272,8 +272,8 @@ export default function KrakenLivePage() {
 
           <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
             {!isEmpty && !fetchError ? (
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-success" />
                 Live
               </div>
             ) : null}
@@ -286,7 +286,7 @@ export default function KrakenLivePage() {
               {updatedAtLabel ? `${data?.stale ? "Dernier jeu conserve a" : "Mis a jour a"} ${updatedAtLabel}` : "En attente de donnees"}
             </span>
             {data?.stale ? (
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+              <span className="rounded-full border border-warning/30 bg-warning/10 px-3 py-1 text-[11px] font-semibold text-warning">
                 Lecture stale securisee
               </span>
             ) : null}
@@ -395,7 +395,7 @@ export default function KrakenLivePage() {
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-semibold tabular-nums text-foreground">{formatPrice(asset.price)}</p>
-                              <p className={cn("text-[11px] font-semibold", positive ? "text-emerald-600" : "text-red-600")}>
+                              <p className={cn("text-[11px] font-semibold", positive ? "text-success" : "text-destructive")}>
                                 {showVolume ? formatCompact(asset.volume24h) : formatChange(asset.change24h)}
                               </p>
                             </div>
@@ -502,7 +502,7 @@ export default function KrakenLivePage() {
                           </div>
                           <div className={cn(
                             "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                            positive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                            positive ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
                           )}>
                             {formatChange(asset.change24h)}
                           </div>

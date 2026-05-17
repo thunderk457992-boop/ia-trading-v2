@@ -45,8 +45,8 @@ const dataSources = [
     ],
     frequency: "Rafraîchissement toutes les ~5 minutes",
     limitation: "CoinGecko peut être momentanément indisponible. Dans ce cas, Axiom l'indique clairement et aucun prix n'est inventé.",
-    color: "border-emerald-200 bg-emerald-50",
-    badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    color: "border-success/30 bg-success/10",
+    badge: "border-success/30 bg-success/10 text-success",
   },
   {
     icon: Zap,
@@ -201,9 +201,9 @@ export default function TransparencyPage() {
                     ))}
                   </ul>
 
-                  <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-                    <p className="text-[12px] leading-5 text-amber-900">{source.limitation}</p>
+                  <div className="mt-4 flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/8 px-3 py-2.5">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                    <p className="text-[12px] leading-5 text-muted-foreground">{source.limitation}</p>
                   </div>
                 </div>
               </div>
@@ -262,22 +262,22 @@ export default function TransparencyPage() {
       </section>
 
       {/* Statut légal */}
-      <section className="mt-6 rounded-[32px] border border-amber-200 bg-amber-50 px-6 py-7 sm:px-8">
+      <section className="mt-6 rounded-[32px] border border-warning/30 bg-warning/8 px-6 py-7 sm:px-8">
         <div className="flex items-start gap-3">
-          <Shield className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+          <Shield className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
           <div>
             <h2 className="text-lg font-semibold text-foreground">Statut légal — Important</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
               <strong>Axiom AI n&apos;est pas un conseiller en investissements financiers agréé (CIF).</strong> Les analyses
               produites sont des outils pédagogiques d&apos;aide à la décision. Elles ne constituent pas des recommandations
               financières au sens réglementaire du terme (AMF, ESMA).
             </p>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
               Les marchés crypto peuvent subir des baisses sévères et imprévisibles. Investir comporte un risque de perte
               en capital, potentiellement total. Axiom ne gère pas vos actifs et ne peut pas être tenu responsable des
               décisions prises à partir de ses analyses.
             </p>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
               Si vous gérez des sommes significatives, nous recommandons de consulter un professionnel réglementé.
             </p>
           </div>

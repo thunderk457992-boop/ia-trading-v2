@@ -240,12 +240,12 @@ export default function GuidePage() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-[32px] border border-amber-200 bg-amber-50 px-6 py-7 shadow-card sm:px-8">
+      <section className="mt-6 rounded-[32px] border border-warning/30 bg-warning/8 px-6 py-7 shadow-card sm:px-8">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
           <div>
             <h2 className="text-xl font-semibold text-foreground">Limite claire du produit</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
               Axiom ne promet pas de gains, ne cache pas le risque et ne fait pas semblant de savoir ou ira le marche.
               Le produit sert a structurer une strategie, a expliciter le risque et a transformer des donnees marche
               en decisions plus rationnelles.

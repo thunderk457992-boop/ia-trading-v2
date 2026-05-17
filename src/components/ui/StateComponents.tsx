@@ -60,16 +60,16 @@ export function DataUnavailableState({
   lastUpdated,
 }: DataUnavailableStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-200 bg-white">
-        <AlertTriangle className="h-4.5 w-4.5 text-amber-700" />
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-warning/30 bg-warning/8 px-6 py-8 text-center">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-warning/30 bg-card">
+        <AlertTriangle className="h-4.5 w-4.5 text-warning" />
       </div>
       <p className="text-sm font-semibold text-foreground">{title}</p>
-      <p className="mt-1.5 max-w-xs text-[13px] leading-6 text-amber-900/70">
+      <p className="mt-1.5 max-w-xs text-[13px] leading-6 text-muted-foreground">
         {message ?? "Les données de marché sont temporairement inaccessibles. La page se met à jour automatiquement."}
       </p>
       {lastUpdated && (
-        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-700">
+        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-warning">
           <Clock className="h-3 w-3" />
           <span>Dernière donnée : {lastUpdated}</span>
         </div>
@@ -77,7 +77,7 @@ export function DataUnavailableState({
       {onRetry && retryLabel && (
         <button
           onClick={onRetry}
-          className="mt-4 rounded-xl border border-amber-200 bg-white px-4 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-amber-50"
+          className="mt-4 rounded-xl border border-border bg-card px-4 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
         >
           {retryLabel}
         </button>

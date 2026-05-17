@@ -245,7 +245,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
           </div>
 
           {saveStatus === "error" ? (
-            <div className="flex items-center gap-2 text-red-600 text-sm px-3 py-2 bg-red-50 rounded-xl border border-red-200">
+            <div className="flex items-center gap-2 text-destructive text-sm px-3 py-2 bg-destructive/8 rounded-xl border border-destructive/30">
               <AlertCircle className="w-4 h-4" />
               Erreur lors de la sauvegarde. Reessayez.
             </div>
@@ -307,7 +307,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
               )}
             </div>
             {portalError ? (
-              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/8 px-3 py-2 text-sm text-destructive">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>{portalError}</p>
               </div>
@@ -331,8 +331,8 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                         className={cn(
                           "text-xs px-2 py-0.5 rounded-md font-medium",
                           payment.status === "succeeded"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-red-50 text-red-600 border border-red-200"
+                            ? "bg-success/10 text-success border border-success/30"
+                            : "bg-destructive/10 text-destructive border border-destructive/30"
                         )}
                       >
                         {payment.status === "succeeded" ? "Reussi" : "Echoue"}
@@ -367,7 +367,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
               Un email de reinitialisation sera envoye a <strong className="text-foreground">{user.email}</strong>
             </p>
             {resetSent ? (
-              <div className="flex items-center gap-2 text-emerald-700 text-sm bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
+              <div className="flex items-center gap-2 text-success text-sm bg-success/10 px-3 py-2 rounded-lg border border-success/30">
                 <Check className="w-4 h-4" />
                 Email envoye ! Verifiez votre boite mail.
               </div>
@@ -386,15 +386,15 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
           <div className="p-4 rounded-xl bg-secondary border border-border">
             <div className="text-sm font-semibold text-foreground mb-1 flex items-center gap-2">
               Authentification a deux facteurs
-              <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md font-semibold">
+              <span className="text-xs bg-warning/10 text-warning border border-warning/30 px-1.5 py-0.5 rounded-md font-semibold">
                 Bientot
               </span>
             </div>
             <p className="text-xs text-muted-foreground">Securisez votre compte avec une application d&apos;authentification.</p>
           </div>
 
-          <div className="p-4 rounded-xl bg-red-50 border border-red-200">
-            <div className="text-sm font-semibold text-red-600 mb-1">Zone de danger</div>
+          <div className="p-4 rounded-xl bg-destructive/8 border border-destructive/30">
+            <div className="text-sm font-semibold text-destructive mb-1">Zone de danger</div>
             <p className="text-xs text-muted-foreground mb-3">
               La suppression de votre compte est irreversible. Avec le schema actuel, les donnees reliees a votre profil seront egalement supprimees.
             </p>
@@ -410,9 +410,9 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                 Supprimer mon compte
               </button>
             ) : (
-              <div role="dialog" aria-modal="true" className="space-y-3 rounded-xl border border-red-200 bg-card p-4">
+              <div role="dialog" aria-modal="true" className="space-y-3 rounded-xl border border-destructive/30 bg-card p-4">
                 <div>
-                  <p className="text-sm font-semibold text-red-600">Cette action supprimera definitivement votre compte.</p>
+                  <p className="text-sm font-semibold text-destructive">Cette action supprimera definitivement votre compte.</p>
                   <p className="mt-1 text-xs text-muted-foreground">Tapez DELETE pour confirmer. Vous serez ensuite deconnecte.</p>
                 </div>
                 <input
@@ -423,7 +423,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring"
                 />
                 {deleteError ? (
-                  <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive">
                     <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     <p>{deleteError}</p>
                   </div>

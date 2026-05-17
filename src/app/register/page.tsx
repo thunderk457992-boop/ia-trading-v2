@@ -51,7 +51,7 @@ export default function RegisterPage() {
   })()
 
   const strengthLabel = ["", "Faible", "Moyen", "Bon", "Fort"][passwordStrength]
-  const strengthColor = ["", "bg-red-400", "bg-amber-400", "bg-blue-500", "bg-emerald-500"][passwordStrength]
+  const strengthColor = ["", "bg-destructive", "bg-warning", "bg-ring", "bg-success"][passwordStrength]
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -113,8 +113,8 @@ export default function RegisterPage() {
     return (
       <div className="min-h-screen bg-background overflow-y-auto flex items-start justify-center px-4 py-10 sm:items-center sm:px-6 sm:py-12">
         <div className="text-center max-w-sm">
-          <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-7 h-7 text-emerald-600" />
+          <div className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center mx-auto mb-6">
+            <Mail className="w-7 h-7 text-success" />
           </div>
           <h2 className="text-2xl font-bold text-foreground mb-3">Verifiez votre email</h2>
           <p className="text-muted-foreground text-sm mb-4 leading-relaxed">
@@ -227,7 +227,7 @@ export default function RegisterPage() {
             </div>
 
             {error ? (
-              <div className="flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+              <div className="flex items-start gap-2 px-4 py-3 bg-destructive/8 border border-destructive/30 rounded-xl text-destructive text-sm">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 {error}
               </div>
@@ -275,7 +275,7 @@ export default function RegisterPage() {
         <div className="mt-6 flex items-center justify-center gap-6">
           {["Gratuit pour commencer", "Sans carte de credit"].map((text) => (
             <div key={text} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Check className="w-3.5 h-3.5 text-emerald-500" />
+              <Check className="w-3.5 h-3.5 text-success" />
               {text}
             </div>
           ))}

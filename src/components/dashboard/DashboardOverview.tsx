@@ -138,8 +138,8 @@ function getMarketSourceLabel(source: CryptoPrice["source"]) {
 }
 
 function getMarketSourceClasses(source: CryptoPrice["source"]) {
-  if (source === "Kraken") return "border-emerald-200 bg-emerald-50 text-emerald-700"
-  if (source === "fallback") return "border-amber-200 bg-amber-50 text-amber-700"
+  if (source === "Kraken") return "border-success/30 bg-success/10 text-success"
+  if (source === "fallback") return "border-warning/30 bg-warning/10 text-warning"
   return "border-border bg-secondary text-muted-foreground"
 }
 function fmtPortfolioEuroDelta(value: number | null | undefined) {
@@ -527,16 +527,16 @@ function MarketOverviewTable({ cryptoPrices }: { cryptoPrices: CryptoPrice[] }) 
         <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-muted-foreground">
           {displayed.length} actifs suivis
         </span>
-        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">
+        <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-success">
           {positives} en hausse
         </span>
-        <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-red-700">
+        <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-destructive">
           {negatives} en baisse
         </span>
         <span className="rounded-full border border-border bg-secondary px-2.5 py-1 text-muted-foreground">
           {krakenCount} via Kraken
         </span>
-        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-700">
+        <span className="rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-warning">
           {fallbackCount} en fallback
         </span>
       </div>
@@ -1331,7 +1331,7 @@ export function DashboardOverview({
                     key={coin.id}
                     className={cn(
                       "rounded-xl border px-3 py-3 transition-transform hover:-translate-y-0.5",
-                      coin.change24h >= 0 ? "border-emerald-200 bg-emerald-50/70" : "border-red-200 bg-red-50/70"
+                      coin.change24h >= 0 ? "border-success/30 bg-success/10" : "border-destructive/30 bg-destructive/10"
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -1501,7 +1501,7 @@ export function DashboardOverview({
                 {advisorOutput.executionNow[0] && (
                   <div className="rounded-xl border border-border bg-secondary/60 px-3 py-3">
                     <div className="flex items-center gap-2 mb-1.5">
-                      <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <Check className="h-3.5 w-3.5 text-success shrink-0" />
                       <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Action principale</span>
                     </div>
                     <p className="text-[12px] font-semibold text-foreground leading-relaxed">
@@ -1527,7 +1527,7 @@ export function DashboardOverview({
                 {advisorOutput.nextReview && (
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
-                      <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <Clock className="h-3.5 w-3.5 text-warning shrink-0" />
                       <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{"Prochaine \u00e9tape"}</span>
                     </div>
                     <p className="text-[12px] text-muted-foreground leading-relaxed">{advisorOutput.nextReview}</p>
@@ -1537,13 +1537,13 @@ export function DashboardOverview({
                 {advisorOutput.errorsToAvoid.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
-                      <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                      <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
                       <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{"\u00c0 \u00e9viter"}</span>
                     </div>
                     <ul className="space-y-1.5">
                       {advisorOutput.errorsToAvoid.map((item, index) => (
                         <li key={`${item}-${index}`} className="flex items-start gap-2 text-[12px] text-muted-foreground leading-relaxed">
-                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-red-300 shrink-0" />
+                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-destructive/60 shrink-0" />
                           <span>{item}</span>
                         </li>
                       ))}
