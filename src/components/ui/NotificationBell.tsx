@@ -94,27 +94,33 @@ export function NotificationBell() {
     <div className="relative" ref={panelRef}>
       <button
         onClick={handleOpen}
-        className="relative flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        aria-label="Notifications"
+        className="focus-ring relative flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        aria-label={unreadCount > 0 ? `Notifications (${unreadCount} non lue${unreadCount > 1 ? "s" : ""})` : "Notifications"}
+        aria-expanded={open}
+        aria-haspopup="dialog"
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-4 w-4" aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-foreground text-[9px] font-bold text-background">
+          <span
+            className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-foreground text-[9px] font-bold text-background"
+            aria-hidden="true"
+          >
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 z-50 w-80 rounded-2xl border border-border bg-card shadow-2xl animate-fade-in">
+        <div className="absolute right-0 top-10 z-50 w-80 rounded-2xl border border-border bg-card shadow-2xl animate-fade-in" role="dialog" aria-label="Panneau de notifications">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h3 className="text-[13px] font-semibold text-foreground">Notifications</h3>
             {unreadCount > 0 && (
               <button
                 onClick={() => void markAllRead()}
-                className="flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Marquer toutes les notifications comme lues"
+                className="focus-ring flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
               >
-                <CheckCheck className="h-3 w-3" />
+                <CheckCheck className="h-3 w-3" aria-hidden="true" />
                 Tout marquer lu
               </button>
             )}

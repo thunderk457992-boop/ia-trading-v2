@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 import { NotificationBell } from "@/components/ui/NotificationBell"
 
 const navItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", mobileLabel: "Dashboard" },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord", mobileLabel: "Accueil" },
   { href: "/advisor", icon: Brain, label: "Conseiller IA", mobileLabel: "IA" },
   { href: "/chat", icon: MessageSquare, label: "Chat IA", mobileLabel: "Chat" },
   { href: "/kraken-live", icon: Activity, label: "Kraken Live", mobileLabel: "Kraken" },
@@ -131,14 +131,15 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all",
+                    "focus-ring flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all",
                     active
                       ? "bg-foreground text-background shadow-card-xs"
                       : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                   )}
                 >
-                  <item.icon className="h-4 w-4 shrink-0" />
+                  <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>{item.label}</span>
                 </Link>
               )
@@ -174,27 +175,27 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
           <div className="mt-4 border-t border-border/80 pt-4">
             <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</p>
             <div className="space-y-0.5">
-              <Link href="/settings?tab=notifications" className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+              <Link href="/settings?tab=notifications" className="focus-ring flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
                 <Bell className="h-3.5 w-3.5" />
                 <span>Notifications</span>
               </Link>
-              <Link href="/advisor" className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+              <Link href="/advisor" className="focus-ring flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
                 <Brain className="h-3.5 w-3.5" />
                 <span>Nouvelle analyse</span>
               </Link>
-              <Link href="/chat" className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+              <Link href="/chat" className="focus-ring flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
                 <MessageSquare className="h-3.5 w-3.5" />
                 <span>Ouvrir le chat</span>
               </Link>
-              <Link href="/guide" className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+              <Link href="/guide" className="focus-ring flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>Guide méthodologie</span>
               </Link>
-              <Link href="/how-it-works" className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+              <Link href="/how-it-works" className="focus-ring flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>Comment ça marche</span>
               </Link>
-              <Link href="/transparency" className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+              <Link href="/transparency" className="focus-ring flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>Transparence</span>
               </Link>
@@ -203,7 +204,7 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
                 onClick={() => void handleSupportClick()}
                 title="Support Axiom - Contactez-nous pour toute question"
                 aria-label="Contacter le support Axiom par email"
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="focus-ring flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               >
                 <HelpCircle className="h-3.5 w-3.5" />
                 <span>Support</span>
@@ -255,7 +256,7 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
               <button
                 onClick={handleLogout}
                 aria-label="Deconnexion"
-                className="shrink-0 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="focus-ring shrink-0 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 title="Deconnexion"
               >
                 <LogOut className="h-4 w-4" />
@@ -282,7 +283,7 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
             onClick={handleLogout}
             aria-label="Deconnexion"
             title="Deconnexion"
-            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            className="focus-ring inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <LogOut className="h-4 w-4" />
             <span>Deconnexion</span>
@@ -298,12 +299,14 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl py-2.5 text-[9px] font-medium leading-tight transition-colors",
+                "focus-ring relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl py-2.5 text-[9px] font-medium leading-tight transition-colors",
                 active ? "text-foreground" : "text-muted-foreground"
               )}
             >
-              <item.icon className="h-5 w-5" />
+              <item.icon className="h-5 w-5" aria-hidden="true" />
               <span className="whitespace-nowrap">{item.mobileLabel}</span>
               {active && (
                 <div className="absolute -top-0.5 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-foreground" />
@@ -315,4 +318,3 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
     </>
   )
 }
-

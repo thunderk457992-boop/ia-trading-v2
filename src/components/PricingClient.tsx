@@ -514,8 +514,8 @@ export function PricingClient({
             )}
           >
             Annuel
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-              Jusqu&apos;a -{MAX_YEARLY_DISCOUNT}%
+            <span className="badge badge-live px-2 py-0.5 text-[10px]">
+              -{MAX_YEARLY_DISCOUNT}%
             </span>
           </button>
         </div>
@@ -541,7 +541,7 @@ export function PricingClient({
       {showSuccessNotice && (
         <div
           data-testid="pricing-success-banner"
-          className="mx-auto mb-8 flex max-w-lg items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 shadow-card-xs"
+          className="mx-auto mb-8 flex max-w-lg items-start gap-2 rounded-2xl border border-border bg-card p-4 text-sm text-foreground shadow-card-xs"
         >
           <CreditCard className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
@@ -665,12 +665,12 @@ export function PricingClient({
                 </div>
 
                 {price === 0 ? (
-                  <p className="mt-2 text-xs font-medium text-emerald-700">Aucune carte requise</p>
+                  <p className="mt-2 text-xs font-medium text-success">Aucune carte requise</p>
                 ) : null}
 
                 {price > 0 && billing === "monthly" && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-emerald-700">
+                    <p className="text-xs font-medium text-success">
                       {formatEuro(plan.price.yearly)} / an - economisez {formatEuro(yearlySavings)}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -682,10 +682,10 @@ export function PricingClient({
                 {price > 0 && billing === "yearly" && (
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                      <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-success">
                         -{yearlyDiscount}%
                       </span>
-                      <span className="text-xs font-medium text-emerald-700">
+                      <span className="text-xs font-medium text-success">
                         Economisez {formatEuro(yearlySavings)}
                       </span>
                     </div>

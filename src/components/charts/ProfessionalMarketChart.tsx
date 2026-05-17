@@ -365,7 +365,7 @@ function getTrend(points: BaseChartPoint[]) {
   if (points.length < 2 || points[0].performance === null || points[points.length - 1].performance === null) {
     return {
       label: "Neutre",
-      tone: "text-slate-500",
+      tone: "text-muted-foreground",
       note: "Pas assez d'historique pour qualifier une tendance fiable.",
     }
   }
@@ -383,7 +383,7 @@ function getTrend(points: BaseChartPoint[]) {
   if (change >= 2 && recentSlope > 0 && volatility <= 8) {
     return {
       label: "Haussiere",
-      tone: "text-emerald-600",
+      tone: "text-success",
       note: "La pente reste positive et la courbe defend encore son support recent.",
     }
   }
@@ -391,14 +391,14 @@ function getTrend(points: BaseChartPoint[]) {
   if (change <= -2 && recentSlope < 0) {
     return {
       label: "Baissiere",
-      tone: "text-rose-600",
+      tone: "text-destructive",
       note: "La structure glisse sous sa zone mediane et la pression reste negative.",
     }
   }
 
   return {
     label: "Neutre",
-    tone: "text-amber-600",
+    tone: "text-warning",
     note: "Le rythme est encore indecis, sans impulsion directionnelle dominante.",
   }
 }
@@ -432,17 +432,17 @@ function ChartTooltip({
   if (!point || point.value === null) return null
 
   return (
-    <div className="min-w-[220px] rounded-2xl border border-slate-200 bg-white/96 px-4 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{formatDateTime(point.timestamp)}</p>
+    <div className="min-w-[220px] rounded-2xl border border-border bg-card/98 px-4 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{formatDateTime(point.timestamp)}</p>
       <div className="mt-3 space-y-2">
         <div className="flex items-center justify-between gap-4">
-          <span className="text-[11px] text-slate-500">{mode === "portfolio" ? "Valeur portefeuille" : "Prix spot"}</span>
-          <span className="text-[13px] font-semibold text-slate-900">{formatCurrency(point.value, currency)}</span>
+          <span className="text-[11px] text-muted-foreground">{mode === "portfolio" ? "Valeur portefeuille" : "Prix spot"}</span>
+          <span className="text-[13px] font-semibold text-foreground">{formatCurrency(point.value, currency)}</span>
         </div>
         {point.performance !== null && (
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[11px] text-slate-500">Variation periode</span>
-            <span className={cn("text-[12px] font-semibold", point.performance >= 0 ? "text-emerald-600" : "text-rose-600")}>
+            <span className="text-[11px] text-muted-foreground">Variation periode</span>
+            <span className={cn("text-[12px] font-semibold", point.performance >= 0 ? "text-success" : "text-destructive")}>
               {point.performance >= 0 ? "+" : ""}
               {point.performance.toFixed(2)}%
             </span>
@@ -450,8 +450,8 @@ function ChartTooltip({
         )}
         {point.valueChange !== null && (
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[11px] text-slate-500">{mode === "portfolio" ? "Variation EUR" : "Variation USD"}</span>
-            <span className={cn("text-[12px] font-semibold", point.valueChange >= 0 ? "text-emerald-600" : "text-rose-600")}>
+            <span className="text-[11px] text-muted-foreground">{mode === "portfolio" ? "Variation EUR" : "Variation USD"}</span>
+            <span className={cn("text-[12px] font-semibold", point.valueChange >= 0 ? "text-success" : "text-destructive")}>
               {point.valueChange >= 0 ? "+" : ""}
               {formatCurrency(Math.abs(point.valueChange), currency)}
             </span>
@@ -459,13 +459,13 @@ function ChartTooltip({
         )}
         {point.volume !== null && Number.isFinite(point.volume) && point.volume > 0 && (
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[11px] text-slate-500">Volume</span>
-            <span className="text-[12px] font-semibold text-slate-900">{formatVolume(point.volume)}</span>
+            <span className="text-[11px] text-muted-foreground">Volume</span>
+            <span className="text-[12px] font-semibold text-foreground">{formatVolume(point.volume)}</span>
           </div>
         )}
         <div className="flex items-center justify-between gap-4">
-          <span className="text-[11px] text-slate-500">Source</span>
-          <span className="text-[11px] font-semibold text-slate-700">{point.sourceLabel}</span>
+          <span className="text-[11px] text-muted-foreground">Source</span>
+          <span className="text-[11px] font-semibold text-foreground">{point.sourceLabel}</span>
         </div>
       </div>
     </div>
@@ -559,7 +559,7 @@ export function ProfessionalMarketChart({
     ? trend
     : {
         label: "En construction",
-        tone: "text-slate-500",
+        tone: "text-muted-foreground",
         note: "Il faut davantage de snapshots reels pour qualifier une tendance fiable.",
       }
 
@@ -630,62 +630,62 @@ export function ProfessionalMarketChart({
     : "Pas encore assez d'historique portefeuille."
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#fcfcfb_100%)] shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
-      <div className="border-b border-slate-200 px-4 py-4 sm:px-5">
+    <div className="overflow-hidden rounded-[24px] border border-border bg-card shadow-card">
+      <div className="border-b border-border px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-                {mode === "portfolio" ? "Performance reelle du portefeuille" : "Lecture marche"}
+              <span className="badge">
+                {mode === "portfolio" ? "Performance réelle" : "Lecture marché"}
               </span>
-              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <span className="badge">
                 Source : {sourceLabel}
               </span>
               {historyStartLabel && (
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-500">
-                  Historique reel depuis {historyStartLabel}
+                <span className="badge">
+                  Depuis {historyStartLabel}
                 </span>
               )}
               {historyAgeLabel && (
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-500">
+                <span className="badge">
                   {historyAgeLabel}
                 </span>
               )}
               {marketUpdatedLabel && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-medium text-emerald-700">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-dot" />
-                  Live · Mis a jour a {marketUpdatedLabel}
+                <span className="badge badge-live inline-flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-dot" />
+                  Live · {marketUpdatedLabel}
                 </span>
               )}
               {partialBadge && (
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
+                <span className="badge badge-warning">
                   Historique partiel
                 </span>
               )}
             </div>
 
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Graphique portefeuille</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
+              <p className="eyebrow">Graphique portefeuille</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                 {mode === "portfolio"
-                  ? "Lecture claire de ta performance reelle"
+                  ? "Performance réelle du portefeuille"
                   : marketReferenceAsset
-                  ? `${marketReferenceAsset.symbol} - lecture marche`
-                  : "Lecture marche"}
+                  ? `${marketReferenceAsset.symbol} · lecture marché`
+                  : "Lecture marché"}
               </h2>
             </div>
 
             <div className="space-y-2">
-              <p className="max-w-2xl text-[12px] leading-6 text-slate-500">{CHART_EXPLANATION}</p>
+              <p className="max-w-2xl text-[12px] leading-6 text-muted-foreground">{CHART_EXPLANATION}</p>
               {(timelineLabel || seriesCoverageLabel || historyStartLabel) && (
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-                  {timelineLabel && <span className="font-medium text-slate-700">{timelineLabel}</span>}
-                  {timelineLabel && (seriesCoverageLabel || historyStartLabel) && <span className="text-slate-300">·</span>}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                  {timelineLabel && <span className="font-medium text-foreground">{timelineLabel}</span>}
+                  {timelineLabel && (seriesCoverageLabel || historyStartLabel) && <span className="text-border">·</span>}
                   {seriesCoverageLabel && <span>{seriesCoverageLabel}</span>}
                   {historyStartLabel && (
                     <>
-                      {(timelineLabel || seriesCoverageLabel) && <span className="text-slate-300">·</span>}
-                      <span>{mode === "portfolio" ? "Depuis le premier snapshot" : "Serie marche disponible"}</span>
+                      {(timelineLabel || seriesCoverageLabel) && <span className="text-border">·</span>}
+                      <span>{mode === "portfolio" ? "Depuis le premier snapshot" : "Série marché disponible"}</span>
                     </>
                   )}
                 </div>
@@ -694,7 +694,7 @@ export function ProfessionalMarketChart({
           </div>
 
           <div className="flex flex-col items-start gap-2 xl:items-end">
-            <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1">
+            <div className="flex flex-wrap gap-1 rounded-2xl border border-border bg-secondary p-1">
               {PERIODS.map((candidate) => {
                 const selected = candidate.id === period
                 const available = availablePeriods.includes(candidate.id)
@@ -717,13 +717,15 @@ export function ProfessionalMarketChart({
                     }}
                     disabled={!available}
                     title={available ? candidate.label : disabledReason}
+                    aria-label={available ? `Afficher ${candidate.label}` : disabledReason}
+                    aria-pressed={selected}
                     className={cn(
-                      "rounded-xl px-3 py-2 text-[11px] font-semibold transition-all",
+                      "focus-ring rounded-xl px-3 py-2 text-[11px] font-semibold transition-all",
                       selected
-                        ? "bg-white text-slate-950 shadow-[0_6px_16px_rgba(15,23,42,0.08)]"
+                        ? "bg-card text-foreground shadow-card-xs"
                         : available
-                        ? "text-slate-500 hover:bg-white hover:text-slate-900"
-                        : "cursor-not-allowed text-slate-300"
+                        ? "text-muted-foreground hover:bg-card hover:text-foreground"
+                        : "cursor-not-allowed text-muted-foreground/30"
                     )}
                   >
                     {candidate.label}
@@ -735,7 +737,9 @@ export function ProfessionalMarketChart({
             <button
               type="button"
               onClick={() => setShowDetails((current) => !current)}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+              aria-expanded={showDetails}
+              aria-label={showDetails ? "Masquer les détails" : "Voir les détails du graphique"}
+              className="focus-ring inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
             >
               Voir details
               <ArrowRight className={cn("h-3.5 w-3.5 transition-transform", showDetails && "rotate-90")} />

@@ -30,7 +30,7 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
             href="/advisor"
             className="inline-flex items-center gap-2 rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-foreground/92 md:hidden"
           >
-            Tester
+            Creer mon plan
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

@@ -379,21 +379,21 @@ export function ChatClient({ plan, initialUsage, latestAnalysisAt, initialMarket
               <div className="space-y-1.5">
                 {userMemory.budget && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-foreground/40 shrink-0" />
                     <span className="text-foreground font-medium">Budget :</span>
                     <span className="text-muted-foreground">{userMemory.budget}</span>
                   </div>
                 )}
                 {userMemory.risk && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-foreground/40 shrink-0" />
                     <span className="text-foreground font-medium">Profil :</span>
                     <span className="text-muted-foreground">{userMemory.risk}</span>
                   </div>
                 )}
                 {userMemory.horizon && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-foreground/40 shrink-0" />
                     <span className="text-foreground font-medium">Horizon :</span>
                     <span className="text-muted-foreground">{userMemory.horizon}</span>
                   </div>

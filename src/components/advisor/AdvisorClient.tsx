@@ -142,9 +142,9 @@ const PORTFOLIO_PREFERENCE_OPTIONS = [
 ]
 
 const RISK_CONFIG = {
-  faible: { label: "Risque faible", dot: "bg-emerald-500", text: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-  modéré: { label: "Risque modéré", dot: "bg-amber-500",   text: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200"   },
-  élevé:  { label: "Risque élevé",  dot: "bg-red-500",     text: "text-red-600",     bg: "bg-red-50",     border: "border-red-200"     },
+  faible: { label: "Risque faible", dot: "bg-success",     text: "text-success",     bg: "bg-success/8",     border: "border-success/20"     },
+  modéré: { label: "Risque modéré", dot: "bg-warning",     text: "text-warning",     bg: "bg-warning/8",     border: "border-warning/20"     },
+  élevé:  { label: "Risque élevé",  dot: "bg-destructive", text: "text-destructive", bg: "bg-destructive/8", border: "border-destructive/20" },
 }
 
 const ASSET_BAR: Record<string, string> = {
@@ -376,7 +376,11 @@ function PlanLimitModal({ onClose, plan }: { onClose: () => void; plan: string }
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-card border border-border rounded-2xl shadow-xl max-w-sm w-full p-8">
-        <button onClick={onClose} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center">
+        <button
+          onClick={onClose}
+          aria-label="Fermer la limite de plan"
+          className="focus-ring absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center"
+        >
           <X className="w-4 h-4" />
         </button>
         <div className="flex items-center justify-center w-12 h-12 bg-secondary border border-border rounded-2xl mx-auto mb-5">
@@ -399,7 +403,7 @@ function PlanLimitModal({ onClose, plan }: { onClose: () => void; plan: string }
         <Link href="/pricing" className="block w-full text-center py-3.5 bg-foreground hover:bg-foreground/90 text-background font-bold rounded-2xl transition-all mb-3">
           Comparer les plans
         </Link>
-        <button onClick={onClose} className="block w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-1.5">
+        <button onClick={onClose} className="focus-ring block w-full rounded-xl text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-1.5">
           Rester sur ce plan
         </button>
       </div>
@@ -629,7 +633,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
             <div className="space-y-1.5">
               {planAccess.included.map((item) => (
                 <div key={item} className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <CheckCircle className="w-3.5 h-3.5 text-success shrink-0" />
                   {item}
                 </div>
               ))}
@@ -757,14 +761,14 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Capital initial (€) <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Capital initial (€) <span className="text-destructive" aria-hidden="true">*</span></label>
                 <input type="number" value={form.capital}
                   onChange={(e) => setForm((p) => ({ ...p, capital: e.target.value }))}
                   placeholder="ex : 5 000"
                   className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/10 text-sm transition-all" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Revenu mensuel (€) <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Revenu mensuel (€) <span className="text-destructive" aria-hidden="true">*</span></label>
                 <input type="number" value={form.monthlyIncome}
                   onChange={(e) => setForm((p) => ({ ...p, monthlyIncome: e.target.value }))}
                   placeholder="ex : 3 000"
@@ -805,7 +809,7 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
               })}
             </div>
             <div className="mt-3">
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Objectif précis <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Objectif précis <span className="text-destructive" aria-hidden="true">*</span></label>
               <input type="text" value={form.preciseObjective}
                 onChange={(e) => setForm((p) => ({ ...p, preciseObjective: e.target.value }))}
                 placeholder="ex : acheter un logement dans 3 ans"
@@ -920,33 +924,42 @@ export function AdvisorClient({ userId, plan, monthlyCount }: Props) {
           )}
 
           {error && (
-            <div className="flex items-center gap-2 px-4 py-3.5 bg-red-50 border border-red-200 rounded-2xl text-red-600 text-sm">
-              <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+            <div className="flex items-center gap-2 px-4 py-3.5 border border-destructive/20 bg-destructive/8 rounded-2xl text-destructive text-sm" role="alert">
+              <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" /> {error}
             </div>
           )}
 
           <div className="grid grid-cols-[auto_1fr] gap-2 mt-1">
-            <button onClick={() => { setError(""); setFormStep((s) => Math.max(0, s - 1)) }}
+            <button
+              type="button"
+              onClick={() => { setError(""); setFormStep((s) => Math.max(0, s - 1)) }}
               disabled={formStep === 0}
+              aria-label="Étape précédente"
               className={cn(
-                "px-4 py-4 rounded-2xl border border-border font-bold text-sm transition-all",
+                "px-4 py-4 rounded-2xl border border-border font-bold text-sm transition-all focus-visible:outline-2 focus-visible:outline-foreground/20",
                 formStep === 0 ? "text-muted-foreground/40 cursor-not-allowed" : "text-foreground hover:bg-secondary"
               )}>
               Retour
             </button>
             {formStep < lastFormStep ? (
-              <button onClick={goNext}
+              <button
+                type="button"
+                onClick={goNext}
                 disabled={formStep === 6 && (!form.investmentFrequency || !form.buyStrategy)}
-                className="w-full py-4 bg-foreground hover:bg-foreground/90 disabled:opacity-60 disabled:cursor-not-allowed text-background font-black rounded-2xl transition-all flex items-center justify-center gap-2.5 text-base">
+                aria-label="Passer à l'étape suivante"
+                className="w-full py-4 bg-foreground hover:bg-foreground/90 disabled:opacity-60 disabled:cursor-not-allowed text-background font-black rounded-2xl transition-all flex items-center justify-center gap-2.5 text-base focus-visible:outline-2 focus-visible:outline-foreground/40">
                 Continuer
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </button>
             ) : (
-              <button onClick={handleAnalyze}
-                className="w-full py-4 bg-foreground hover:bg-foreground/90 text-background font-black rounded-2xl transition-all flex items-center justify-center gap-2.5 text-base">
-                <Brain className="w-5 h-5" />
+              <button
+                type="button"
+                onClick={handleAnalyze}
+                aria-label="Lancer l'analyse IA avec votre profil"
+                className="w-full py-4 bg-foreground hover:bg-foreground/90 text-background font-black rounded-2xl transition-all flex items-center justify-center gap-2.5 text-base focus-visible:outline-2 focus-visible:outline-foreground/40">
+                <Brain className="w-5 h-5" aria-hidden="true" />
                 Générer mon analyse
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -1123,10 +1136,10 @@ function AnalysisResult({
       .toLowerCase()
 
     if (s.includes("bull") || s.includes("haussier") || s.includes("favorable") || s.includes("positif") || s.includes("hausse")) {
-      return { label: "Haussier", short: "BULL", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200", Icon: TrendingUp }
+      return { label: "Haussier", short: "BULL", color: "text-success", bg: "bg-success/8", border: "border-success/20", Icon: TrendingUp }
     }
     if (s.includes("bear") || s.includes("baissier") || s.includes("prudence") || s.includes("baisse") || s.includes("négatif")) {
-      return { label: "Baissier", short: "BEAR", color: "text-red-600", bg: "bg-red-50", border: "border-red-200", Icon: TrendingDown }
+      return { label: "Baissier", short: "BEAR", color: "text-destructive", bg: "bg-destructive/8", border: "border-destructive/20", Icon: TrendingDown }
     }
     return { label: "Neutre", short: "NEUTRAL", color: "text-muted-foreground", bg: "bg-secondary", border: "border-border", Icon: Activity }
   }, [isPro, analysis.marketSignal, analysis.marketVerdict, analysis.marketVerdictNote, analysis.marketInsight])
@@ -1176,13 +1189,6 @@ function AnalysisResult({
     analysis.marketVerdictNote,
     analysis.pedagogy,
   ].filter((item): item is string => Boolean(item && item.trim()))
-  const nextActions = [
-    primaryAction
-      ? `Executer l'action principale: ${primaryAction.crypto}${primaryAction.amount ? ` pour ${primaryAction.amount}` : ""}.`
-      : null,
-    strategy ? strategy : null,
-    analysis.nextReview ? `Revenir sur votre allocation: ${analysis.nextReview}.` : null,
-  ].filter(Boolean).slice(0, 3) as string[]
   const lockedInsights =
     plan === "premium"
       ? []
@@ -1328,7 +1334,7 @@ ${advancedBlock}
               <div key={alloc.asset}>
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <div className={cn("h-2 w-2 shrink-0 rounded-full", ASSET_BAR[alloc.asset] ?? "bg-slate-400")} />
+                    <div className={cn("h-2 w-2 shrink-0 rounded-full", ASSET_BAR[alloc.asset] ?? "bg-muted-foreground/50")} />
                     <span className="text-sm font-semibold text-foreground">{alloc.asset}</span>
                     {alloc.note ? (
                       <span className="truncate text-[11px] text-muted-foreground">{alloc.note}</span>
@@ -1338,7 +1344,7 @@ ${advancedBlock}
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                   <div
-                    className={cn("h-1.5 rounded-full transition-all duration-700", ASSET_BAR[alloc.asset] ?? "bg-slate-400")}
+                    className={cn("h-1.5 rounded-full transition-all duration-700", ASSET_BAR[alloc.asset] ?? "bg-muted-foreground/50")}
                     style={{ width: `${alloc.percentage}%` }}
                   />
                 </div>
@@ -1360,26 +1366,33 @@ ${advancedBlock}
       </ResultSection>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <ResultSection eyebrow="Lecture" title="Pourquoi ce plan">
+        <ResultSection eyebrow="Raisonnement" title="Pourquoi cette répartition">
           <div className="space-y-3">
-            <p className="text-sm leading-7 text-muted-foreground">{analysis.explanation}</p>
+            {/* Pédagogie / market insight en premier */}
             {whyPlanItems.length > 0 ? (
-              <div className="grid gap-3">
-                {whyPlanItems.slice(0, 2).map((item) => (
-                  <div key={item} className="rounded-2xl border border-border bg-secondary/60 px-4 py-3">
-                    <p className="text-sm leading-6 text-foreground">{item}</p>
-                  </div>
+              <div className="space-y-3">
+                {whyPlanItems.slice(0, 2).map((item, idx) => (
+                  <p key={`why-${idx}`} className="text-sm leading-7 text-muted-foreground">{item}</p>
                 ))}
               </div>
-            ) : null}
+            ) : (
+              <p className="text-sm leading-7 text-muted-foreground">{analysis.explanation}</p>
+            )}
+            {/* Signal marché si dispo */}
+            {analysis.marketSignal && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-border bg-secondary/40 px-3 py-3">
+                <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <p className="text-[12px] leading-5 text-muted-foreground">{analysis.marketSignal}</p>
+              </div>
+            )}
           </div>
         </ResultSection>
 
-        <ResultSection eyebrow="Vigilance" title="Risques a surveiller">
-          <div className="space-y-3">
-            {risksToWatch.map((item, index) => (
-              <div key={`${item}-${index}`} className="flex items-start gap-3 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <ResultSection eyebrow="Risques" title="Points de vigilance">
+          <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden">
+            {risksToWatch.slice(0, 4).map((item, index) => (
+              <div key={`risk-${index}`} className="flex items-start gap-3 px-4 py-3">
+                <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning/60" />
                 <p className="text-sm leading-6 text-muted-foreground">{item}</p>
               </div>
             ))}
@@ -1388,70 +1401,55 @@ ${advancedBlock}
       </div>
 
       {(analysis.plan.length > 0 || showAiRecommendations || (isPro && analysis.timePlan && analysis.timePlan.length > 0)) && (
-        <ResultSection eyebrow="Execution" title="Prochaine action">
-          <div className="grid gap-4 lg:grid-cols-[1.02fr_0.98fr]">
-            <div className="space-y-4">
-              {nextActions.length > 0 ? (
-                <div className="grid gap-3">
-                  {nextActions.map((item, index) => (
-                    <div key={`${item}-${index}`} className="rounded-2xl border border-border bg-secondary/60 px-4 py-4">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Action {index + 1}</p>
-                      <p className="mt-2 text-sm leading-6 text-foreground">{item}</p>
+        <ResultSection eyebrow="Exécution" title="Actions et calendrier">
+          {/* Execution immédiate */}
+          {analysis.executionNow && analysis.executionNow.length > 0 && (
+            <div className="mb-4">
+              <p className="data-label mb-2">Exécution immédiate</p>
+              <div className="divide-y divide-border rounded-2xl border border-border bg-card overflow-hidden">
+                {analysis.executionNow.map((item, index) => (
+                  <div key={`${item.crypto}-${index}`} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={cn("h-2 w-2 rounded-full shrink-0", ASSET_BAR[item.crypto] ?? "bg-muted-foreground/50")} />
+                      <p className="text-sm font-semibold text-foreground">{item.crypto}</p>
                     </div>
+                    <span className="rounded-xl border border-border bg-secondary px-3 py-1.5 text-[12px] font-semibold text-foreground tabular-nums">
+                      {item.amount}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Plan d'action + Calendrier */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {analysis.plan.length > 0 && (
+              <div className="rounded-2xl border border-border bg-secondary/30 px-4 py-4">
+                <p className="data-label mb-3">Plan d&apos;action</p>
+                <ol className="space-y-3">
+                  {analysis.plan.slice(0, 5).map((item, index) => (
+                    <li key={`plan-${index}`} className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-bold text-foreground">
+                        {index + 1}
+                      </div>
+                      <p className="text-sm leading-6 text-muted-foreground">{item}</p>
+                    </li>
                   ))}
-                </div>
-              ) : null}
-              {analysis.executionNow && analysis.executionNow.length > 0 ? (
-                <div className="rounded-2xl border border-border bg-background px-4 py-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Execution immediate</p>
-                  <div className="mt-3 space-y-3">
-                    {analysis.executionNow.map((item, index) => (
-                      <div key={`${item.crypto}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/60 px-3 py-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{item.crypto}</p>
-                          <p className="text-xs text-muted-foreground">Action prioritaire</p>
-                        </div>
-                        <span className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground">
-                          {item.amount}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
+                </ol>
+              </div>
+            )}
 
-            <div className="space-y-4">
-              {analysis.plan.length > 0 ? (
-                <div className="rounded-2xl border border-border bg-secondary/40 px-4 py-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Plan d&apos;action</p>
-                  <ol className="mt-3 space-y-3">
-                    {analysis.plan.slice(0, 5).map((item, index) => (
-                      <li key={`${item}-${index}`} className="flex items-start gap-3">
-                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-background text-[11px] font-bold text-foreground">
-                          {index + 1}
-                        </div>
-                        <p className="text-sm leading-6 text-muted-foreground">{item}</p>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              ) : null}
-
-              {isPro && analysis.timePlan && analysis.timePlan.length > 0 ? (
-                <div className="rounded-2xl border border-border bg-background px-4 py-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Plan dans le temps</p>
-                  <div className="mt-3 space-y-3">
-                    {analysis.timePlan.slice(0, 4).map((item, index) => (
-                      <div key={`${item.period}-${index}`} className="rounded-2xl border border-border bg-secondary/60 px-3 py-3">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{item.period}</p>
-                        <p className="mt-1 text-sm leading-6 text-foreground">{item.action}</p>
-                      </div>
-                    ))}
+            {isPro && analysis.timePlan && analysis.timePlan.length > 0 && (
+              <div className="divide-y divide-border rounded-2xl border border-border bg-card overflow-hidden">
+                {analysis.timePlan.slice(0, 5).map((item, index) => (
+                  <div key={`timeplan-${index}`} className="px-4 py-3">
+                    <p className="data-label">{item.period}</p>
+                    <p className="mt-1 text-sm leading-6 text-foreground">{item.action}</p>
                   </div>
-                </div>
-              ) : null}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </ResultSection>
       )}
@@ -1584,8 +1582,8 @@ ${advancedBlock}
         </Link>
       </div>
       {exportError && (
-        <div className="mt-3 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="mt-3 flex items-start gap-2 rounded-2xl border border-destructive/20 bg-destructive/8 px-4 py-3 text-sm text-destructive" role="alert">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>{exportError}</p>
         </div>
       )}

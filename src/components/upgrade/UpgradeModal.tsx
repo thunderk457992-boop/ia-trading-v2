@@ -1,10 +1,12 @@
 "use client"
 
+import { useState } from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import Link from "next/link"
-import { ArrowRight, CheckCircle2, CreditCard, Lock, Shield, X, Zap, Crown } from "lucide-react"
+import { ArrowRight, CheckCircle2, CreditCard, Crown, Lock, Shield, X, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { UpgradeFeature } from "@/lib/upgrade-features"
+import { getUpgradeFeature } from "@/lib/upgrade-features"
 
 interface UpgradeModalProps {
   feature: UpgradeFeature
@@ -26,8 +28,8 @@ const TARGET_LABELS: Record<string, { label: string; color: string; icon: React.
 }
 
 const PRICING: Record<string, { monthly: string; yearly: string }> = {
-  pro: { monthly: "24,99€/mois", yearly: "219,99€/an" },
-  premium: { monthly: "59,99€/mois", yearly: "499,99€/an" },
+  pro: { monthly: "24,99 EUR/mois", yearly: "219,99 EUR/an" },
+  premium: { monthly: "59,99 EUR/mois", yearly: "499,99 EUR/an" },
 }
 
 export function UpgradeModal({ feature, open, onClose }: UpgradeModalProps) {
@@ -35,37 +37,37 @@ export function UpgradeModal({ feature, open, onClose }: UpgradeModalProps) {
   const pricing = PRICING[feature.target]
 
   return (
-    <Dialog.Root open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+    <Dialog.Root open={open} onOpenChange={(value) => { if (!value) onClose() }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=open]:animate-fade-in" />
         <Dialog.Content
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 w-full max-w-md rounded-t-3xl border border-border bg-card shadow-2xl",
-            "sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:top-1/2 sm:-translate-y-1/2 sm:bottom-auto sm:rounded-3xl",
+            "sm:inset-x-auto sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl",
             "focus:outline-none data-[state=open]:animate-slide-up"
           )}
           aria-describedby="upgrade-modal-desc"
         >
-          {/* Close */}
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-secondary">
                 <Lock className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-              <div>
-                <span className={cn(
+              <span
+                className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em]",
                   targetInfo.color
-                )}>
-                  {targetInfo.icon}
-                  {targetInfo.label}
-                </span>
-              </div>
+                )}
+              >
+                {targetInfo.icon}
+                {targetInfo.label}
+              </span>
             </div>
             <Dialog.Close asChild>
               <button
-                className="flex h-8 w-8 items-center justify-center rounded-xl bg-secondary text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Fermer"
+                type="button"
+                aria-label="Fermer le panneau d'abonnement"
+                className="focus-ring flex h-8 w-8 items-center justify-center rounded-xl bg-secondary text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -89,42 +91,43 @@ export function UpgradeModal({ feature, open, onClose }: UpgradeModalProps) {
               ))}
             </ul>
 
-            {/* Pricing hint */}
-            {pricing && (
+            {pricing ? (
               <div className="mt-5 rounded-2xl border border-border bg-secondary/60 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Tarif {targetInfo.label}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Tarif {targetInfo.label}
+                </p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{pricing.monthly}</p>
                 <p className="text-[11px] text-muted-foreground">ou {pricing.yearly} · sans engagement</p>
               </div>
-            )}
+            ) : null}
 
-            {/* CTAs */}
             <div className="mt-5 flex flex-col gap-3">
               <Link
                 href="/pricing"
                 onClick={onClose}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-foreground px-5 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-85"
+                className="focus-ring flex items-center justify-center gap-2 rounded-2xl bg-foreground px-5 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-85"
               >
                 {feature.ctaLabel}
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <button
+                type="button"
                 onClick={onClose}
-                className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+                aria-label="Voir toutes les offres"
+                className="focus-ring flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
               >
                 Voir toutes les offres
               </button>
             </div>
 
-            {/* Trust signals */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <CreditCard className="h-3.5 w-3.5" />
-                <span>Paiement Stripe sécurisé</span>
+                <span>Paiement Stripe securise</span>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Shield className="h-3.5 w-3.5" />
-                <span>Annulable à tout moment</span>
+                <span>Annulable a tout moment</span>
               </div>
             </div>
           </div>
@@ -133,11 +136,6 @@ export function UpgradeModal({ feature, open, onClose }: UpgradeModalProps) {
     </Dialog.Root>
   )
 }
-
-// ── Hook utilitaire pour gérer l'état modal ──────────────────────────────────
-
-import { useState } from "react"
-import { getUpgradeFeature } from "@/lib/upgrade-features"
 
 export function useUpgradeModal() {
   const [activeFeatureId, setActiveFeatureId] = useState<string | null>(null)

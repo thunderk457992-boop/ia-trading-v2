@@ -105,7 +105,7 @@ export function ResendConfirmationButton({
       {success ? (
         <div
           data-testid="resend-confirmation-success"
-          className="mt-2 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+          className="mt-2 flex items-start gap-2 rounded-xl border border-success/20 bg-success/8 px-3 py-2 text-xs text-success"
         >
           <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p>{success}</p>
@@ -115,7 +115,7 @@ export function ResendConfirmationButton({
       {error ? (
         <div
           data-testid="resend-confirmation-error"
-          className="mt-2 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+          className="mt-2 flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive"
         >
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p>{error}</p>

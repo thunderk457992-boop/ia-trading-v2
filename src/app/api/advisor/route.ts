@@ -1139,6 +1139,10 @@ export async function POST(request: Request) {
           analysisId: savedAnalysis.id,
           mode: computedPortfolioSnapshot.mode,
         })
+        // Fire-and-forget: in-app notification (silent on failure)
+        void import("@/lib/notifications")
+          .then(({ notifyAnalysisReady }) => notifyAnalysisReady(user.id))
+          .catch((err) => console.warn("[advisor] notification skipped:", err))
       }
     }
 

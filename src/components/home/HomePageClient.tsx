@@ -247,15 +247,30 @@ interface HomePageClientProps {
   marketSnapshot?: MarketSnapshot
 }
 
+type PublicStats = {
+  analysesCount: number | null
+  activeAssets: number | null
+  marketUpdatedAt: string | null
+}
+
 export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [analysesCount, setAnalysesCount] = useState<number | null>(null)
+  const [publicStats, setPublicStats] = useState<PublicStats>({
+    analysesCount: null,
+    activeAssets: null,
+    marketUpdatedAt: null,
+  })
 
   useEffect(() => {
     fetch("/api/public/stats", { next: { revalidate: 60 } })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data?.analysesCount != null) setAnalysesCount(data.analysesCount)
+        if (!data) return
+        setPublicStats({
+          analysesCount: typeof data.analysesCount === "number" ? data.analysesCount : null,
+          activeAssets: typeof data.activeAssets === "number" ? data.activeAssets : null,
+          marketUpdatedAt: typeof data.marketUpdatedAt === "string" ? data.marketUpdatedAt : null,
+        })
       })
       .catch(() => {})
   }, [])
@@ -296,6 +311,13 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
         timeZone: "Europe/Paris",
       })
     : null
+  const statsUpdatedLabel = publicStats.marketUpdatedAt
+    ? new Date(publicStats.marketUpdatedAt).toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Paris",
+      })
+    : liveDataLabel
 
   useEffect(() => {
     const supabase = createClient()
@@ -319,7 +341,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
   }, [])
 
   const navPrimaryHref = isAuthenticated ? "/dashboard" : "/login"
-  const navPrimaryLabel = isAuthenticated ? "Dashboard" : "Connexion"
+  const navPrimaryLabel = isAuthenticated ? "Tableau de bord" : "Connexion"
   const navSecondaryHref = isAuthenticated ? "/advisor" : "/register"
   const navSecondaryLabel = isAuthenticated ? "Nouvelle analyse" : "Créer mon plan gratuit"
   const heroPrimaryHref = isAuthenticated ? "/dashboard" : "/register"
@@ -379,14 +401,14 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
               href={navPrimaryHref}
               className="rounded-full border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
             >
-              {isAuthenticated ? "Dashboard" : "Login"}
+              {isAuthenticated ? "Tableau de bord" : "Connexion"}
             </Link>
             <Link
               href={navSecondaryHref}
               data-testid="home-mobile-primary"
               className="btn-primary min-h-0 rounded-full px-3.5 py-2 text-sm shadow-card-xs"
             >
-              {isAuthenticated ? "Analyse" : "Tester"}
+              {isAuthenticated ? "Analyse" : "Creer mon plan"}
             </Link>
           </div>
         </div>
@@ -439,12 +461,24 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                   valueClassName="mt-2 text-base font-semibold tracking-normal"
                 />
               ))}
-              {analysesCount !== null && analysesCount > 0 && (
+              {publicStats.analysesCount !== null && publicStats.analysesCount > 0 && (
                 <MetricCard
                   label="Analyses générées"
                   value={
                     <span className="text-base font-semibold tracking-normal tabular-nums">
-                      {analysesCount.toLocaleString("fr-FR")}
+                      {publicStats.analysesCount.toLocaleString("fr-FR")}
+                    </span>
+                  }
+                  className="rounded-2xl p-4"
+                  valueClassName="mt-2 text-base font-semibold tracking-normal"
+                />
+              )}
+              {publicStats.activeAssets !== null && publicStats.activeAssets > 0 && (
+                <MetricCard
+                  label="Actifs suivis"
+                  value={
+                    <span className="text-base font-semibold tracking-normal tabular-nums">
+                      {publicStats.activeAssets.toLocaleString("fr-FR")}
                     </span>
                   }
                   className="rounded-2xl p-4"
@@ -478,11 +512,11 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                   <div className="flex flex-wrap gap-2">
                     {topMover && (
                       <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700">
-                        Top mover: {topMover.symbol} {topMover.change24h >= 0 ? "+" : ""}{topMover.change24h.toFixed(1)}%
+                        Mouvement fort : {topMover.symbol} {topMover.change24h >= 0 ? "+" : ""}{topMover.change24h.toFixed(1)}%
                       </div>
                     )}
                     <div className="rounded-full border border-border bg-secondary px-3 py-1.5 text-[11px] font-semibold text-muted-foreground">
-                      Live market
+                      Marche live
                     </div>
                   </div>
                 </div>
@@ -492,7 +526,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                       { label: "Actifs suivis", value: String(liveMarketPulse.tracked) },
                       { label: "Hausse 24h", value: String(liveMarketPulse.positive) },
                       { label: "Baisse 24h", value: String(liveMarketPulse.negative) },
-                      { label: "Fallback", value: liveMarketPulse.fallback > 0 ? `${liveMarketPulse.fallback} actif(s)` : "Aucun" },
+                      { label: "Relais", value: liveMarketPulse.fallback > 0 ? `${liveMarketPulse.fallback} actif(s)` : "Aucun" },
                     ].map((item) => (
                       <div key={item.label} className="rounded-2xl border border-border bg-secondary px-3 py-3">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -526,7 +560,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-semibold text-foreground">
-                          Source : {coin.source === "Kraken" ? "Kraken" : coin.source === "fallback" ? "Fallback" : "CoinGecko"}
+                          Source : {coin.source === "Kraken" ? "Kraken" : coin.source === "fallback" ? "CoinGecko fallback" : "CoinGecko"}
                         </span>
                         {(coin.categories ?? []).slice(0, 2).map((category) => (
                           <span
@@ -574,7 +608,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          Advisor preview
+                          Apercu Advisor
                         </p>
                         <h2 className="mt-1 text-lg font-semibold text-foreground">Profil, risque, plan</h2>
                       </div>
@@ -647,7 +681,7 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          Dashboard preview
+                          Apercu tableau de bord
                         </p>
                         <p className="mt-1 text-lg font-semibold text-foreground">Historique reel</p>
                       </div>
@@ -1163,10 +1197,15 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
       <footer className="border-t border-border bg-secondary px-5 py-10 pb-24 sm:px-6 md:pb-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 md:flex-row">
           <AxiomLogo />
-          <p className="text-center text-xs leading-6 text-muted-foreground">
-            Donnees live si disponibles, paiements via Stripe, authentification via Supabase, et cadre produit
-            transparent sur les risques.
-          </p>
+          <div className="space-y-2 text-center md:text-left">
+            <p className="text-xs leading-6 text-muted-foreground">
+              Donnees live si disponibles, paiements via Stripe, authentification via Supabase, et cadre produit
+              transparent sur les risques.
+            </p>
+            <p className="text-[11px] leading-5 text-muted-foreground/80">
+              Axiom AI est un outil pedagogique. Il ne constitue pas un conseil financier reglemente.
+            </p>
+          </div>
           <div className="flex flex-wrap items-center justify-center gap-5">
             <Link href="/how-it-works" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
               Comment ça marche
@@ -1177,6 +1216,12 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
             <Link href="/guide" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
               Guide
             </Link>
+            <Link href="/pricing" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
+              Tarifs
+            </Link>
+            <Link href={navPrimaryHref} className="text-xs text-muted-foreground transition-colors hover:text-foreground">
+              {isAuthenticated ? "Tableau de bord" : "Connexion"}
+            </Link>
             <Link href="/legal/cgu" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
               CGU
             </Link>
@@ -1185,6 +1230,19 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
             </Link>
           </div>
         </div>
+        {(publicStats.analysesCount !== null || publicStats.activeAssets !== null || statsUpdatedLabel) && (
+          <div className="mx-auto mt-5 flex max-w-6xl flex-wrap items-center justify-center gap-3 border-t border-border/70 pt-4 text-[11px] text-muted-foreground md:justify-start">
+            {publicStats.analysesCount !== null ? (
+              <span>{publicStats.analysesCount.toLocaleString("fr-FR")} analyses generees</span>
+            ) : null}
+            {publicStats.activeAssets !== null ? (
+              <span>{publicStats.activeAssets} actifs suivis</span>
+            ) : null}
+            {statsUpdatedLabel ? (
+              <span>Donnees mises a jour a {statsUpdatedLabel}</span>
+            ) : null}
+          </div>
+        )}
       </footer>
     </div>
   )

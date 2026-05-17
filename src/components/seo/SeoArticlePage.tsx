@@ -77,27 +77,38 @@ export function SeoArticlePage({
 
         <section className="mt-6 rounded-[32px] border border-foreground bg-foreground px-6 py-7 text-background shadow-card sm:px-8">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-background/70">
-            Next step
+            Prochaine etape
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-            Build your plan with Axiom AI
+            Creez votre plan avec Axiom AI
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-background/72">
-            Use the Advisor to turn your risk profile, time horizon, and capital into a structured crypto allocation you can review and refine.
+            Utilisez l&apos;Advisor pour transformer votre profil de risque, votre horizon et votre capital en allocation crypto structuree, relisible et ajustable.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="max-w-2xl text-xs leading-6 text-background/70">
-              Crypto assets can fall sharply in value. This content is educational and does not constitute financial advice or a promise of returns.
+              Les crypto-actifs peuvent chuter fortement. Ce contenu est pedagogique et ne constitue ni un conseil financier, ni une promesse de rendement.
             </p>
             <Link
               href="/advisor"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-white/92"
             >
-              Go to Advisor
+              Lancer mon analyse
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </section>
+        <footer className="mt-6 flex flex-col gap-4 rounded-[28px] border border-border bg-card px-6 py-5 shadow-card-xs sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl text-xs leading-6 text-muted-foreground">
+            Axiom AI est un outil pedagogique. Il aide a structurer une strategie, pas a promettre des gains ni a remplacer un conseiller financier reglemente.
+          </p>
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+            <Link href="/guide" className="transition-colors hover:text-foreground">Guide</Link>
+            <Link href="/how-it-works" className="transition-colors hover:text-foreground">Comment ca marche</Link>
+            <Link href="/transparency" className="transition-colors hover:text-foreground">Transparence</Link>
+            <Link href="/pricing" className="transition-colors hover:text-foreground">Tarifs</Link>
+          </div>
+        </footer>
       </main>
     </div>
   )

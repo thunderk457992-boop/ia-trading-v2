@@ -302,7 +302,7 @@ export function SettingsClient({ user, profile, subscription, payments }: Props)
                   href="/pricing"
                   className="px-4 py-2 bg-foreground hover:bg-foreground/90 text-background text-sm rounded-xl transition-colors font-bold"
                 >
-                  Upgrader
+                  Voir les offres
                 </Link>
               )}
             </div>

@@ -86,10 +86,10 @@ export function PortfolioChart({ allocations }: { allocations: Allocation[] }) {
     <div ref={containerRef} className="relative h-full w-full min-h-0 min-w-0">
       {/* Center label */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mb-0.5">
           {top.asset}
         </span>
-        <span className="text-xl font-black text-slate-800 tabular-nums leading-none">
+        <span className="text-xl font-semibold text-foreground tabular-nums leading-none">
           {top.percentage}%
         </span>
       </div>
