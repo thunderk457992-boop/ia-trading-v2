@@ -1,11 +1,12 @@
-﻿import { HomePageClient } from "@/components/home/HomePageClient"
-import { fetchMarketSnapshot } from "@/lib/coingecko"
+import { HomePageClient } from "@/components/home/HomePageClient"
 import {
   DEFAULT_SEO_DESCRIPTION,
   SITE_NAME,
   SITE_URL,
   buildPageMetadata,
 } from "@/lib/seo"
+
+export const revalidate = 300
 
 export const metadata = buildPageMetadata({
   title: "Axiom AI — Conseiller crypto IA, répartition personnalisée",
@@ -80,17 +81,14 @@ const homeStructuredData = {
   ],
 }
 
-export default async function HomePage() {
-  const marketSnapshot = await fetchMarketSnapshot()
-
+export default function HomePage() {
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeStructuredData) }}
       />
-      <HomePageClient marketSnapshot={marketSnapshot} />
+      <HomePageClient />
     </>
   )
 }
-

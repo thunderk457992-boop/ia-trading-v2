@@ -12,7 +12,8 @@ export async function GET() {
     return NextResponse.json(
       {
         source: market.summary?.primarySource ?? "CoinGecko",
-        updatedAt: Date.now(),
+        updatedAt: market.fetchedAt,
+        stale: market.stale ?? false,
         tickers: market.prices,
         summary: market.summary,
         marketGlobal: market.global,
@@ -27,6 +28,7 @@ export async function GET() {
       {
         source: "CoinGecko",
         updatedAt: Date.now(),
+        stale: false,
         tickers: [],
         error: "Impossible de recuperer les prix de marche",
       },

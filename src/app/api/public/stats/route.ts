@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { fetchMarketSnapshot } from "@/lib/coingecko"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-export const revalidate = 60
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
@@ -29,7 +29,7 @@ export async function GET() {
         },
         {
           status: 200,
-          headers: { "Cache-Control": "public, max-age=120, stale-while-revalidate=300" },
+          headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=900" },
         }
       )
     }
@@ -43,7 +43,7 @@ export async function GET() {
       },
       {
         status: 200,
-        headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=300" },
+        headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=900" },
       }
     )
   } catch (err) {

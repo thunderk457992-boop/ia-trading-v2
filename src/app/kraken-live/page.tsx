@@ -49,6 +49,7 @@ type MarketGlobal = {
 type KrakenResponse = {
   source: string
   updatedAt: number
+  stale?: boolean
   tickers: LiveMarketAsset[]
   summary?: MarketSummary
   marketGlobal?: MarketGlobal | null
@@ -282,8 +283,13 @@ export default function KrakenLivePage() {
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock3 className="h-3.5 w-3.5" />
-              {updatedAtLabel ? `Mis a jour a ${updatedAtLabel}` : "En attente de donnees"}
+              {updatedAtLabel ? `${data?.stale ? "Dernier jeu conserve a" : "Mis a jour a"} ${updatedAtLabel}` : "En attente de donnees"}
             </span>
+            {data?.stale ? (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+                Lecture stale securisee
+              </span>
+            ) : null}
             {summary ? (
               <span className="rounded-full border border-border bg-secondary px-3 py-1 text-[11px] font-semibold text-muted-foreground">
                 {summary.krakenAssets} Kraken · {summary.fallbackAssets} fallback · {summary.coinGeckoAssets} CoinGecko

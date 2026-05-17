@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache"
+import { cache } from "react"
 import {
   getTrackedCryptoUniverse,
   normalizeTrackedSymbol,
@@ -31,6 +33,33 @@ type KrakenAssetPair = {
 type KrakenApiResponse<T> = {
   error: string[]
   result: T
+}
+
+type StaleKrakenStore = Map<string, { value: unknown; updatedAt: number }>
+
+const KRAKEN_STALE_MAX_AGE_MS = 15 * 60 * 1000
+const KRAKEN_TICKERS_REVALIDATE_SECONDS = 45
+
+const krakenStaleStore = (
+  globalThis as typeof globalThis & { __axiomKrakenStaleStore?: StaleKrakenStore }
+).__axiomKrakenStaleStore ?? new Map<string, { value: unknown; updatedAt: number }>()
+
+if (!(globalThis as typeof globalThis & { __axiomKrakenStaleStore?: StaleKrakenStore }).__axiomKrakenStaleStore) {
+  ;(globalThis as typeof globalThis & { __axiomKrakenStaleStore?: StaleKrakenStore }).__axiomKrakenStaleStore = krakenStaleStore
+}
+
+function readStale<T>(key: string): T | null {
+  const entry = krakenStaleStore.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.updatedAt > KRAKEN_STALE_MAX_AGE_MS) {
+    krakenStaleStore.delete(key)
+    return null
+  }
+  return entry.value as T
+}
+
+function writeStale<T>(key: string, value: T) {
+  krakenStaleStore.set(key, { value, updatedAt: Date.now() })
 }
 
 function withTimeout(ms: number) {
@@ -110,12 +139,12 @@ function scoreKrakenPair(
   return score
 }
 
-async function fetchKrakenAssetPairs() {
+async function fetchKrakenAssetPairsRaw() {
   const timeout = withTimeout(8000)
   const res = await fetch("https://api.kraken.com/0/public/AssetPairs", {
     method: "GET",
     headers: { Accept: "application/json" },
-    next: { revalidate: 60 },
+    cache: "no-store",
     signal: timeout.signal,
   }).finally(timeout.clear)
 
@@ -131,7 +160,7 @@ async function fetchKrakenAssetPairs() {
   return data.result
 }
 
-async function fetchKrakenTickerBatch(pairs: string[]) {
+async function fetchKrakenTickerBatchRaw(pairs: string[]) {
   if (!pairs.length) return {} as Record<string, KrakenTickerResult>
 
   const timeout = withTimeout(8000)
@@ -140,7 +169,7 @@ async function fetchKrakenTickerBatch(pairs: string[]) {
     {
       method: "GET",
       headers: { Accept: "application/json" },
-      next: { revalidate: 10 },
+      cache: "no-store",
       signal: timeout.signal,
     }
   ).finally(timeout.clear)
@@ -184,13 +213,13 @@ function resolveKrakenPairs(assetPairs: Record<string, KrakenAssetPair>) {
   return resolved
 }
 
-export async function fetchKrakenTickers(): Promise<KrakenTicker[]> {
-  const assetPairs = await fetchKrakenAssetPairs()
+async function fetchKrakenTickersImpl(): Promise<KrakenTicker[]> {
+  const assetPairs = await fetchKrakenAssetPairsRaw()
   const resolvedPairs = resolveKrakenPairs(assetPairs)
-  const uniquePairs = Array.from(new Set(resolvedPairs.values()))
-  const tickerMap = await fetchKrakenTickerBatch(uniquePairs)
+  const uniquePairs = Array.from(new Set(resolvedPairs.values())).sort()
+  const tickerMap = await fetchKrakenTickerBatchRaw(uniquePairs)
 
-  const tickers = Array.from(resolvedPairs.entries())
+  return Array.from(resolvedPairs.entries())
     .map(([displaySymbol, pairKey]) => {
       const rawTicker = tickerMap[pairKey]
       if (!rawTicker) return null
@@ -212,6 +241,39 @@ export async function fetchKrakenTickers(): Promise<KrakenTicker[]> {
       }
     })
     .filter((ticker): ticker is KrakenTicker => ticker !== null)
-
-  return tickers
 }
+
+const fetchKrakenTickersCached = unstable_cache(
+  async () => {
+    const tickers = await fetchKrakenTickersImpl()
+    if (!tickers.length) {
+      throw new Error("Kraken tickers unavailable")
+    }
+
+    writeStale("kraken:tickers", tickers)
+    return tickers
+  },
+  ["kraken-tickers-v1"],
+  {
+    revalidate: KRAKEN_TICKERS_REVALIDATE_SECONDS,
+    tags: ["market:kraken-tickers"],
+  }
+)
+
+export const fetchKrakenTickers = cache(async (): Promise<KrakenTicker[]> => {
+  try {
+    return await fetchKrakenTickersCached()
+  } catch (error) {
+    const stale = readStale<KrakenTicker[]>("kraken:tickers")
+    if (stale?.length) {
+      console.warn("[Kraken] serving stale tickers after upstream error", {
+        reason: error instanceof Error ? error.message : String(error),
+        count: stale.length,
+      })
+      return stale
+    }
+
+    console.warn("[Kraken] tickers unavailable and no stale cache is available", error)
+    return []
+  }
+})

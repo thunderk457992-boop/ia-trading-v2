@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache"
+import { cache } from "react"
 import {
   getCryptoCategories as getUniverseCryptoCategories,
   getTrackedCryptoUniverse,
@@ -32,6 +34,7 @@ export interface MarketSnapshot {
   prices: CryptoPrice[]
   global: MarketGlobal | null
   fetchedAt: number
+  stale?: boolean
   summary?: {
     trackedAssets: number
     positiveAssets: number
@@ -59,6 +62,23 @@ export interface PortfolioAssetHistory {
   prices: MarketChartPoint[]
 }
 
+type MarketStaleStore = Map<string, { value: unknown; updatedAt: number }>
+
+const MARKET_STALE_MAX_AGE_MS = 6 * 60 * 60 * 1000
+const MARKET_GLOBAL_REVALIDATE_SECONDS = 300
+const MARKET_PRICES_REVALIDATE_SECONDS = 300
+const MARKET_SERIES_REVALIDATE_SECONDS = 900
+const MARKET_SNAPSHOT_REVALIDATE_SECONDS = 60
+const HOUR_MS = 60 * 60 * 1000
+
+const marketStaleStore = (
+  globalThis as typeof globalThis & { __axiomMarketStaleStore?: MarketStaleStore }
+).__axiomMarketStaleStore ?? new Map<string, { value: unknown; updatedAt: number }>()
+
+if (!(globalThis as typeof globalThis & { __axiomMarketStaleStore?: MarketStaleStore }).__axiomMarketStaleStore) {
+  ;(globalThis as typeof globalThis & { __axiomMarketStaleStore?: MarketStaleStore }).__axiomMarketStaleStore = marketStaleStore
+}
+
 export function getCryptoCategories(symbol: string): string[] {
   return getUniverseCryptoCategories(symbol)
 }
@@ -71,6 +91,29 @@ function cgHeaders(): HeadersInit {
   }
 }
 
+function withTimeout(ms: number) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), ms)
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timeout),
+  }
+}
+
+function readStale<T>(key: string): T | null {
+  const entry = marketStaleStore.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.updatedAt > MARKET_STALE_MAX_AGE_MS) {
+    marketStaleStore.delete(key)
+    return null
+  }
+  return entry.value as T
+}
+
+function writeStale<T>(key: string, value: T) {
+  marketStaleStore.set(key, { value, updatedAt: Date.now() })
+}
+
 function downsample(data: number[], target: number): number[] {
   if (data.length <= target) return data
   const step = data.length / target
@@ -78,11 +121,16 @@ function downsample(data: number[], target: number): number[] {
 }
 
 function mapCoin(coin: {
-  id: string; symbol: string; name: string; current_price: number
+  id: string
+  symbol: string
+  name: string
+  current_price: number
   price_change_percentage_1h_in_currency?: number
   price_change_percentage_24h?: number
   price_change_percentage_7d_in_currency?: number
-  market_cap: number; total_volume?: number; image: string
+  market_cap: number
+  total_volume?: number
+  image: string
   sparkline_in_7d?: { price: number[] }
 }): CryptoPrice {
   return {
@@ -103,17 +151,19 @@ function mapCoin(coin: {
   }
 }
 
-async function fetchSpecificCryptoPrices(ids: string[]): Promise<CryptoPrice[]> {
+async function fetchSpecificCryptoPricesImpl(ids: string[]): Promise<CryptoPrice[]> {
   if (!ids.length) return []
 
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8000)
-
+    const controller = withTimeout(8000)
     const res = await fetch(
       `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(ids.join(","))}&sparkline=true&price_change_percentage=1h,24h,7d`,
-      { next: { revalidate: 45 }, headers: cgHeaders(), signal: controller.signal }
-    ).finally(() => clearTimeout(timeout))
+      {
+        cache: "no-store",
+        headers: cgHeaders(),
+        signal: controller.signal,
+      }
+    ).finally(controller.clear)
 
     if (!res.ok) {
       console.warn("[CoinGecko] fetchSpecificCryptoPrices non-ok response", {
@@ -192,8 +242,8 @@ function buildTrackedMarketPrices(
       const source: CryptoPrice["source"] = krakenTicker
         ? "Kraken"
         : krakenAvailable
-        ? "fallback"
-        : "CoinGecko"
+          ? "fallback"
+          : "CoinGecko"
 
       return {
         id: coin?.id ?? asset.coingeckoId,
@@ -246,15 +296,17 @@ function buildTrackedMarketPrices(
   }
 }
 
-export async function fetchCryptoPrices(): Promise<CryptoPrice[]> {
+async function fetchCryptoPricesImpl(): Promise<CryptoPrice[]> {
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8000)
-
+    const controller = withTimeout(8000)
     const res = await fetch(
       "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&sparkline=true&price_change_percentage=1h,24h,7d",
-      { next: { revalidate: 30 }, headers: cgHeaders(), signal: controller.signal }
-    ).finally(() => clearTimeout(timeout))
+      {
+        cache: "no-store",
+        headers: cgHeaders(),
+        signal: controller.signal,
+      }
+    ).finally(controller.clear)
 
     if (!res.ok) {
       console.warn("[CoinGecko] fetchCryptoPrices non-ok response", {
@@ -272,15 +324,17 @@ export async function fetchCryptoPrices(): Promise<CryptoPrice[]> {
   }
 }
 
-export async function fetchMarketsData(count = 50): Promise<CryptoPrice[]> {
+async function fetchMarketsDataImpl(count = 50): Promise<CryptoPrice[]> {
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 12000)
-
+    const controller = withTimeout(12000)
     const res = await fetch(
       `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${count}&sparkline=true&price_change_percentage=1h,24h,7d`,
-      { next: { revalidate: 60 }, headers: cgHeaders(), signal: controller.signal }
-    ).finally(() => clearTimeout(timeout))
+      {
+        cache: "no-store",
+        headers: cgHeaders(),
+        signal: controller.signal,
+      }
+    ).finally(controller.clear)
 
     if (!res.ok) {
       console.warn("[CoinGecko] fetchMarketsData non-ok response", {
@@ -299,15 +353,17 @@ export async function fetchMarketsData(count = 50): Promise<CryptoPrice[]> {
   }
 }
 
-export async function fetchMarketGlobal(): Promise<MarketGlobal | null> {
+async function fetchMarketGlobalImpl(): Promise<MarketGlobal | null> {
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 5000)
-
+    const controller = withTimeout(5000)
     const res = await fetch(
       "https://api.coingecko.com/api/v3/global",
-      { next: { revalidate: 60 }, headers: cgHeaders(), signal: controller.signal }
-    ).finally(() => clearTimeout(timeout))
+      {
+        cache: "no-store",
+        headers: cgHeaders(),
+        signal: controller.signal,
+      }
+    ).finally(controller.clear)
 
     if (!res.ok) {
       console.warn("[CoinGecko] fetchMarketGlobal non-ok response", {
@@ -317,12 +373,12 @@ export async function fetchMarketGlobal(): Promise<MarketGlobal | null> {
       return null
     }
     const json = await res.json()
-    const d = json?.data
-    if (!d) return null
+    const data = json?.data
+    if (!data) return null
     return {
-      totalMarketCapUsd: d.total_market_cap?.usd ?? 0,
-      btcDominance: d.market_cap_percentage?.btc ?? 0,
-      change24h: d.market_cap_change_percentage_24h_usd ?? 0,
+      totalMarketCapUsd: data.total_market_cap?.usd ?? 0,
+      btcDominance: data.market_cap_percentage?.btc ?? 0,
+      change24h: data.market_cap_change_percentage_24h_usd ?? 0,
     }
   } catch (err) {
     console.error("[CoinGecko] fetchMarketGlobal error:", err)
@@ -330,15 +386,17 @@ export async function fetchMarketGlobal(): Promise<MarketGlobal | null> {
   }
 }
 
-export async function fetchCoinMarketChart(coinId: string, days = 7): Promise<MarketChartPoint[]> {
+async function fetchCoinMarketChartImpl(coinId: string, days = 7): Promise<MarketChartPoint[]> {
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8000)
-
+    const controller = withTimeout(8000)
     const res = await fetch(
       `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`,
-      { next: { revalidate: 60 }, headers: cgHeaders(), signal: controller.signal }
-    ).finally(() => clearTimeout(timeout))
+      {
+        cache: "no-store",
+        headers: cgHeaders(),
+        signal: controller.signal,
+      }
+    ).finally(controller.clear)
 
     if (!res.ok) {
       console.warn("[CoinGecko] fetchCoinMarketChart non-ok response", {
@@ -349,6 +407,7 @@ export async function fetchCoinMarketChart(coinId: string, days = 7): Promise<Ma
       })
       return []
     }
+
     const data = await res.json()
     const rawPrices: unknown[] = Array.isArray(data?.prices) ? data.prices : []
 
@@ -367,18 +426,20 @@ export async function fetchCoinMarketChart(coinId: string, days = 7): Promise<Ma
   }
 }
 
-export async function fetchCoinMarketSeries(
+async function fetchCoinMarketSeriesImpl(
   coinId: string,
   days: number | "max" = 90
 ): Promise<MarketSeriesPoint[]> {
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 9000)
-
+    const controller = withTimeout(9000)
     const res = await fetch(
       `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`,
-      { next: { revalidate: 90 }, headers: cgHeaders(), signal: controller.signal }
-    ).finally(() => clearTimeout(timeout))
+      {
+        cache: "no-store",
+        headers: cgHeaders(),
+        signal: controller.signal,
+      }
+    ).finally(controller.clear)
 
     if (!res.ok) {
       console.warn("[CoinGecko] fetchCoinMarketSeries non-ok response", {
@@ -416,7 +477,7 @@ export async function fetchCoinMarketSeries(
 
     return prices.map(([timestamp, price], index) => {
       const indexedVolume = volumes[index]
-      const matchedVolume = indexedVolume && Math.abs(indexedVolume[0] - timestamp) <= 60 * 60 * 1000
+      const matchedVolume = indexedVolume && Math.abs(indexedVolume[0] - timestamp) <= HOUR_MS
         ? indexedVolume[1]
         : null
 
@@ -431,6 +492,294 @@ export async function fetchCoinMarketSeries(
     return []
   }
 }
+
+function buildEmptyMarketSnapshot(stale = false): MarketSnapshot {
+  return {
+    prices: [],
+    global: null,
+    fetchedAt: Date.now(),
+    stale,
+    summary: {
+      trackedAssets: 0,
+      positiveAssets: 0,
+      negativeAssets: 0,
+      avgVolatility24h: null,
+      krakenAssets: 0,
+      coinGeckoAssets: 0,
+      fallbackAssets: 0,
+      unavailableAssets: [],
+      primarySource: "CoinGecko",
+    },
+  }
+}
+
+const fetchSpecificCryptoPricesCached = unstable_cache(
+  async (ids: string[]) => {
+    const prices = await fetchSpecificCryptoPricesImpl(ids)
+    if (!prices.length) {
+      throw new Error(`CoinGecko specific prices unavailable for ids=${ids.join(",")}`)
+    }
+    writeStale(`cg:specific:${ids.join(",")}`, prices)
+    return prices
+  },
+  ["cg-specific-prices-v1"],
+  {
+    revalidate: MARKET_PRICES_REVALIDATE_SECONDS,
+    tags: ["market:coingecko:specific"],
+  }
+)
+
+const fetchCryptoPricesCached = unstable_cache(
+  async () => {
+    const prices = await fetchCryptoPricesImpl()
+    if (!prices.length) {
+      throw new Error("CoinGecko top market prices unavailable")
+    }
+    writeStale("cg:top50", prices)
+    return prices
+  },
+  ["cg-top50-prices-v1"],
+  {
+    revalidate: MARKET_PRICES_REVALIDATE_SECONDS,
+    tags: ["market:coingecko:top50"],
+  }
+)
+
+const fetchMarketsDataCached = unstable_cache(
+  async (count: number) => {
+    const prices = await fetchMarketsDataImpl(count)
+    if (!prices.length) {
+      throw new Error(`CoinGecko markets data unavailable for count=${count}`)
+    }
+    writeStale(`cg:markets:${count}`, prices)
+    return prices
+  },
+  ["cg-markets-data-v1"],
+  {
+    revalidate: MARKET_PRICES_REVALIDATE_SECONDS,
+    tags: ["market:coingecko:markets"],
+  }
+)
+
+const fetchMarketGlobalCached = unstable_cache(
+  async () => {
+    const global = await fetchMarketGlobalImpl()
+    if (!global) {
+      throw new Error("CoinGecko global market data unavailable")
+    }
+    writeStale("cg:global", global)
+    return global
+  },
+  ["cg-market-global-v1"],
+  {
+    revalidate: MARKET_GLOBAL_REVALIDATE_SECONDS,
+    tags: ["market:coingecko:global"],
+  }
+)
+
+const fetchCoinMarketChartCached = unstable_cache(
+  async (coinId: string, days: number) => {
+    const chart = await fetchCoinMarketChartImpl(coinId, days)
+    if (chart.length <= 1) {
+      throw new Error(`CoinGecko market chart unavailable for ${coinId}:${days}`)
+    }
+    writeStale(`cg:chart:${coinId}:${days}`, chart)
+    return chart
+  },
+  ["cg-market-chart-v1"],
+  {
+    revalidate: MARKET_SERIES_REVALIDATE_SECONDS,
+    tags: ["market:coingecko:chart"],
+  }
+)
+
+const fetchCoinMarketSeriesCached = unstable_cache(
+  async (coinId: string, days: number | "max") => {
+    const series = await fetchCoinMarketSeriesImpl(coinId, days)
+    if (series.length <= 1) {
+      throw new Error(`CoinGecko market series unavailable for ${coinId}:${days}`)
+    }
+    writeStale(`cg:series:${coinId}:${days}`, series)
+    return series
+  },
+  ["cg-market-series-v1"],
+  {
+    revalidate: MARKET_SERIES_REVALIDATE_SECONDS,
+    tags: ["market:coingecko:series"],
+  }
+)
+
+const fetchMarketSnapshotCached = unstable_cache(
+  async () => {
+    const [rankedMarkets, global, krakenTickers] = await Promise.all([
+      fetchMarketsData(100),
+      fetchMarketGlobal(),
+      fetchKrakenTickers().catch((error) => {
+        console.warn("[Kraken] fetchMarketSnapshot fallback to CoinGecko only", error)
+        return [] as KrakenTicker[]
+      }),
+    ])
+
+    const trackedIds = getTrackedCryptoUniverse().map((asset) => asset.coingeckoId)
+    const presentIds = new Set(rankedMarkets.map((coin) => coin.id))
+    const missingIds = trackedIds.filter((id) => !presentIds.has(id))
+    const specificPrices = missingIds.length > 0
+      ? await fetchSpecificCryptoPrices(missingIds)
+      : []
+    const { prices, summary } = buildTrackedMarketPrices(
+      [...rankedMarkets, ...specificPrices],
+      krakenTickers
+    )
+
+    if (!prices.length) {
+      throw new Error("Market snapshot unavailable")
+    }
+
+    const snapshot: MarketSnapshot = {
+      prices,
+      global,
+      fetchedAt: Date.now(),
+      stale: false,
+      summary,
+    }
+
+    writeStale("market:snapshot", snapshot)
+    return snapshot
+  },
+  ["market-snapshot-v2"],
+  {
+    revalidate: MARKET_SNAPSHOT_REVALIDATE_SECONDS,
+    tags: ["market:snapshot"],
+  }
+)
+
+export const fetchSpecificCryptoPrices = cache(async (ids: string[]): Promise<CryptoPrice[]> => {
+  const normalizedIds = Array.from(new Set(ids)).sort()
+  if (!normalizedIds.length) return []
+
+  try {
+    return await fetchSpecificCryptoPricesCached(normalizedIds)
+  } catch (error) {
+    const stale = readStale<CryptoPrice[]>(`cg:specific:${normalizedIds.join(",")}`)
+    if (stale?.length) {
+      console.warn("[CoinGecko] serving stale specific prices", {
+        ids: normalizedIds,
+        reason: error instanceof Error ? error.message : String(error),
+      })
+      return stale
+    }
+
+    console.warn("[CoinGecko] specific prices unavailable and no stale cache exists", {
+      ids: normalizedIds,
+      reason: error instanceof Error ? error.message : String(error),
+    })
+    return []
+  }
+})
+
+export const fetchCryptoPrices = cache(async (): Promise<CryptoPrice[]> => {
+  try {
+    return await fetchCryptoPricesCached()
+  } catch (error) {
+    const stale = readStale<CryptoPrice[]>("cg:top50")
+    if (stale?.length) {
+      console.warn("[CoinGecko] serving stale top market prices", {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+      return stale
+    }
+
+    console.warn("[CoinGecko] top market prices unavailable and no stale cache exists", error)
+    return []
+  }
+})
+
+export const fetchMarketsData = cache(async (count = 50): Promise<CryptoPrice[]> => {
+  try {
+    return await fetchMarketsDataCached(count)
+  } catch (error) {
+    const stale = readStale<CryptoPrice[]>(`cg:markets:${count}`)
+    if (stale?.length) {
+      console.warn("[CoinGecko] serving stale market list", {
+        count,
+        reason: error instanceof Error ? error.message : String(error),
+      })
+      return stale
+    }
+
+    console.warn("[CoinGecko] market list unavailable and no stale cache exists", {
+      count,
+      reason: error instanceof Error ? error.message : String(error),
+    })
+    return []
+  }
+})
+
+export const fetchMarketGlobal = cache(async (): Promise<MarketGlobal | null> => {
+  try {
+    return await fetchMarketGlobalCached()
+  } catch (error) {
+    const stale = readStale<MarketGlobal>("cg:global")
+    if (stale) {
+      console.warn("[CoinGecko] serving stale global market data", {
+        reason: error instanceof Error ? error.message : String(error),
+      })
+      return stale
+    }
+
+    console.warn("[CoinGecko] global market data unavailable and no stale cache exists", error)
+    return null
+  }
+})
+
+export const fetchCoinMarketChart = cache(async (coinId: string, days = 7): Promise<MarketChartPoint[]> => {
+  try {
+    return await fetchCoinMarketChartCached(coinId, days)
+  } catch (error) {
+    const stale = readStale<MarketChartPoint[]>(`cg:chart:${coinId}:${days}`)
+    if (stale?.length) {
+      console.warn("[CoinGecko] serving stale market chart", {
+        coinId,
+        days,
+        reason: error instanceof Error ? error.message : String(error),
+      })
+      return stale
+    }
+
+    console.warn("[CoinGecko] market chart unavailable and no stale cache exists", {
+      coinId,
+      days,
+      reason: error instanceof Error ? error.message : String(error),
+    })
+    return []
+  }
+})
+
+export const fetchCoinMarketSeries = cache(async (
+  coinId: string,
+  days: number | "max" = 90
+): Promise<MarketSeriesPoint[]> => {
+  try {
+    return await fetchCoinMarketSeriesCached(coinId, days)
+  } catch (error) {
+    const stale = readStale<MarketSeriesPoint[]>(`cg:series:${coinId}:${days}`)
+    if (stale?.length) {
+      console.warn("[CoinGecko] serving stale market series", {
+        coinId,
+        days,
+        reason: error instanceof Error ? error.message : String(error),
+      })
+      return stale
+    }
+
+    console.warn("[CoinGecko] market series unavailable and no stale cache exists", {
+      coinId,
+      days,
+      reason: error instanceof Error ? error.message : String(error),
+    })
+    return []
+  }
+})
 
 export async function fetchPortfolioMarketHistory(
   allocations: Array<{ symbol: string; percentage: number }>,
@@ -488,32 +837,27 @@ export async function fetchPortfolioMarketHistory(
     })
     return []
   }
+
   return histories as PortfolioAssetHistory[]
 }
 
-export async function fetchMarketSnapshot(): Promise<MarketSnapshot> {
-  const [rankedMarkets, global, krakenTickers] = await Promise.all([
-    fetchMarketsData(100),
-    fetchMarketGlobal(),
-    fetchKrakenTickers().catch((error) => {
-      console.warn("[Kraken] fetchMarketSnapshot fallback to CoinGecko only", error)
-      return [] as KrakenTicker[]
-    }),
-  ])
+export const fetchMarketSnapshot = cache(async (): Promise<MarketSnapshot> => {
+  try {
+    return await fetchMarketSnapshotCached()
+  } catch (error) {
+    const stale = readStale<MarketSnapshot>("market:snapshot")
+    if (stale?.prices.length) {
+      console.warn("[market] serving stale market snapshot", {
+        reason: error instanceof Error ? error.message : String(error),
+        fetchedAt: stale.fetchedAt,
+      })
+      return {
+        ...stale,
+        stale: true,
+      }
+    }
 
-  const trackedIds = getTrackedCryptoUniverse().map((asset) => asset.coingeckoId)
-  const presentIds = new Set(rankedMarkets.map((coin) => coin.id))
-  const missingIds = trackedIds.filter((id) => !presentIds.has(id))
-  const specificPrices = missingIds.length > 0 ? await fetchSpecificCryptoPrices(missingIds) : []
-  const { prices, summary } = buildTrackedMarketPrices(
-    [...rankedMarkets, ...specificPrices],
-    krakenTickers
-  )
-
-  return {
-    prices,
-    global,
-    fetchedAt: Date.now(),
-    summary,
+    console.warn("[market] market snapshot unavailable and no stale cache exists", error)
+    return buildEmptyMarketSnapshot(false)
   }
-}
+})

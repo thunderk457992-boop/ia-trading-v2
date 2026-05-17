@@ -255,17 +255,22 @@ type PublicStats = {
 
 export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [liveMarketSnapshot, setLiveMarketSnapshot] = useState<MarketSnapshot | undefined>(marketSnapshot)
   const [publicStats, setPublicStats] = useState<PublicStats>({
     analysesCount: null,
     activeAssets: null,
     marketUpdatedAt: null,
   })
 
+  const resolvedMarketSnapshot = liveMarketSnapshot ?? marketSnapshot
+
   useEffect(() => {
-    fetch("/api/public/stats", { next: { revalidate: 60 } })
+    let cancelled = false
+
+    fetch("/api/public/stats", { cache: "no-store" })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (!data) return
+        if (!data || cancelled) return
         setPublicStats({
           analysesCount: typeof data.analysesCount === "number" ? data.analysesCount : null,
           activeAssets: typeof data.activeAssets === "number" ? data.activeAssets : null,
@@ -273,10 +278,28 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
         })
       })
       .catch(() => {})
+
+    fetch("/api/kraken", { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data || cancelled || !Array.isArray(data.tickers) || data.tickers.length === 0) return
+        setLiveMarketSnapshot({
+          prices: data.tickers,
+          global: data.marketGlobal ?? null,
+          fetchedAt: typeof data.updatedAt === "number" ? data.updatedAt : Date.now(),
+          stale: Boolean(data.stale),
+          summary: data.summary,
+        })
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
   }, [])
   const liveMarketRows = useMemo(
     () => LANDING_LIVE_MARKET_SYMBOLS
-      .map((symbol) => marketSnapshot?.prices.find((coin) => coin.symbol === symbol) ?? null)
+      .map((symbol) => resolvedMarketSnapshot?.prices.find((coin) => coin.symbol === symbol) ?? null)
       .filter((coin): coin is NonNullable<typeof coin> => (
         coin !== null
         && Number.isFinite(coin.price)
@@ -284,28 +307,28 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
         && Number.isFinite(coin.change24h)
       ))
       .slice(0, 8),
-    [marketSnapshot]
+    [resolvedMarketSnapshot]
   )
   const marketLead = liveMarketRows
   const topMover = liveMarketRows.length
     ? [...liveMarketRows].sort((left, right) => right.change24h - left.change24h)[0]
     : null
-  const liveDataSummary = marketSnapshot?.global
+  const liveDataSummary = resolvedMarketSnapshot?.global
     ? {
-        cap: `$${(marketSnapshot.global.totalMarketCapUsd / 1e12).toFixed(2)}T`,
-        dominance: `${marketSnapshot.global.btcDominance.toFixed(1)}%`,
+        cap: `$${(resolvedMarketSnapshot.global.totalMarketCapUsd / 1e12).toFixed(2)}T`,
+        dominance: `${resolvedMarketSnapshot.global.btcDominance.toFixed(1)}%`,
       }
     : null
-  const liveMarketPulse = marketSnapshot?.summary
+  const liveMarketPulse = resolvedMarketSnapshot?.summary
     ? {
-        tracked: marketSnapshot.summary.trackedAssets,
-        positive: marketSnapshot.summary.positiveAssets,
-        negative: marketSnapshot.summary.negativeAssets,
-        fallback: marketSnapshot.summary.fallbackAssets,
+        tracked: resolvedMarketSnapshot.summary.trackedAssets,
+        positive: resolvedMarketSnapshot.summary.positiveAssets,
+        negative: resolvedMarketSnapshot.summary.negativeAssets,
+        fallback: resolvedMarketSnapshot.summary.fallbackAssets,
       }
     : null
-  const liveDataLabel = marketSnapshot?.fetchedAt
-    ? new Date(marketSnapshot.fetchedAt).toLocaleTimeString("fr-FR", {
+  const liveDataLabel = resolvedMarketSnapshot?.fetchedAt
+    ? new Date(resolvedMarketSnapshot.fetchedAt).toLocaleTimeString("fr-FR", {
         hour: "2-digit",
         minute: "2-digit",
         timeZone: "Europe/Paris",
@@ -775,10 +798,10 @@ export function HomePageClient({ marketSnapshot }: HomePageClientProps) {
       </section>
 
       <SocialProofStrip
-        btcPrice={marketSnapshot?.prices.find((p) => p.symbol === "BTC")?.price}
-        btcChange24h={marketSnapshot?.prices.find((p) => p.symbol === "BTC")?.change24h}
-        marketCapT={marketSnapshot?.global ? marketSnapshot.global.totalMarketCapUsd / 1e12 : undefined}
-        btcDominance={marketSnapshot?.global?.btcDominance}
+        btcPrice={resolvedMarketSnapshot?.prices.find((p) => p.symbol === "BTC")?.price}
+        btcChange24h={resolvedMarketSnapshot?.prices.find((p) => p.symbol === "BTC")?.change24h}
+        marketCapT={resolvedMarketSnapshot?.global ? resolvedMarketSnapshot.global.totalMarketCapUsd / 1e12 : undefined}
+        btcDominance={resolvedMarketSnapshot?.global?.btcDominance}
       />
 
       <section id="product" className="border-y border-border bg-secondary px-5 py-18 sm:px-6 sm:py-24">
