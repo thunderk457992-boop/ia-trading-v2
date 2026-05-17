@@ -58,6 +58,8 @@ interface AnalysisResult {
   allocation: AllocationItem[]
   plan: string[]
   explanation: string
+  overview?: string
+  watchList?: string[]
   marketSignal?: string
   entryStrategy?: string
   rebalanceNote?: string
@@ -670,6 +672,228 @@ function applyPlanFeatureGate(analysisData: AnalysisResult, plan: string) {
   }
 }
 
+const GENERIC_LEADS = [
+  "dans ce contexte",
+  "il est important",
+  "il convient de",
+  "en conclusion",
+  "en resume",
+  "comme mentionne",
+]
+
+function dedupeStringList(items: string[], maxItems: number) {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const item of items) {
+    const normalized = item
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^[•\-–]\s*/, "")
+    if (!normalized) continue
+
+    const key = normalized.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(normalized)
+    if (result.length >= maxItems) break
+  }
+
+  return result
+}
+
+function splitSentences(text: string) {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+}
+
+function cleanNarrative(text: string, maxSentences: number) {
+  const sanitized = text
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim()
+
+  const sentences = splitSentences(sanitized)
+    .map((sentence) => {
+      const lowered = sentence.toLowerCase()
+      if (GENERIC_LEADS.some((lead) => lowered.startsWith(lead))) {
+        return sentence.replace(/^[^,]+,\s*/u, "").trim()
+      }
+      return sentence
+    })
+    .filter(Boolean)
+
+  return sentences.slice(0, maxSentences).join(" ")
+}
+
+function sameMeaning(left?: string | null, right?: string | null) {
+  if (!left || !right) return false
+  return left.replace(/\s+/g, " ").trim().toLowerCase() === right.replace(/\s+/g, " ").trim().toLowerCase()
+}
+
+function formatSignedPercent(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return null
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
+}
+
+function buildDefaultOverview(
+  analysisData: AnalysisResult,
+  prices: CryptoPrice[],
+  globalData: MarketGlobal | null,
+  portfolioPreferenceLabel: string
+) {
+  const core = analysisData.allocation
+    .slice()
+    .sort((left, right) => right.percentage - left.percentage)
+    .slice(0, 2)
+    .map((item) => `${item.asset} ${item.percentage}%`)
+    .join(", ")
+  const btcDominance = globalData?.btcDominance
+  const btcDominanceText = btcDominance != null
+    ? `BTC domine encore a ${btcDominance.toFixed(1)}%`
+    : "La lecture de marche reste prudente"
+  const strongestSignal = prices
+    .filter((price) => Number.isFinite(price.change24h))
+    .sort((left, right) => Math.abs(right.change24h) - Math.abs(left.change24h))[0]
+  const marketSignalText = strongestSignal
+    ? `${strongestSignal.symbol} bouge ${formatSignedPercent(strongestSignal.change24h) ?? "0.0%"} sur 24h`
+    : "les mouvements 24h restent melanges"
+
+  return `${core || "Allocation a confirmer"} forment la base d'un plan axe sur ${portfolioPreferenceLabel}. ${btcDominanceText} et ${marketSignalText}, ce qui justifie une execution progressive plutot qu'une prise de risque large.`
+}
+
+function buildDefaultWatchList(
+  prices: CryptoPrice[],
+  globalData: MarketGlobal | null,
+  marketDecision: ReturnType<typeof buildMarketDecision>
+) {
+  const items: string[] = []
+  const btc = prices.find((price) => price.symbol === "BTC")
+  const eth = prices.find((price) => price.symbol === "ETH")
+
+  if (globalData?.btcDominance != null) {
+    items.push(`Surveiller la dominance BTC autour de ${globalData.btcDominance.toFixed(1)}% pour savoir si le marche reste centre sur BTC/ETH ou s'ouvre davantage aux altcoins.`)
+  }
+
+  if (btc && Number.isFinite(btc.change24h)) {
+    items.push(`Verifier si BTC conserve un rythme 24h proche de ${formatSignedPercent(btc.change24h)}. Une acceleration ou une cassure nette changerait le tempo d'entree.`)
+  }
+
+  if (eth && Number.isFinite(eth.change24h)) {
+    items.push(`Observer ETH depuis ${formatSignedPercent(eth.change24h)} sur 24h pour confirmer si le coeur du portefeuille reste bien porte par les grandes capitalisations.`)
+  }
+
+  if (marketDecision) {
+    items.push(`Rester attentif au regime actuel "${marketDecision.label}" et a la volatilite moyenne de ${marketDecision.metrics.avgAbsChange24h.toFixed(1)}% sur 24h.`)
+  }
+
+  return dedupeStringList(items, 3)
+}
+
+function buildDefaultAllocationNote(symbol: string, categories: string[], marketDecision: ReturnType<typeof buildMarketDecision>) {
+  if (symbol === "BTC") return "Socle liquide, conviction prioritaire"
+  if (symbol === "ETH") return "Second pilier, exposition plus equilibree"
+  if (categories.includes("Memecoins")) return "Satellite speculatif, poids volontairement limite"
+  if (categories.includes("AI")) return "Theme dynamique, taille de position disciplinee"
+  if (categories.includes("Layer 1")) return marketDecision?.riskLevel === "prudent"
+    ? "Layer 1 garde, exposition contenue"
+    : "Layer 1 liquide, relais de croissance"
+  if (categories.includes("DeFi")) return "Exposition selective, liquidite a surveiller"
+  return "Diversification utile, allocation restee mesuree"
+}
+
+function refineAnalysisResult(params: {
+  analysisData: AnalysisResult
+  plan: string
+  prices: CryptoPrice[]
+  globalData: MarketGlobal | null
+  marketDecision: ReturnType<typeof buildMarketDecision>
+  portfolioPreferenceLabel: string
+  riskLabel: string
+}) {
+  const {
+    analysisData,
+    plan,
+    prices,
+    globalData,
+    marketDecision,
+    portfolioPreferenceLabel,
+    riskLabel,
+  } = params
+
+  const maxNarrativeSentences = plan === "premium" ? 3 : 2
+  analysisData.explanation = cleanNarrative(analysisData.explanation, maxNarrativeSentences)
+
+  analysisData.plan = dedupeStringList(
+    analysisData.plan.map((item) => cleanNarrative(item, 1)),
+    plan === "premium" ? 5 : 4
+  )
+
+  analysisData.errorsToAvoid = dedupeStringList(
+    [...(analysisData.errorsToAvoid ?? []), ...(marketDecision?.errorsToAvoid ?? [])].map((item) => cleanNarrative(item, 1)),
+    4
+  )
+
+  analysisData.watchList = dedupeStringList(
+    [
+      ...((analysisData.watchList ?? []).map((item) => cleanNarrative(item, 1))),
+      ...buildDefaultWatchList(prices, globalData, marketDecision),
+    ],
+    3
+  )
+
+  if (!analysisData.overview || sameMeaning(analysisData.overview, analysisData.explanation)) {
+    analysisData.overview = buildDefaultOverview(analysisData, prices, globalData, portfolioPreferenceLabel)
+  } else {
+    analysisData.overview = cleanNarrative(analysisData.overview, 2)
+  }
+
+  if (!analysisData.marketSignal && marketDecision) {
+    analysisData.marketSignal = cleanNarrative(
+      `${marketDecision.reason} Le biais reste ${marketDecision.label.toLowerCase()}, avec un niveau de risque ${marketDecision.riskLevel}.`,
+      2
+    )
+  } else if (analysisData.marketSignal) {
+    analysisData.marketSignal = cleanNarrative(analysisData.marketSignal, 2)
+  }
+
+  if (!analysisData.marketInsight && marketDecision && plan === "premium") {
+    analysisData.marketInsight = cleanNarrative(
+      `${marketDecision.reason} Cela pousse a garder un coeur BTC/ETH fort avant d'ouvrir trop largement le portefeuille aux actifs plus volatils.`,
+      2
+    )
+  } else if (analysisData.marketInsight) {
+    analysisData.marketInsight = cleanNarrative(analysisData.marketInsight, 2)
+  }
+
+  if (analysisData.marketVerdictNote) {
+    analysisData.marketVerdictNote = cleanNarrative(analysisData.marketVerdictNote, 1)
+  }
+
+  if (analysisData.pedagogy) {
+    analysisData.pedagogy = cleanNarrative(analysisData.pedagogy, 2)
+  } else {
+    analysisData.pedagogy = cleanNarrative(
+      `Le plan reste ${riskLabel} et progressif: l'objectif est de structurer les entrees, pas de predire le prochain mouvement du marche.`,
+      2
+    )
+  }
+
+  analysisData.allocation = analysisData.allocation.map((item) => {
+    const categories = getCryptoCategories(item.asset)
+    return {
+      ...item,
+      note: item.note && item.note.trim()
+        ? cleanNarrative(item.note, 1)
+        : plan === "free"
+          ? undefined
+          : buildDefaultAllocationNote(item.asset, categories, marketDecision),
+    }
+  })
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -921,6 +1145,7 @@ export async function POST(request: Request) {
 
     // text fields
     if (!analysisData.explanation || typeof analysisData.explanation !== "string") analysisData.explanation = ""
+    if (analysisData.overview && typeof analysisData.overview !== "string") analysisData.overview = undefined
     if (analysisData.marketSignal  && typeof analysisData.marketSignal  !== "string") analysisData.marketSignal  = undefined
     if (analysisData.entryStrategy && typeof analysisData.entryStrategy !== "string") analysisData.entryStrategy = undefined
     if (analysisData.rebalanceNote && typeof analysisData.rebalanceNote !== "string") analysisData.rebalanceNote = undefined
@@ -950,6 +1175,9 @@ export async function POST(request: Request) {
           .map((t) => ({ period: String(t.period).trim(), action: String(t.action ?? "").trim() }))
           .slice(0, 5)
       : []
+    analysisData.watchList = Array.isArray(analysisData.watchList)
+      ? analysisData.watchList.map(String).filter(Boolean).slice(0, 4)
+      : []
     if (typeof analysisData.aiSignature !== "string") analysisData.aiSignature = undefined
     analysisData.projection = Array.isArray(analysisData.projection)
       ? (analysisData.projection as unknown[])
@@ -974,6 +1202,17 @@ export async function POST(request: Request) {
     }
     const finalTotal = analysisData.allocation.reduce((s, a) => s + a.percentage, 0)
     if (finalTotal !== 100) analysisData.allocation[0].percentage += 100 - finalTotal
+
+    refineAnalysisResult({
+      analysisData,
+      plan,
+      prices,
+      globalData,
+      marketDecision,
+      portfolioPreferenceLabel,
+      riskLabel,
+    })
+
     applyPlanFeatureGate(analysisData, plan)
 
     const investedAmount = parseEuroAmount(cleanCapital)
@@ -1163,6 +1402,3 @@ export async function POST(request: Request) {
     )
   }
 }
-
-
-

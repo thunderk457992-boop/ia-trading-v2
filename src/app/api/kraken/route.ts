@@ -14,12 +14,18 @@ export async function GET() {
         source: market.summary?.primarySource ?? "CoinGecko",
         updatedAt: market.fetchedAt,
         stale: market.stale ?? false,
+        retrievedAt: Date.now(),
         tickers: market.prices,
         summary: market.summary,
         marketGlobal: market.global,
         error: hasData ? undefined : "Impossible de recuperer les donnees de marche",
       },
-      { status: hasData ? 200 : 503 }
+      {
+        status: hasData ? 200 : 503,
+        headers: {
+          "Cache-Control": "public, max-age=45, stale-while-revalidate=180",
+        },
+      }
     )
   } catch (error) {
     console.error("Kraken route error:", error)
@@ -29,10 +35,16 @@ export async function GET() {
         source: "CoinGecko",
         updatedAt: Date.now(),
         stale: false,
+        retrievedAt: Date.now(),
         tickers: [],
         error: "Impossible de recuperer les prix de marche",
       },
-      { status: 503 }
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "public, max-age=15, stale-while-revalidate=60",
+        },
+      }
     )
   }
 }

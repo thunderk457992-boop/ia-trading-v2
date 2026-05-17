@@ -5,6 +5,8 @@ import {
   normalizeTrackedSymbol,
   type CryptoUniverseAsset,
 } from "@/lib/crypto-universe"
+import { recordMarketEvent } from "@/lib/market-observability"
+import { readSharedStale, writeSharedStale } from "@/lib/shared-market-cache"
 
 export interface KrakenTicker {
   symbol: string
@@ -48,18 +50,40 @@ if (!(globalThis as typeof globalThis & { __axiomKrakenStaleStore?: StaleKrakenS
   ;(globalThis as typeof globalThis & { __axiomKrakenStaleStore?: StaleKrakenStore }).__axiomKrakenStaleStore = krakenStaleStore
 }
 
-function readStale<T>(key: string): T | null {
+function writeStale<T>(key: string, value: T) {
+  krakenStaleStore.set(key, { value, updatedAt: Date.now() })
+}
+
+function readStaleEntry<T>(key: string) {
   const entry = krakenStaleStore.get(key)
   if (!entry) return null
   if (Date.now() - entry.updatedAt > KRAKEN_STALE_MAX_AGE_MS) {
     krakenStaleStore.delete(key)
     return null
   }
-  return entry.value as T
+  return entry as { value: T; updatedAt: number }
 }
 
-function writeStale<T>(key: string, value: T) {
-  krakenStaleStore.set(key, { value, updatedAt: Date.now() })
+async function persistKrakenStale<T>(key: string, value: T) {
+  writeStale(key, value)
+  await writeSharedStale(key, value, Math.ceil(KRAKEN_STALE_MAX_AGE_MS / 1000), "Kraken")
+}
+
+async function readBestKrakenStale<T>(key: string) {
+  const [localEntry, sharedEntry] = await Promise.all([
+    Promise.resolve(readStaleEntry<T>(key)),
+    readSharedStale<T>(key, KRAKEN_STALE_MAX_AGE_MS),
+  ])
+
+  if (localEntry && sharedEntry) {
+    return localEntry.updatedAt >= sharedEntry.updatedAt
+      ? { value: localEntry.value, source: "memory" as const, updatedAt: localEntry.updatedAt }
+      : { value: sharedEntry.value, source: "shared" as const, updatedAt: sharedEntry.updatedAt }
+  }
+
+  if (localEntry) return { value: localEntry.value, source: "memory" as const, updatedAt: localEntry.updatedAt }
+  if (sharedEntry) return { value: sharedEntry.value, source: "shared" as const, updatedAt: sharedEntry.updatedAt }
+  return null
 }
 
 function withTimeout(ms: number) {
@@ -140,50 +164,87 @@ function scoreKrakenPair(
 }
 
 async function fetchKrakenAssetPairsRaw() {
+  const startedAt = Date.now()
   const timeout = withTimeout(8000)
-  const res = await fetch("https://api.kraken.com/0/public/AssetPairs", {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-    signal: timeout.signal,
-  }).finally(timeout.clear)
+  try {
+    const res = await fetch("https://api.kraken.com/0/public/AssetPairs", {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: timeout.signal,
+    }).finally(timeout.clear)
 
-  if (!res.ok) {
-    throw new Error(`Kraken AssetPairs HTTP ${res.status}`)
+    if (!res.ok) throw new Error(`Kraken AssetPairs HTTP ${res.status}`)
+
+    const data = (await res.json()) as KrakenApiResponse<Record<string, KrakenAssetPair>>
+    if (data.error?.length) throw new Error(`Kraken AssetPairs error: ${data.error.join(", ")}`)
+
+    await recordMarketEvent({
+      provider: "kraken",
+      operation: "assetPairs",
+      durationMs: Date.now() - startedAt,
+      ok: true,
+      extra: { pairCount: Object.keys(data.result ?? {}).length },
+    })
+    return data.result
+  } catch (error) {
+    await recordMarketEvent({
+      provider: "kraken",
+      operation: "assetPairs",
+      durationMs: Date.now() - startedAt,
+      ok: false,
+      statusCode: error instanceof Error && /HTTP (\d+)/.test(error.message)
+        ? Number(error.message.match(/HTTP (\d+)/)?.[1] ?? 0)
+        : undefined,
+      reason: error instanceof Error ? error.message : String(error),
+    })
+    throw error
   }
-
-  const data = (await res.json()) as KrakenApiResponse<Record<string, KrakenAssetPair>>
-  if (data.error?.length) {
-    throw new Error(`Kraken AssetPairs error: ${data.error.join(", ")}`)
-  }
-
-  return data.result
 }
 
 async function fetchKrakenTickerBatchRaw(pairs: string[]) {
   if (!pairs.length) return {} as Record<string, KrakenTickerResult>
 
+  const startedAt = Date.now()
   const timeout = withTimeout(8000)
-  const res = await fetch(
-    `https://api.kraken.com/0/public/Ticker?pair=${pairs.join(",")}`,
-    {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      signal: timeout.signal,
-    }
-  ).finally(timeout.clear)
+  try {
+    const res = await fetch(
+      `https://api.kraken.com/0/public/Ticker?pair=${pairs.join(",")}`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: timeout.signal,
+      }
+    ).finally(timeout.clear)
 
-  if (!res.ok) {
-    throw new Error(`Kraken Ticker HTTP ${res.status}`)
+    if (!res.ok) throw new Error(`Kraken Ticker HTTP ${res.status}`)
+
+    const data = (await res.json()) as KrakenApiResponse<Record<string, KrakenTickerResult>>
+    if (data.error?.length) throw new Error(`Kraken Ticker error: ${data.error.join(", ")}`)
+
+    await recordMarketEvent({
+      provider: "kraken",
+      operation: "tickerBatch",
+      durationMs: Date.now() - startedAt,
+      ok: true,
+      extra: { pairCount: pairs.length, tickerCount: Object.keys(data.result ?? {}).length },
+    })
+    return data.result
+  } catch (error) {
+    await recordMarketEvent({
+      provider: "kraken",
+      operation: "tickerBatch",
+      durationMs: Date.now() - startedAt,
+      ok: false,
+      statusCode: error instanceof Error && /HTTP (\d+)/.test(error.message)
+        ? Number(error.message.match(/HTTP (\d+)/)?.[1] ?? 0)
+        : undefined,
+      reason: error instanceof Error ? error.message : String(error),
+      extra: { pairCount: pairs.length },
+    })
+    throw error
   }
-
-  const data = (await res.json()) as KrakenApiResponse<Record<string, KrakenTickerResult>>
-  if (data.error?.length) {
-    throw new Error(`Kraken Ticker error: ${data.error.join(", ")}`)
-  }
-
-  return data.result
 }
 
 function resolveKrakenPairs(assetPairs: Record<string, KrakenAssetPair>) {
@@ -250,7 +311,7 @@ const fetchKrakenTickersCached = unstable_cache(
       throw new Error("Kraken tickers unavailable")
     }
 
-    writeStale("kraken:tickers", tickers)
+    await persistKrakenStale("kraken:tickers", tickers)
     return tickers
   },
   ["kraken-tickers-v1"],
@@ -261,18 +322,49 @@ const fetchKrakenTickersCached = unstable_cache(
 )
 
 export const fetchKrakenTickers = cache(async (): Promise<KrakenTicker[]> => {
+  const startedAt = Date.now()
   try {
-    return await fetchKrakenTickersCached()
+    const tickers = await fetchKrakenTickersCached()
+    await recordMarketEvent({
+      provider: "kraken",
+      operation: "fetchKrakenTickers",
+      durationMs: Date.now() - startedAt,
+      ok: true,
+      countAsRequest: false,
+      extra: { count: tickers.length },
+    })
+    return tickers
   } catch (error) {
-    const stale = readStale<KrakenTicker[]>("kraken:tickers")
-    if (stale?.length) {
+    const stale = await readBestKrakenStale<KrakenTicker[]>("kraken:tickers")
+    if (stale?.value?.length) {
+      await recordMarketEvent({
+        provider: "kraken",
+        operation: "fetchKrakenTickers",
+        durationMs: Date.now() - startedAt,
+        ok: false,
+        countAsRequest: false,
+        staleServed: true,
+        staleSource: stale.source,
+        reason: error instanceof Error ? error.message : String(error),
+        extra: { count: stale.value.length, updatedAt: stale.updatedAt },
+      })
       console.warn("[Kraken] serving stale tickers after upstream error", {
         reason: error instanceof Error ? error.message : String(error),
-        count: stale.length,
+        count: stale.value.length,
+        source: stale.source,
+        updatedAt: stale.updatedAt,
       })
-      return stale
+      return stale.value
     }
 
+    await recordMarketEvent({
+      provider: "kraken",
+      operation: "fetchKrakenTickers",
+      durationMs: Date.now() - startedAt,
+      ok: false,
+      countAsRequest: false,
+      reason: error instanceof Error ? error.message : String(error),
+    })
     console.warn("[Kraken] tickers unavailable and no stale cache is available", error)
     return []
   }
